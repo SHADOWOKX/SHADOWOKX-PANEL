@@ -1,71 +1,141 @@
+/* Shadowokx Panel 2.0 — focused Codex and Weather utility */
+
 .shadow-menu-item {
   padding: 0;
 }
 
 .shadow-dashboard {
   width: 386px;
-  padding: 14px 15px 13px;
+  padding: 14px 16px 15px;
+  border-radius: 16px;
 }
 
 .shadow-dashboard.shadow-compact {
-  width: 348px;
-  padding: 11px 12px;
+  width: 350px;
+  padding: 12px 13px 13px;
 }
 
-.shadow-theme-dark {
-  color: #f4f4f5;
-  background-color: #202124;
-  border-radius: 15px;
-}
-
-.shadow-theme-light {
-  color: #202124;
-  background-color: #fafafa;
-  border-radius: 15px;
-}
-
+/* Background tokens */
 .shadow-bg-claude-gray {
-  color: #f5f3ed;
+  color: #f4f3ee;
   background-color: #30312f;
-  border-radius: 15px;
 }
 
-.shadow-bg-dark-graphite {
+.shadow-bg-graphite {
   color: #f5f6f7;
   background-color: #1f2226;
-  border-radius: 15px;
 }
 
 .shadow-bg-light-neutral {
-  color: #242523;
-  background-color: #f5f5f2;
-  border-radius: 15px;
+  color: #252624;
+  background-color: #f4f4f1;
 }
 
-.shadow-bg-custom {
-  border-radius: 15px;
+.shadow-theme-dark.shadow-bg-gnome {
+  color: #f4f4f4;
+  background-color: #242424;
 }
 
-/* Top bar summary */
+.shadow-theme-light.shadow-bg-gnome {
+  color: #242424;
+  background-color: #fafafa;
+}
+
+/* Surface tokens */
+.shadow-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.045);
+  border-radius: 13px;
+}
+
+.shadow-secondary-surface {
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  background-color: rgba(255, 255, 255, 0.025);
+  border-radius: 11px;
+}
+
+.shadow-bg-light-neutral .shadow-card,
+.shadow-theme-light.shadow-bg-gnome .shadow-card {
+  border-color: rgba(0, 0, 0, 0.09);
+  background-color: rgba(0, 0, 0, 0.025);
+}
+
+.shadow-bg-light-neutral .shadow-secondary-surface,
+.shadow-theme-light.shadow-bg-gnome .shadow-secondary-surface {
+  border-color: rgba(0, 0, 0, 0.075);
+  background-color: rgba(0, 0, 0, 0.018);
+}
+
+/* Text tokens */
+.shadow-muted,
+.shadow-metadata-label,
+.shadow-metric-label,
+.shadow-hourly-time,
+.shadow-weather-location,
+.shadow-provider-footer,
+.shadow-state-detail,
+.shadow-weekly-unit,
+.shadow-five-hour-unavailable {
+  color: #b8b7b0;
+}
+
+.shadow-bg-graphite .shadow-muted,
+.shadow-bg-graphite .shadow-metadata-label,
+.shadow-bg-graphite .shadow-metric-label,
+.shadow-bg-graphite .shadow-hourly-time,
+.shadow-bg-graphite .shadow-weather-location,
+.shadow-bg-graphite .shadow-provider-footer,
+.shadow-bg-graphite .shadow-state-detail,
+.shadow-bg-graphite .shadow-weekly-unit,
+.shadow-bg-graphite .shadow-five-hour-unavailable,
+.shadow-theme-dark.shadow-bg-gnome .shadow-muted,
+.shadow-theme-dark.shadow-bg-gnome .shadow-metadata-label,
+.shadow-theme-dark.shadow-bg-gnome .shadow-metric-label,
+.shadow-theme-dark.shadow-bg-gnome .shadow-hourly-time,
+.shadow-theme-dark.shadow-bg-gnome .shadow-weather-location,
+.shadow-theme-dark.shadow-bg-gnome .shadow-provider-footer,
+.shadow-theme-dark.shadow-bg-gnome .shadow-state-detail,
+.shadow-theme-dark.shadow-bg-gnome .shadow-weekly-unit,
+.shadow-theme-dark.shadow-bg-gnome .shadow-five-hour-unavailable {
+  color: #aeb3ba;
+}
+
+.shadow-bg-light-neutral .shadow-muted,
+.shadow-bg-light-neutral .shadow-metadata-label,
+.shadow-bg-light-neutral .shadow-metric-label,
+.shadow-bg-light-neutral .shadow-hourly-time,
+.shadow-bg-light-neutral .shadow-weather-location,
+.shadow-bg-light-neutral .shadow-provider-footer,
+.shadow-bg-light-neutral .shadow-state-detail,
+.shadow-bg-light-neutral .shadow-weekly-unit,
+.shadow-bg-light-neutral .shadow-five-hour-unavailable,
+.shadow-theme-light.shadow-bg-gnome .shadow-muted,
+.shadow-theme-light.shadow-bg-gnome .shadow-metadata-label,
+.shadow-theme-light.shadow-bg-gnome .shadow-metric-label,
+.shadow-theme-light.shadow-bg-gnome .shadow-hourly-time,
+.shadow-theme-light.shadow-bg-gnome .shadow-weather-location,
+.shadow-theme-light.shadow-bg-gnome .shadow-provider-footer,
+.shadow-theme-light.shadow-bg-gnome .shadow-state-detail,
+.shadow-theme-light.shadow-bg-gnome .shadow-weekly-unit,
+.shadow-theme-light.shadow-bg-gnome .shadow-five-hour-unavailable {
+  color: #696d68;
+}
+
+/* Top bar */
 .shadow-panel-indicator {
-  spacing: 10px;
+  spacing: 12px;
 }
 
-.shadow-panel-summary-item {
-  spacing: 4px;
+.shadow-panel-summary {
+  spacing: 5px;
 }
 
-.shadow-panel-mark,
 .shadow-panel-summary-icon,
-.shadow-brand-icon,
+.shadow-panel-fallback-icon,
 .shadow-button-brand-icon,
 .shadow-tab-icon,
 .shadow-hourly-icon {
   icon-shadow: none;
-}
-
-.shadow-panel-summary-icon {
-  opacity: 235;
 }
 
 .shadow-panel-summary-value {
@@ -74,627 +144,442 @@
   font-feature-settings: "tnum";
 }
 
-/* Compact application header */
+/* Product header */
 .shadow-header {
-  min-height: 34px;
-  spacing: 8px;
+  min-height: 32px;
   margin-bottom: 10px;
-}
-
-.shadow-brand {
   spacing: 8px;
 }
 
-.shadow-brand-copy {
-  spacing: 2px;
-}
-
-.shadow-title {
-  font-size: 16px;
+.shadow-product-title {
+  font-size: 15px;
   font-weight: 720;
-  letter-spacing: 0.15px;
+  letter-spacing: 0.1px;
 }
 
-.shadow-title-mark {
-  color: #aeb3bc;
-  font-size: 8px;
-  font-weight: 650;
-}
-
-.shadow-theme-light .shadow-muted,
-.shadow-theme-light .shadow-provider-status,
-.shadow-theme-light .shadow-state-detail,
-.shadow-theme-light .shadow-reset-date,
-.shadow-theme-light .shadow-usage-remaining,
-.shadow-theme-light .shadow-usage-unavailable-mark,
-.shadow-theme-light .shadow-weather-location,
-.shadow-theme-light .shadow-metric-label,
-.shadow-theme-light .shadow-hourly-time,
-.shadow-theme-light .shadow-vault-path {
-  color: #69707d;
-}
-
-.shadow-theme-light .shadow-list-heading,
-.shadow-theme-light .shadow-empty-list {
-  color: #5f6670;
-}
-
-.shadow-theme-light .shadow-inline-error,
-.shadow-bg-light-neutral .shadow-inline-error {
-  color: #9f2635;
-  background-color: rgba(180, 35, 52, 0.10);
-}
-
-.shadow-theme-light .shadow-inline-success,
-.shadow-bg-light-neutral .shadow-inline-success {
-  color: #176b48;
-  background-color: rgba(20, 120, 75, 0.10);
-}
-
-.shadow-theme-light .shadow-status-banner,
-.shadow-bg-light-neutral .shadow-status-banner {
-  color: #7a5414;
-  background-color: rgba(150, 96, 15, 0.11);
-}
-
-.shadow-bg-light-neutral .shadow-muted,
-.shadow-bg-light-neutral .shadow-provider-status,
-.shadow-bg-light-neutral .shadow-state-detail,
-.shadow-bg-light-neutral .shadow-reset-date,
-.shadow-bg-light-neutral .shadow-usage-remaining,
-.shadow-bg-light-neutral .shadow-usage-unavailable-mark,
-.shadow-bg-light-neutral .shadow-weather-location,
-.shadow-bg-light-neutral .shadow-metric-label,
-.shadow-bg-light-neutral .shadow-hourly-time,
-.shadow-bg-light-neutral .shadow-vault-path,
-.shadow-bg-light-neutral .shadow-title-mark,
-.shadow-bg-light-neutral .shadow-hero-kicker,
-.shadow-bg-light-neutral .shadow-weekly-unit {
-  color: #696d68;
-}
-
-.shadow-bg-claude-gray .shadow-muted,
-.shadow-bg-claude-gray .shadow-provider-status,
-.shadow-bg-claude-gray .shadow-state-detail,
-.shadow-bg-claude-gray .shadow-reset-date,
-.shadow-bg-claude-gray .shadow-usage-remaining,
-.shadow-bg-claude-gray .shadow-usage-unavailable-mark,
-.shadow-bg-claude-gray .shadow-weather-location,
-.shadow-bg-claude-gray .shadow-metric-label,
-.shadow-bg-claude-gray .shadow-hourly-time,
-.shadow-bg-claude-gray .shadow-vault-path,
-.shadow-bg-claude-gray .shadow-title-mark,
-.shadow-bg-claude-gray .shadow-hero-kicker,
-.shadow-bg-claude-gray .shadow-weekly-unit {
-  color: #b6b4ac;
-}
-
-.shadow-bg-dark-graphite .shadow-muted,
-.shadow-bg-dark-graphite .shadow-provider-status,
-.shadow-bg-dark-graphite .shadow-state-detail,
-.shadow-bg-dark-graphite .shadow-reset-date,
-.shadow-bg-dark-graphite .shadow-usage-remaining,
-.shadow-bg-dark-graphite .shadow-usage-unavailable-mark,
-.shadow-bg-dark-graphite .shadow-weather-location,
-.shadow-bg-dark-graphite .shadow-metric-label,
-.shadow-bg-dark-graphite .shadow-hourly-time,
-.shadow-bg-dark-graphite .shadow-vault-path,
-.shadow-bg-dark-graphite .shadow-title-mark,
-.shadow-bg-dark-graphite .shadow-hero-kicker,
-.shadow-bg-dark-graphite .shadow-weekly-unit {
-  color: #a5abb3;
+.shadow-settings-button {
+  opacity: 220;
 }
 
 /* Controls */
 .shadow-title-actions,
-.shadow-editor-actions,
-.shadow-capture-actions {
-  spacing: 6px;
+.shadow-button-content {
+  spacing: 5px;
+}
+
+.shadow-icon-button,
+.shadow-text-button {
+  color: inherit;
+  min-height: 28px;
+  border-radius: 8px;
+  transition-duration: 130ms;
 }
 
 .shadow-icon-button {
   min-width: 28px;
-  min-height: 28px;
   padding: 5px;
-  border-radius: 8px;
-  transition-duration: 90ms;
+}
+
+.shadow-text-button {
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.shadow-action-button {
+  min-height: 27px;
+  padding: 4px 7px;
+  background-color: rgba(128, 128, 128, 0.08);
+  font-size: 11px;
 }
 
 .shadow-icon-button:hover,
 .shadow-text-button:hover,
-.shadow-primary-button:hover {
+.shadow-tab:hover {
   background-color: rgba(128, 128, 128, 0.14);
 }
 
 .shadow-icon-button:active,
 .shadow-text-button:active,
-.shadow-primary-button:active,
 .shadow-tab:active {
   background-color: rgba(128, 128, 128, 0.22);
 }
 
-.shadow-codex-open-button {
-  background-color: rgba(128, 128, 128, 0.08);
-}
-
-.shadow-accent-button {
-  background-color: rgba(128, 128, 128, 0.08);
-}
-
 .shadow-icon-button:focus,
-.shadow-tab:focus,
 .shadow-text-button:focus,
-.shadow-primary-button:focus,
-.shadow-entry:focus {
-  box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.54);
+.shadow-tab:focus {
+  box-shadow: 0 0 0 2px rgba(125, 130, 140, 0.58);
 }
 
-.shadow-destructive-button:hover {
-  color: #ef6464;
-  background-color: rgba(239, 68, 68, 0.11);
-}
-
-.shadow-text-button,
-.shadow-primary-button {
-  min-height: 28px;
-  padding: 5px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 620;
-  transition-duration: 90ms;
-}
-
-.shadow-primary-button {
-  background-color: rgba(100, 116, 139, 0.24);
-}
-
-.shadow-secondary-button {
-  color: inherit;
-}
-
-/* Expanding tabs: no divider or decorative line. */
-.shadow-tab-scroll {
-  max-width: 386px;
+/* Two-page tab bar — deliberately no ScrollView or separator. */
+.shadow-tab-strip {
+  min-height: 36px;
   margin-bottom: 12px;
-}
-
-.shadow-tab-box {
-  spacing: 7px;
-}
-
-.shadow-tab-content {
-  spacing: 6px;
+  spacing: 11px;
 }
 
 .shadow-tab {
   min-width: 34px;
-  min-height: 29px;
-  padding: 4px 7px;
-  border-radius: 8px;
-  color: inherit;
-  transition-duration: 100ms;
+  min-height: 32px;
+  padding: 5px 9px;
+  border-radius: 10px;
+  transition-duration: 140ms;
 }
 
-.shadow-tab:hover {
-  background-color: rgba(128, 128, 128, 0.12);
+.shadow-tab-content {
+  spacing: 7px;
 }
 
 .shadow-tab-icon {
-  color: inherit;
-  opacity: 245;
-}
-
-.shadow-tab-active {
-  padding-left: 9px;
-  padding-right: 10px;
-  font-weight: 650;
+  opacity: 235;
 }
 
 .shadow-tab-label {
   font-size: 12px;
+  font-weight: 650;
 }
 
-/* Shared mini-application page hierarchy */
-.shadow-page-stack {
-  min-width: 340px;
+.shadow-tab-active {
+  box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.08);
 }
 
+/* Page hierarchy */
 .shadow-page {
   spacing: 8px;
 }
 
 .shadow-page-title-row {
-  min-height: 30px;
+  min-height: 31px;
+  margin-bottom: 1px;
   spacing: 8px;
+}
+
+.shadow-page-brand-icon {
+  icon-shadow: none;
 }
 
 .shadow-page-title {
-  font-size: 19px;
-  font-weight: 720;
+  font-size: 14px;
+  font-weight: 700;
 }
 
-.shadow-section-heading {
-  min-height: 18px;
-  margin: 1px 2px 0;
+.shadow-codex-content,
+.shadow-weather-content {
+  padding-right: 2px;
+  spacing: 10px;
 }
 
-.shadow-section-title,
+.shadow-codex-scroll,
+.shadow-weather-scroll {
+  min-height: 255px;
+  max-height: 354px;
+  padding-right: 2px;
+}
+
+.shadow-section-label {
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: 0.75px;
+}
+
 .shadow-card-title {
   font-size: 12px;
-  font-weight: 690;
+  font-weight: 680;
 }
 
+.shadow-inline-empty {
+  padding: 16px 12px;
+  text-align: center;
+}
+
+.shadow-provider-footer {
+  padding: 1px 2px 0;
+  font-size: 10px;
+}
+
+/* Loading and first-run errors */
 .shadow-state {
   spacing: 8px;
-  min-height: 176px;
-  padding: 23px 21px;
-  border: 1px solid rgba(128, 128, 128, 0.11);
-  border-radius: 12px;
-  background-color: rgba(128, 128, 128, 0.04);
+  padding: 32px 22px;
   text-align: center;
 }
 
 .shadow-state-icon-tile {
-  min-width: 48px;
-  min-height: 48px;
-  padding: 12px;
-  border-radius: 24px;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 9px;
+  margin-bottom: 2px;
+  border-radius: 13px;
   background-color: rgba(128, 128, 128, 0.09);
-}
-
-.shadow-state-icon {
-  opacity: 215;
-  icon-shadow: none;
 }
 
 .shadow-state-title {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 680;
 }
 
 .shadow-state-detail {
-  max-width: 286px;
-  color: #aeb3bc;
-  font-size: 12px;
+  max-width: 280px;
+  font-size: 11px;
+  text-align: center;
 }
 
 .shadow-inline-error,
-.shadow-inline-success,
-.shadow-status-banner {
-  padding: 7px 9px;
+.shadow-inline-success {
+  min-height: 30px;
+  padding: 6px 8px;
   border-radius: 8px;
-  font-size: 11px;
   spacing: 6px;
+  font-size: 11px;
 }
 
 .shadow-inline-error {
-  color: #ef7777;
-  background-color: rgba(239, 68, 68, 0.09);
+  color: #ffb4ab;
+  background-color: rgba(239, 68, 68, 0.10);
 }
 
 .shadow-inline-success {
-  color: #51c58d;
-  background-color: rgba(16, 185, 129, 0.09);
+  color: #9ed8bb;
+  background-color: rgba(16, 185, 129, 0.10);
 }
 
-.shadow-status-banner {
-  spacing: 7px;
-  color: #d0a24f;
-  background-color: rgba(245, 158, 11, 0.09);
+.shadow-bg-light-neutral .shadow-inline-error,
+.shadow-theme-light.shadow-bg-gnome .shadow-inline-error {
+  color: #9f2635;
 }
 
-.shadow-status-banner-label {
-  font-size: 11px;
+.shadow-bg-light-neutral .shadow-inline-success,
+.shadow-theme-light.shadow-bg-gnome .shadow-inline-success {
+  color: #176b48;
 }
 
-.shadow-muted,
-.shadow-provider-status,
-.shadow-reset-date,
-.shadow-usage-remaining,
-.shadow-usage-unavailable-mark,
-.shadow-vault-path {
-  color: #aeb3bc;
-  font-size: 11px;
-}
-
-.shadow-provider-footer,
-.shadow-summary-row {
-  min-height: 18px;
-  spacing: 8px;
+.shadow-inline-action {
+  min-height: 24px;
+  padding: 3px 6px;
 }
 
 /* Codex */
-.shadow-codex-content {
-  spacing: 9px;
-  padding-right: 4px;
-}
-
-.shadow-codex-scroll {
-  min-height: 220px;
-  max-height: 354px;
-  padding-right: 1px;
-}
-
-.shadow-weekly-hero,
-.shadow-five-hour-card,
-.shadow-codex-facts,
-.shadow-weather-hero,
-.shadow-weather-metrics,
-.shadow-editor,
-.shadow-capture-card,
-.shadow-vault-card,
-.shadow-item-row {
-  border: 1px solid rgba(128, 128, 128, 0.11);
-  border-radius: 11px;
-  background-color: rgba(128, 128, 128, 0.047);
-}
-
-.shadow-codex-context {
-  margin: 0 2px 1px;
-  max-width: 320px;
-  font-size: 10px;
-}
-
-.shadow-vault-icon {
-  min-width: 34px;
-  min-height: 34px;
-  padding: 7px;
-  border-radius: 10px;
-  background-color: rgba(128, 128, 128, 0.09);
-}
-
-.shadow-vault-copy {
-  spacing: 1px;
-}
-
-.shadow-vault-title {
-  max-width: 220px;
-  font-size: 12px;
-  font-weight: 660;
-}
-
-.shadow-editor,
-.shadow-capture-card {
-  padding: 10px;
-  spacing: 7px;
-}
-
 .shadow-weekly-hero {
-  padding: 14px;
-  spacing: 9px;
-  background-color: rgba(128, 128, 128, 0.062);
-}
-
-.shadow-hero-kicker {
-  color: #aeb3bc;
-  font-size: 10px;
-  font-weight: 720;
-  letter-spacing: 0.8px;
+  min-height: 157px;
+  padding: 14px 15px;
+  spacing: 8px;
 }
 
 .shadow-weekly-value-row {
-  min-height: 53px;
   spacing: 7px;
 }
 
 .shadow-weekly-value {
-  font-size: 42px;
-  font-weight: 720;
+  font-size: 43px;
+  font-weight: 760;
   font-feature-settings: "tnum";
 }
 
 .shadow-weekly-unit {
   padding-bottom: 7px;
-  color: #aeb3bc;
   font-size: 12px;
+  font-weight: 560;
 }
 
 .shadow-weekly-unavailable {
-  margin-top: 7px;
-  font-size: 20px;
-  font-weight: 680;
+  margin-top: 6px;
+  font-size: 24px;
+  font-weight: 700;
 }
 
 .shadow-progress-track {
+  height: 7px;
   border-radius: 4px;
-  background-color: rgba(128, 128, 128, 0.18);
+  background-color: rgba(128, 128, 128, 0.22);
 }
 
 .shadow-progress-fill {
+  height: 7px;
   border-radius: 4px;
-  transition-duration: 160ms;
 }
 
 .shadow-weekly-reset {
+  margin-top: 1px;
   spacing: 8px;
 }
 
-.shadow-usage-countdown {
-  font-size: 12px;
-  font-weight: 620;
+.shadow-reset-countdown {
+  font-size: 11px;
+  font-weight: 650;
 }
 
-.shadow-five-hour-card {
-  min-height: 46px;
-  padding: 9px 11px;
-  spacing: 9px;
+.shadow-five-hour-section {
+  min-height: 47px;
+  padding: 8px 3px;
+  spacing: 10px;
+  border-top: 1px solid rgba(128, 128, 128, 0.15);
 }
 
 .shadow-five-hour-value {
-  font-size: 14px;
-  font-weight: 680;
+  font-size: 13px;
+  font-weight: 700;
   font-feature-settings: "tnum";
 }
 
-.shadow-codex-facts {
-  padding: 6px;
-  spacing: 6px;
+.shadow-five-hour-unavailable {
+  font-size: 11px;
+  font-weight: 600;
 }
 
-.shadow-codex-fact {
-  min-width: 115px;
-  padding: 4px 7px;
-  spacing: 1px;
+.shadow-metadata-row {
+  padding: 3px 2px;
+  spacing: 20px;
+}
+
+.shadow-metadata-label,
+.shadow-metric-label {
+  font-size: 10px;
+}
+
+.shadow-metadata-value,
+.shadow-metric-value {
+  font-size: 12px;
+  font-weight: 650;
+  font-feature-settings: "tnum";
 }
 
 /* Weather */
-.shadow-weather-scroll {
-  min-height: 220px;
-  max-height: 354px;
-  padding-right: 1px;
-}
-
-.shadow-weather-content {
-  spacing: 8px;
-  padding-right: 4px;
-}
-
 .shadow-weather-hero {
-  min-height: 82px;
-  padding: 10px 12px;
-  spacing: 13px;
-}
-
-.shadow-weather-icon-tile {
-  min-width: 48px;
-  min-height: 48px;
-  padding: 10px;
-  border-radius: 16px;
-  background-color: rgba(128, 128, 128, 0.09);
-}
-
-.shadow-weather-hero-text {
-  spacing: 0;
+  min-height: 126px;
+  padding: 13px 14px 11px;
+  spacing: 9px;
 }
 
 .shadow-weather-temperature {
-  font-size: 33px;
-  font-weight: 670;
+  font-size: 39px;
+  font-weight: 740;
   font-feature-settings: "tnum";
 }
 
 .shadow-weather-condition {
   font-size: 13px;
-  font-weight: 620;
+  font-weight: 650;
 }
 
-.shadow-weather-location {
-  max-width: 248px;
-  color: #aeb3bc;
+.shadow-weather-icon-tile {
+  min-width: 48px;
+  min-height: 48px;
+  padding: 9px;
+  border-radius: 14px;
+  background-color: rgba(128, 128, 128, 0.085);
+}
+
+.shadow-weather-location-row {
+  spacing: 8px;
+}
+
+.shadow-weather-location,
+.shadow-weather-today {
   font-size: 11px;
 }
 
+.shadow-weather-today {
+  font-weight: 620;
+}
+
 .shadow-weather-metrics {
-  padding: 6px;
-  spacing: 5px;
+  padding: 7px;
+  spacing: 3px;
 }
 
 .shadow-weather-metric-row {
-  spacing: 5px;
+  spacing: 3px;
 }
 
 .shadow-weather-metric {
-  min-width: 137px;
-  padding: 5px 8px;
-  border-radius: 8px;
-  background-color: rgba(128, 128, 128, 0.045);
+  min-width: 132px;
+  padding: 5px 7px;
 }
 
-.shadow-metric-label {
-  color: #aeb3bc;
-  font-size: 10px;
-}
-
-.shadow-metric-value {
-  font-size: 13px;
-  font-weight: 650;
-  font-feature-settings: "tnum";
+.shadow-hourly-section {
+  spacing: 6px;
 }
 
 .shadow-hourly-row {
-  min-height: 67px;
+  min-height: 70px;
   padding: 6px;
-  spacing: 5px;
-  border: 1px solid rgba(128, 128, 128, 0.10);
-  border-radius: 11px;
-  background-color: rgba(128, 128, 128, 0.035);
+  spacing: 4px;
 }
 
 .shadow-hourly-item {
-  min-width: 52px;
+  min-width: 66px;
+  padding: 4px 3px;
   spacing: 3px;
-  padding: 4px 2px;
   border-radius: 8px;
-  background-color: rgba(128, 128, 128, 0.045);
   text-align: center;
 }
 
+.shadow-hourly-item:hover {
+  background-color: rgba(128, 128, 128, 0.07);
+}
+
 .shadow-hourly-time {
-  color: #aeb3bc;
   font-size: 10px;
 }
 
 .shadow-hourly-temperature {
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 680;
   font-feature-settings: "tnum";
 }
 
-.shadow-hourly-empty {
-  min-height: 48px;
-  padding: 15px 12px;
-  border: 1px solid rgba(128, 128, 128, 0.10);
-  border-radius: 11px;
-  background-color: rgba(128, 128, 128, 0.035);
-  text-align: center;
+.shadow-sun-row {
+  min-height: 25px;
+  padding: 2px 3px;
+  font-size: 11px;
 }
 
 /* Compact density */
-.shadow-compact .shadow-page {
-  spacing: 6px;
-}
-
 .shadow-compact .shadow-header {
   margin-bottom: 8px;
 }
 
-.shadow-compact .shadow-tab-scroll {
+.shadow-compact .shadow-tab-strip {
   margin-bottom: 9px;
 }
 
-.shadow-compact .shadow-weekly-hero,
-.shadow-compact .shadow-five-hour-card {
-  padding: 7px 8px;
+.shadow-compact .shadow-page {
+  spacing: 6px;
+}
+
+.shadow-compact .shadow-codex-content,
+.shadow-compact .shadow-weather-content {
+  spacing: 8px;
+}
+
+.shadow-compact .shadow-codex-scroll,
+.shadow-compact .shadow-weather-scroll {
+  max-height: 316px;
+}
+
+.shadow-compact .shadow-weekly-hero {
+  min-height: 145px;
+  padding: 11px 12px;
+}
+
+.shadow-compact .shadow-weekly-value {
+  font-size: 38px;
 }
 
 .shadow-compact .shadow-weather-hero {
-  min-height: 72px;
-  padding: 7px 9px;
-}
-
-.shadow-compact .shadow-weather-icon-tile {
-  min-width: 40px;
-  min-height: 40px;
-  padding: 8px;
+  min-height: 112px;
+  padding: 10px 11px;
 }
 
 .shadow-compact .shadow-weather-temperature {
-  font-size: 28px;
+  font-size: 35px;
 }
 
 .shadow-compact .shadow-weather-metric {
-  min-width: 122px;
-  padding: 4px 7px;
+  min-width: 118px;
+  padding: 4px 6px;
 }
 
-.shadow-compact .shadow-hourly-row {
-  min-height: 62px;
-}
-
-.shadow-compact .shadow-weather-scroll {
-  max-height: 314px;
-}
-
-.shadow-compact .shadow-codex-scroll {
-  max-height: 314px;
+.shadow-compact .shadow-hourly-item {
+  min-width: 58px;
 }

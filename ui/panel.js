@@ -2,43 +2,53 @@ import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
 
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
-import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
+import {formatCountdown} from '../lib/format.js';
 import {ACCENTS, MODULE_IDS, MODULE_META} from '../lib/constants.js';
 import {chooseInitialModule} from '../lib/moduleConfig.js';
 import {codexRemainingSummary, weatherSummaryTemperature} from '../lib/summary.js';
 import {PAGE_FACTORIES} from '../modules/index.js';
-import {
-    iconButton,
-    moduleIcon,
-    pageTitle,
-    resolveAccent,
-    stateMessage,
-    textButton,
-} from './components.js';
+import {iconButton, moduleIcon, pageTitle, stateMessage, textButton} from './components.js';
 import {TabStrip} from './tabs.js';
+
+function effectiveTheme(settings) {
+    const configured = settings.get_string('theme');
+    if (configured === 'dark' || configured === 'light')
+        return configured;
+    return St.Settings.get().color_scheme === St.SystemColorScheme.PREFER_LIGHT
+        ? 'light'
+        : 'dark';
+}
+
+function resetCountdown(window) {
+    if (!Number.isFinite(window?.resetsAt))
+        return null;
+    const formatted = formatCountdown(window.resetsAt);
+    return formatted === 'Reset time unavailable' ? null : formatted.replace(/^Resets in /, '');
+}
 
 export const ShadowIndicator = GObject.registerClass(
 class ShadowIndicator extends PanelMenu.Button {
     _init(extension, settings, logger) {
-        super._init(0.5, 'Shadow Panel', false);
+        super._init(0.5, 'Shadowokx Panel', false);
         this._extension = extension;
         this._settings = settings;
         this._logger = logger;
-        this._scheduler = extension.getRuntimeServices().scheduler;
         this._pages = new Map();
         this._subscriptions = [];
         this._activeId = null;
         this._popupOpen = false;
+        this._codexState = null;
+        this._weatherState = null;
 
-        this._visibleIds = [...MODULE_IDS];
         this._buildIndicator();
         this._buildDashboard();
-        this._createServicesAndPages();
-        if (settings.get_string('theme') === 'auto' &&
-            settings.get_string('background-theme') === 'default') {
+        this._createPages();
+
+        if (settings.get_string('theme') === 'auto') {
             const shellSettings = St.Settings.get();
             const colorSchemeId = shellSettings.connect('notify::color-scheme', () =>
                 this._extension._queueRebuild());
@@ -53,102 +63,85 @@ class ShadowIndicator extends PanelMenu.Button {
     }
 
     _buildIndicator() {
-        this._summaryActors = new Map();
-        this._indicatorBox = new St.BoxLayout({style_class: 'shadow-panel-indicator'});
-        this._fallbackIcon = moduleIcon(this._extension, 'codex', 15, 'shadow-panel-mark');
-        this._fallbackIcon.style = `color: ${resolveAccent(this._settings)};`;
+        this._indicatorBox = new St.BoxLayout({
+            style_class: 'shadow-panel-indicator',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._fallbackIcon = moduleIcon(
+            this._extension,
+            'codex',
+            15,
+            'shadow-panel-fallback-icon'
+        );
         this._indicatorBox.add_child(this._fallbackIcon);
-
-        this._addSummaryItem('codex', 'Codex remaining usage');
-        this._addSummaryItem('weather', 'Weather temperature');
+        this._codexSummary = this._summaryItem('codex', 'Codex usage');
+        this._weatherSummary = this._summaryItem('weather', 'Weather');
+        this._indicatorBox.add_child(this._codexSummary.item);
+        this._indicatorBox.add_child(this._weatherSummary.item);
         this.add_child(this._indicatorBox);
+
         const monitorsChangedId = Main.layoutManager.connect('monitors-changed', () =>
             this._syncIndicator());
         this._subscriptions.push(() => Main.layoutManager.disconnect(monitorsChangedId));
         this._syncIndicator();
     }
 
-    _addSummaryItem(id, accessibleName) {
+    _summaryItem(id, accessibleName) {
         const item = new St.BoxLayout({
-            style_class: `shadow-panel-summary-item shadow-panel-summary-${id}`,
+            style_class: `shadow-panel-summary shadow-panel-summary-${id}`,
             y_align: Clutter.ActorAlign.CENTER,
         });
-        const icon = moduleIcon(this._extension, id, 14, 'shadow-panel-summary-icon');
+        const icon = moduleIcon(this._extension, id, 15, 'shadow-panel-summary-icon');
         const label = new St.Label({
-            text: '',
             style_class: 'shadow-panel-summary-value',
             y_align: Clutter.ActorAlign.CENTER,
         });
-        label.hide();
         item.add_child(icon);
         item.add_child(label);
-        item.hide();
         item.accessible_name = accessibleName;
-        this._indicatorBox.add_child(item);
-        this._summaryActors.set(id, {item, icon, label, value: null, accessibleName});
+        return {item, icon, label};
     }
 
     _buildDashboard() {
         const density = this._settings.get_string('density');
-        const theme = this._settings.get_string('theme');
-        const backgroundTheme = this._settings.get_string('background-theme');
-        let effectiveTheme;
-        if (backgroundTheme === 'light-neutral')
-            effectiveTheme = 'light';
-        else if (backgroundTheme === 'claude-gray' || backgroundTheme === 'graphite')
-            effectiveTheme = 'dark';
-        else if (theme !== 'auto')
-            effectiveTheme = theme;
-        else
-            effectiveTheme = St.Settings.get().color_scheme === St.SystemColorScheme.PREFER_LIGHT
-                ? 'light'
-                : 'dark';
-        const configuredAccent = this._settings.get_string('accent-color');
-        const accentClass = Object.hasOwn(ACCENTS, configuredAccent)
-            ? configuredAccent
-            : 'custom';
+        const background = this._settings.get_string('background-theme');
+        const accentName = this._settings.get_string('accent-color');
+        const accentClass = Object.hasOwn(ACCENTS, accentName) ? accentName : 'custom';
         this._root = new St.BoxLayout({
             vertical: true,
-            style_class: `shadow-dashboard shadow-${density}` +
-                ` shadow-theme-${effectiveTheme}` +
-                ` shadow-bg-${backgroundTheme}` +
-                ` shadow-accent-${accentClass}`,
+            style_class: `shadow-dashboard shadow-${density} ` +
+                `shadow-theme-${effectiveTheme(this._settings)} ` +
+                `shadow-bg-${background} shadow-accent-${accentClass}`,
         });
+
         const header = new St.BoxLayout({style_class: 'shadow-header', x_expand: true});
-        const brand = new St.BoxLayout({style_class: 'shadow-brand', x_expand: true});
-        const brandIcon = moduleIcon(this._extension, 'codex', 18, 'shadow-brand-icon');
-        brandIcon.style = `color: ${resolveAccent(this._settings)};`;
-        brand.add_child(brandIcon);
-        const brandCopy = new St.BoxLayout({style_class: 'shadow-brand-copy', x_expand: true});
-        brandCopy.add_child(new St.Label({
+        header.add_child(new St.Label({
             text: 'Shadowokx Panel',
-            style_class: 'shadow-title',
+            style_class: 'shadow-product-title',
+            x_expand: true,
             x_align: Clutter.ActorAlign.START,
             y_align: Clutter.ActorAlign.CENTER,
         }));
-        brandCopy.add_child(new St.Label({
-            text: '™',
-            style_class: 'shadow-title-mark',
-            y_align: Clutter.ActorAlign.START,
-        }));
-        brand.add_child(brandCopy);
-        header.add_child(brand);
-        header.add_child(iconButton('emblem-system-symbolic', 'Shadow Panel settings', () => {
+        header.add_child(iconButton('emblem-system-symbolic', 'Open settings', () => {
             this.menu.close();
             this._extension.openPreferences();
-        }));
+        }, 'shadow-icon-button shadow-settings-button'));
         this._root.add_child(header);
 
-        this._tabs = new TabStrip(this._extension, this._settings, this._visibleIds, id => this._select(id));
+        this._tabs = new TabStrip(
+            this._extension,
+            this._settings,
+            MODULE_IDS,
+            id => this._select(id)
+        );
         this._root.add_child(this._tabs.actor);
 
-        const height = density === 'compact' ? 352 : 392;
         this._pageStack = new St.Widget({
             style_class: 'shadow-page-stack',
             layout_manager: new Clutter.BinLayout(),
             x_expand: true,
             y_expand: true,
-            height,
+            height: density === 'compact' ? 354 : 394,
         });
         this._root.add_child(this._pageStack);
 
@@ -161,33 +154,28 @@ class ShadowIndicator extends PanelMenu.Button {
         this.menu.addMenuItem(item);
     }
 
-    _createServicesAndPages() {
+    _createPages() {
         const services = this._extension.getRuntimeServices();
         const context = {
             extension: this._extension,
             settings: this._settings,
             scheduler: services.scheduler,
             logger: this._logger,
+            notify: (title, message) => Main.notify(title, message),
+            codexProvider: services.codexProvider,
+            weatherProvider: services.weatherProvider,
         };
-        const needsCodex = this._visibleIds.includes('codex') ||
-            this._settings.get_boolean('show-codex-icon') ||
-            this._settings.get_boolean('show-codex-remaining') ||
-            this._settings.get_boolean('show-codex-reset-countdown');
-        if (needsCodex) {
-            context.codexProvider = services.codexProvider;
-            this._subscriptions.push(context.codexProvider.subscribe(state =>
-                this._updateCodexSummary(state)));
-        }
-        const needsWeather = this._visibleIds.includes('weather') ||
-            this._settings.get_boolean('show-weather-icon') ||
-            this._settings.get_boolean('show-weather-temperature') ||
-            this._settings.get_boolean('show-weather-condition');
-        if (needsWeather) {
-            context.weatherProvider = services.weatherProvider;
-            this._subscriptions.push(context.weatherProvider.subscribe(state =>
-                this._updateWeatherSummary(state)));
-        }
-        for (const id of this._visibleIds) {
+
+        this._subscriptions.push(services.codexProvider.subscribe(state => {
+            this._codexState = state;
+            this._syncIndicator();
+        }));
+        this._subscriptions.push(services.weatherProvider.subscribe(state => {
+            this._weatherState = state;
+            this._syncIndicator();
+        }));
+
+        for (const id of MODULE_IDS) {
             try {
                 const page = PAGE_FACTORIES[id](context);
                 page.actor.hide();
@@ -202,20 +190,8 @@ class ShadowIndicator extends PanelMenu.Button {
             }
         }
 
-        this._tabs.setModules([...this._pages.keys()]);
-
-        if (this._pages.size === 0) {
-            const empty = stateMessage(
-                'view-grid-symbolic',
-                'No modules enabled',
-                'Enable a module in Shadow Panel preferences.'
-            );
-            this._pageStack.add_child(empty);
-        }
-
-        const availableIds = [...this._pages.keys()];
         const initial = chooseInitialModule(
-            availableIds,
+            [...this._pages.keys()],
             this._settings.get_boolean('remember-last-tab'),
             this._settings.get_string('last-selected-tab'),
             this._settings.get_string('default-tab')
@@ -231,14 +207,14 @@ class ShadowIndicator extends PanelMenu.Button {
             x_expand: true,
             y_expand: true,
         });
-        actor.add_child(pageTitle(MODULE_META[id]?.name ?? 'Module'));
+        actor.add_child(pageTitle(MODULE_META[id].name));
         actor.add_child(stateMessage(
             'dialog-warning-symbolic',
-            `${MODULE_META[id]?.name ?? 'Module'} unavailable`,
-            'This module could not be initialized. Other Shadow Panel modules remain available.',
+            `${MODULE_META[id].name} unavailable`,
+            'This page could not be initialized. The other page remains available.',
             textButton('Retry', () => {
-                this._extension._queueRebuild();
                 this.menu.close();
+                this._extension._queueRebuild();
             })
         ));
         return {
@@ -247,9 +223,7 @@ class ShadowIndicator extends PanelMenu.Button {
             activate() {},
             onPopupOpened() {},
             onPopupClosed() {},
-            destroy() {
-                actor.destroy();
-            },
+            destroy() { actor.destroy(); },
         };
     }
 
@@ -257,26 +231,26 @@ class ShadowIndicator extends PanelMenu.Button {
         if (!this._pages.has(id))
             return;
         const previousId = this._activeId;
-        const animate = previousId && previousId !== id &&
-            this._settings.get_boolean('animations');
+        const animate = Boolean(previousId && previousId !== id &&
+            this._settings.get_boolean('animations'));
         this._activeId = id;
         if (this._popupOpen && previousId && previousId !== id)
             this._pages.get(previousId)?.onPopupClosed();
         for (const [pageId, page] of this._pages) {
             page.actor.remove_all_transitions();
             if (pageId === id) {
-                page.actor.visible = true;
+                page.actor.show();
                 page.actor.opacity = animate ? 0 : 255;
                 page.activate();
                 if (animate) {
                     page.actor.ease({
                         opacity: 255,
-                        duration: 110,
+                        duration: 140,
                         mode: Clutter.AnimationMode.EASE_OUT_QUAD,
                     });
                 }
             } else {
-                page.actor.visible = false;
+                page.actor.hide();
                 page.actor.opacity = 255;
             }
         }
@@ -287,89 +261,76 @@ class ShadowIndicator extends PanelMenu.Button {
             this._settings.set_string('last-selected-tab', id);
     }
 
-    _updateCodexSummary(state) {
-        const percent = codexRemainingSummary(state);
-        const source = state?.fiveHour ? 'five-hour' : 'weekly';
-        this._setSummary('codex', percent === null ? null : `${percent}%`,
-            percent === null
-                ? 'Codex remaining usage unavailable'
-                : `Codex ${source}: ${percent}% remaining`);
-    }
-
-    _updateWeatherSummary(state) {
-        const temperature = weatherSummaryTemperature(state);
-        const unit = state?.unit === 'fahrenheit' ? 'Fahrenheit' : 'Celsius';
-        if (state?.current?.condition?.icon)
-            this._summaryActors.get('weather').icon.icon_name = state.current.condition.icon;
-        this._setSummary('weather', temperature === null ? null : `${temperature}°`,
-            temperature === null ? 'Weather unavailable' : `Temperature ${temperature} degrees ${unit}`);
-    }
-
-    _setSummary(id, value, accessibleName) {
-        const summary = this._summaryActors.get(id);
-        if (!summary)
-            return;
-        summary.value = value;
-        summary.accessibleName = accessibleName;
-        this._syncIndicator();
-    }
-
     _syncIndicator() {
-        const enabled = {
-            codex: this._settings.get_boolean('show-codex-icon') ||
-                this._settings.get_boolean('show-codex-remaining') ||
-                this._settings.get_boolean('show-codex-reset-countdown'),
-            weather: this._settings.get_boolean('show-weather-icon') ||
-                this._settings.get_boolean('show-weather-temperature') ||
-                this._settings.get_boolean('show-weather-condition'),
-        };
-        const showText = true;
-        const candidates = [...this._summaryActors].filter(([id, summary]) =>
-            enabled[id] && (summary.value !== null || id === 'codex'));
+        if (!this._codexSummary || !this._weatherSummary)
+            return;
         const monitorWidth = Main.layoutManager.primaryMonitor?.width ?? global.stage.width;
-        const maximumItems = showText
-            ? monitorWidth < 700 ? 1 : 2
-            : 2;
-        const visibleIds = new Set(candidates.slice(0, maximumItems).map(([id]) => id));
-        const descriptions = [];
-        let visibleCount = 0;
-        for (const [id, summary] of this._summaryActors) {
-            const visible = visibleIds.has(id);
-            summary.item.visible = visible;
-            summary.label.visible = visible && showText && summary.value !== null;
-            if (summary.value !== null)
-                summary.label.text = summary.value;
-            summary.item.accessible_name = summary.accessibleName;
-            if (visible) {
-                visibleCount++;
-                descriptions.push(summary.accessibleName);
-            }
+        const constrained = monitorWidth < 900;
+        const singleItem = monitorWidth < 650;
+
+        const codexWindow = this._codexState?.weekly ?? this._codexState?.fiveHour;
+        const codexPercent = codexRemainingSummary(this._codexState);
+        const codexParts = [];
+        if (this._settings.get_boolean('show-codex-remaining') && codexPercent !== null)
+            codexParts.push(`${codexPercent}%`);
+        if (!constrained && this._settings.get_boolean('show-codex-reset-countdown')) {
+            const countdown = resetCountdown(codexWindow);
+            if (countdown)
+                codexParts.push(countdown);
         }
-        this._fallbackIcon.visible = visibleCount === 0;
-        this.accessible_name = descriptions.length ? descriptions.join(', ') : 'Shadow Panel';
+        const codexIcon = this._settings.get_boolean('show-codex-icon');
+        this._codexSummary.icon.visible = codexIcon;
+        this._codexSummary.label.text = codexParts.join('  ');
+        this._codexSummary.label.visible = codexParts.length > 0;
+        this._codexSummary.item.visible = codexIcon || codexParts.length > 0;
+        this._codexSummary.item.accessible_name = codexPercent === null
+            ? 'Codex remaining capacity unavailable'
+            : `Codex ${codexPercent}% remaining`;
+
+        const temperature = weatherSummaryTemperature(this._weatherState);
+        const weatherParts = [];
+        if (this._settings.get_boolean('show-weather-temperature') && temperature !== null)
+            weatherParts.push(`${temperature}°`);
+        if (!constrained && this._settings.get_boolean('show-weather-condition') &&
+            this._weatherState?.current?.condition?.label) {
+            weatherParts.push(this._weatherState.current.condition.label);
+        }
+        const weatherIcon = this._settings.get_boolean('show-weather-icon');
+        this._weatherSummary.icon.visible = weatherIcon;
+        if (this._weatherState?.current?.condition?.icon)
+            this._weatherSummary.icon.icon_name = this._weatherState.current.condition.icon;
+        this._weatherSummary.label.text = weatherParts.join('  ');
+        this._weatherSummary.label.visible = weatherParts.length > 0;
+        const weatherConfigured = weatherIcon || weatherParts.length > 0;
+        this._weatherSummary.item.visible = weatherConfigured &&
+            !(singleItem && this._codexSummary.item.visible);
+        this._weatherSummary.item.accessible_name = temperature === null
+            ? 'Weather unavailable'
+            : `Weather ${temperature} degrees, ${this._weatherState.current.condition.label}`;
+
+        const summariesVisible = this._codexSummary.item.visible || this._weatherSummary.item.visible;
+        this._fallbackIcon.visible = !summariesVisible;
+        const descriptions = [this._codexSummary, this._weatherSummary]
+            .filter(summary => summary.item.visible)
+            .map(summary => summary.item.accessible_name);
+        this.accessible_name = descriptions.join(', ') || 'Shadowokx Panel';
     }
 
     _onPopupOpened() {
         this._popupOpen = true;
-        const page = this._pages.get(this._activeId);
-        if (!page)
-            return;
         try {
-            page.onPopupOpened();
+            this._pages.get(this._activeId)?.onPopupOpened();
         } catch (error) {
-            this._logger.warn(`Could not refresh ${MODULE_META[page.id]?.name ?? page.id}`, error);
+            this._logger.warn(`Could not refresh ${this._activeId}`, error);
         }
     }
 
     _onPopupClosed() {
         this._popupOpen = false;
-        const page = this._pages.get(this._activeId);
-        if (page) {
-            try {
-                page.onPopupClosed();
-            } catch (error) {
-                this._logger.warn(`Could not suspend ${MODULE_META[page.id]?.name ?? page.id}`, error);
-            }
+        try {
+            this._pages.get(this._activeId)?.onPopupClosed();
+        } catch (error) {
+            this._logger.warn(`Could not suspend ${this._activeId}`, error);
         }
         this._extension._flushPendingRebuild();
     }

@@ -20,17 +20,6 @@ export function resolveAccent(settings) {
     return ACCENTS[preset] ?? ACCENTS.purple;
 }
 
-export function contrastForeground(color) {
-    if (!isHexColor(color))
-        return '#ffffff';
-    const channels = [1, 3, 5].map(index => {
-        const value = Number.parseInt(color.slice(index, index + 2), 16) / 255;
-        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-    });
-    const luminance = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
-    return luminance > 0.34 ? '#111318' : '#ffffff';
-}
-
 export function accentRgba(settings, alpha) {
     const accent = resolveAccent(settings);
     const red = Number.parseInt(accent.slice(1, 3), 16);
@@ -70,20 +59,46 @@ export function iconButton(iconName, accessibleName, callback, styleClass = 'sha
     return button;
 }
 
-export function moduleIconButton(
+export function moduleTextButton(
     extension,
     moduleId,
+    label,
     accessibleName,
     callback,
-    styleClass = 'shadow-icon-button'
+    styleClass = 'shadow-text-button'
 ) {
+    const content = new St.BoxLayout({style_class: 'shadow-button-content'});
+    content.add_child(moduleIcon(extension, moduleId, 16, 'shadow-button-brand-icon'));
+    content.add_child(new St.Label({text: label, y_align: Clutter.ActorAlign.CENTER}));
     const button = new St.Button({
         style_class: styleClass,
         can_focus: true,
         reactive: true,
         track_hover: true,
         accessible_name: accessibleName,
-        child: moduleIcon(extension, moduleId, 16, 'shadow-button-brand-icon'),
+        child: content,
+    });
+    button.connect('clicked', callback);
+    return button;
+}
+
+export function iconTextButton(
+    iconName,
+    label,
+    accessibleName,
+    callback,
+    styleClass = 'shadow-text-button'
+) {
+    const content = new St.BoxLayout({style_class: 'shadow-button-content'});
+    content.add_child(new St.Icon({icon_name: iconName, icon_size: 15}));
+    content.add_child(new St.Label({text: label, y_align: Clutter.ActorAlign.CENTER}));
+    const button = new St.Button({
+        style_class: styleClass,
+        can_focus: true,
+        reactive: true,
+        track_hover: true,
+        accessible_name: accessibleName,
+        child: content,
     });
     button.connect('clicked', callback);
     return button;
@@ -101,8 +116,10 @@ export function textButton(label, callback, styleClass = 'shadow-text-button') {
     return button;
 }
 
-export function pageTitle(title, action = null) {
+export function pageTitle(title, action = null, leading = null) {
     const box = new St.BoxLayout({style_class: 'shadow-page-title-row', x_expand: true});
+    if (leading)
+        box.add_child(leading);
     box.add_child(new St.Label({
         text: title,
         style_class: 'shadow-page-title',
@@ -137,13 +154,6 @@ export function stateMessage(iconName, title, detail, action = null) {
     if (action)
         box.add_child(action);
     return box;
-}
-
-export function metricRow(label, value) {
-    const row = new St.BoxLayout({style_class: 'shadow-metric-row', x_expand: true});
-    row.add_child(new St.Label({text: label, style_class: 'shadow-metric-label', x_expand: true}));
-    row.add_child(new St.Label({text: value, style_class: 'shadow-metric-value'}));
-    return row;
 }
 
 export class ProgressMeter {

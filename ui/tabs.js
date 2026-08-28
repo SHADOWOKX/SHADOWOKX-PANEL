@@ -6,65 +6,30 @@ import {accentRgba, moduleIcon, resolveAccent} from './components.js';
 
 export class TabStrip {
     constructor(extension, settings, moduleIds, onSelected) {
-        this._extension = extension;
         this._settings = settings;
         this._onSelected = onSelected;
         this._buttons = new Map();
         this._activeId = null;
-
-        this._box = new St.BoxLayout({style_class: 'shadow-tab-box'});
-        this.actor = new St.ScrollView({
-            style_class: 'shadow-tab-scroll',
-            overlay_scrollbars: true,
-            hscrollbar_policy: St.PolicyType.EXTERNAL,
-            vscrollbar_policy: St.PolicyType.NEVER,
-            enable_mouse_scrolling: false,
+        this.actor = new St.BoxLayout({
+            style_class: 'shadow-tab-strip',
             x_expand: true,
+            x_align: Clutter.ActorAlign.CENTER,
         });
-        this.actor.connect('scroll-event', (_actor, event) => this._onScroll(event));
-        this.actor.set_child(this._box);
-        this.setModules(moduleIds);
-    }
 
-    _onScroll(event) {
-        const adjustment = this.actor.get_hadjustment
-            ? this.actor.get_hadjustment()
-            : this.actor.get_hscroll_bar().get_adjustment();
-        const increment = Math.max(adjustment.step_increment, 44);
-        const direction = event.get_scroll_direction();
-        let delta = 0;
-        if (direction === Clutter.ScrollDirection.SMOOTH) {
-            const [dx, dy] = event.get_scroll_delta();
-            delta = (Math.abs(dx) > Math.abs(dy) ? dx : dy) * increment;
-        } else if (direction === Clutter.ScrollDirection.UP ||
-            direction === Clutter.ScrollDirection.LEFT) {
-            delta = -increment;
-        } else if (direction === Clutter.ScrollDirection.DOWN ||
-            direction === Clutter.ScrollDirection.RIGHT) {
-            delta = increment;
-        }
-        if (delta === 0)
-            return Clutter.EVENT_PROPAGATE;
-        adjustment.set_value(adjustment.get_value() + delta);
-        return Clutter.EVENT_STOP;
-    }
-
-    setModules(moduleIds) {
-        for (const child of this._box.get_children())
-            child.destroy();
-        this._buttons.clear();
-        this._activeId = null;
         for (const id of moduleIds) {
             const meta = MODULE_META[id];
-            const content = new St.BoxLayout({style_class: 'shadow-tab-content'});
-            const icon = moduleIcon(this._extension, id, 17, 'shadow-tab-icon');
-            content.add_child(icon);
+            const content = new St.BoxLayout({
+                style_class: 'shadow-tab-content',
+                y_align: Clutter.ActorAlign.CENTER,
+            });
+            const icon = moduleIcon(extension, id, 17, 'shadow-tab-icon');
             const label = new St.Label({
                 text: meta.name,
-                y_align: Clutter.ActorAlign.CENTER,
                 style_class: 'shadow-tab-label',
+                y_align: Clutter.ActorAlign.CENTER,
             });
             label.hide();
+            content.add_child(icon);
             content.add_child(label);
             const button = new St.Button({
                 child: content,
@@ -77,55 +42,51 @@ export class TabStrip {
             });
             button.connect('clicked', () => {
                 this._onSelected(id);
-                if (this._activeId === id)
-                    button.checked = true;
+                button.checked = this._activeId === id;
             });
             button.connect('key-press-event', (_button, event) =>
                 this._onKeyPress(id, event));
-            this._box.add_child(button);
+            this.actor.add_child(button);
             this._buttons.set(id, {button, icon, label});
         }
     }
 
     setActive(id) {
-        if (this._activeId === id) {
-            const current = this._buttons.get(id);
-            if (current)
-                current.button.checked = true;
+        if (!this._buttons.has(id))
             return;
-        }
-        const hadActiveTab = this._activeId !== null;
+        const hadActive = this._activeId !== null;
         this._activeId = id;
-        const animate = hadActiveTab && this._settings.get_boolean('animations');
+        const animate = hadActive && this._settings.get_boolean('animations');
         const accent = resolveAccent(this._settings);
-        const tint = accentRgba(this._settings, 0.16);
+        const tint = accentRgba(this._settings, 0.14);
+
         for (const [buttonId, {button, icon, label}] of this._buttons) {
             const active = buttonId === id;
             button.checked = active;
-            button.accessible_name = active ? `${MODULE_META[buttonId].name}, selected` :
-                MODULE_META[buttonId].name;
-            label.remove_all_transitions();
+            button.accessible_name = active
+                ? `${MODULE_META[buttonId].name}, selected`
+                : MODULE_META[buttonId].name;
             button.remove_style_class_name('shadow-tab-active');
             button.style = null;
+            label.remove_all_transitions();
             if (active) {
                 button.add_style_class_name('shadow-tab-active');
                 button.style = `background-color: ${tint};`;
                 icon.style = `color: ${accent};`;
                 label.show();
-                label.opacity = animate ? 0 : 255;
                 if (animate) {
                     const [, naturalWidth] = label.get_preferred_width(-1);
+                    label.opacity = 0;
                     label.width = 0;
                     label.ease({
                         opacity: 255,
                         width: naturalWidth,
-                        duration: 120,
+                        duration: 140,
                         mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                        onComplete: () => {
-                            label.width = -1;
-                        },
+                        onComplete: () => { label.width = -1; },
                     });
                 } else {
+                    label.opacity = 255;
                     label.width = -1;
                 }
             } else if (label.visible && animate) {
@@ -133,7 +94,7 @@ export class TabStrip {
                 label.ease({
                     opacity: 0,
                     width: 0,
-                    duration: 80,
+                    duration: 110,
                     mode: Clutter.AnimationMode.EASE_OUT_QUAD,
                     onComplete: () => {
                         label.hide();
@@ -143,6 +104,7 @@ export class TabStrip {
             } else {
                 icon.style = null;
                 label.hide();
+                label.opacity = 255;
                 label.width = -1;
             }
         }
