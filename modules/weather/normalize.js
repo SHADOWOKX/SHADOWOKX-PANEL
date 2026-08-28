@@ -75,6 +75,17 @@ export function weatherCacheMatchesSettings(cached, query, unit) {
     ];
     if (metrics.some(value => !Number.isFinite(value)))
         return false;
+    if (state.current.rainProbability != null &&
+        (!Number.isFinite(state.current.rainProbability) || state.current.rainProbability < 0 ||
+            state.current.rainProbability > 100))
+        return false;
+    if (state.today.uv != null &&
+        (!Number.isFinite(state.today.uv) || state.today.uv < 0 || state.today.uv > 100))
+        return false;
+    for (const timestamp of [state.today.sunrise, state.today.sunset]) {
+        if (timestamp != null && (!Number.isFinite(timestamp) || timestamp <= 0))
+            return false;
+    }
     return state.forecast.length <= 5 && state.forecast.every(hour =>
         Number.isFinite(hour?.time) && Number.isFinite(hour?.temperature) &&
         (hour.precipitationChance === null || Number.isFinite(hour.precipitationChance)) &&
@@ -121,6 +132,10 @@ export function normalizeWeather(payload, location, unit, nowMs = Date.now()) {
             item.temperature <= 150 && item.time >= currentTime)
         .slice(0, 5);
 
+    const uv = Number(daily.uv_index_max?.[0]);
+    const sunrise = Number(daily.sunrise?.[0]);
+    const sunset = Number(daily.sunset?.[0]);
+
     return {
         status: 'success',
         stale: false,
@@ -136,11 +151,15 @@ export function normalizeWeather(payload, location, unit, nowMs = Date.now()) {
             feelsLike: requiredNumbers[1],
             humidity: requiredNumbers[2],
             wind: requiredNumbers[3],
+            rainProbability: forecast[0]?.precipitationChance ?? null,
             condition: weatherCondition(current.weather_code),
         },
         today: {
             high: requiredNumbers[4],
             low: requiredNumbers[5],
+            uv: Number.isFinite(uv) && uv >= 0 && uv <= 100 ? uv : null,
+            sunrise: Number.isFinite(sunrise) && sunrise > 0 ? sunrise : null,
+            sunset: Number.isFinite(sunset) && sunset > 0 ? sunset : null,
         },
         forecast,
         lastSuccessfulRefresh: nowMs,

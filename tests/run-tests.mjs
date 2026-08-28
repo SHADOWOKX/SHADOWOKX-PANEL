@@ -182,7 +182,13 @@ function testWeatherNormalization() {
             weather_code: 0,
             wind_speed_10m: 12.1,
         },
-        daily: {temperature_2m_max: [33], temperature_2m_min: [22]},
+        daily: {
+            temperature_2m_max: [33],
+            temperature_2m_min: [22],
+            uv_index_max: [7.2],
+            sunrise: [currentTime - 6 * 3600],
+            sunset: [currentTime + 6 * 3600],
+        },
         hourly: {
             time: [currentTime - 3600, currentTime, currentTime + 3600],
             temperature_2m: [30, 29, 28],
@@ -194,6 +200,8 @@ function testWeatherNormalization() {
     equal(state.current.condition.label, 'Clear sky', 'weather condition');
     equal(state.forecast.length, 2, 'past forecast hours removed');
     equal(state.today.high, 33, 'daily high');
+    equal(state.today.uv, 7.2, 'daily UV index');
+    equal(state.current.rainProbability, 12, 'current rain chance uses the next forecast hour');
     equal(state.forecast[1].precipitationChance, 27, 'hourly rain chance is normalized');
     equal(weatherCondition(999).label, 'Unknown conditions', 'unknown weather code');
     equal(weatherCondition('__proto__').label, 'Unknown conditions',
@@ -325,7 +333,13 @@ async function testProviderFailureIsolation() {
             weather_code: 0,
             wind_speed_10m: 10,
         },
-        daily: {temperature_2m_max: [33], temperature_2m_min: [22]},
+        daily: {
+            temperature_2m_max: [33],
+            temperature_2m_min: [22],
+            uv_index_max: [6],
+            sunrise: [currentTime - 6 * 3600],
+            sunset: [currentTime + 6 * 3600],
+        },
         hourly: {
             time: [currentTime],
             temperature_2m: [29],
