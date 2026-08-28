@@ -3,16 +3,16 @@ import Pango from 'gi://Pango';
 import St from 'gi://St';
 
 import {formatClock} from '../../lib/format.js';
-import {BasePage} from '../basePage.js';
 import {
     clearChildren,
-    iconButton,
+    iconTextButton,
     pageTitle,
     resolveAccent,
     scrollContainer,
     stateMessage,
     textButton,
 } from '../../ui/components.js';
+import {BasePage} from '../basePage.js';
 
 export class WeatherPage extends BasePage {
     constructor(context) {
@@ -31,10 +31,13 @@ export class WeatherPage extends BasePage {
             return;
         const state = this._provider.getState();
         clearChildren(this.actor);
-        const refresh = iconButton('view-refresh-symbolic', 'Refresh weather', () =>
-            this._provider.refresh(true), 'shadow-icon-button shadow-accent-button');
-        refresh.set_style(`color: ${resolveAccent(this.context.settings)};`);
-        this.actor.add_child(pageTitle('Weather', refresh));
+        this.actor.add_child(pageTitle('Weather', iconTextButton(
+            'view-refresh-symbolic',
+            'Refresh',
+            'Refresh weather',
+            () => this._provider.refresh(true),
+            'shadow-text-button shadow-action-button'
+        )));
 
         if (state.status === 'loading' && !state.lastSuccessfulRefresh) {
             this.actor.add_child(stateMessage(
@@ -54,38 +57,64 @@ export class WeatherPage extends BasePage {
             return;
         }
 
-        const unit = state.unit === 'fahrenheit' ? '°F' : '°C';
+        const unit = '°';
         const content = new St.BoxLayout({
             vertical: true,
             style_class: 'shadow-weather-content',
             x_expand: true,
         });
-        const hero = new St.BoxLayout({style_class: 'shadow-weather-hero', x_expand: true});
-        hero.add_child(new St.Bin({
-            style_class: 'shadow-weather-icon-tile',
-            y_align: Clutter.ActorAlign.CENTER,
-            child: new St.Icon({
-                icon_name: state.current.condition.icon,
-                icon_size: 36,
-                style: `color: ${resolveAccent(this.context.settings)};`,
-            }),
+        content.add_child(this._hero(state, unit));
+
+        const metrics = this._selectedMetrics(state, unit).slice(0, 4);
+        if (metrics.length)
+            content.add_child(this._metricGrid(metrics));
+
+        content.add_child(this._hourlyForecast(state));
+
+        if (this.context.settings.get_boolean('show-weather-sun-times') &&
+            (state.today.sunrise || state.today.sunset)) {
+            content.add_child(this._sunTimes(state));
+        }
+
+        content.add_child(new St.Label({
+            text: this._footerText(state),
+            style_class: 'shadow-provider-footer shadow-muted',
+            x_align: Clutter.ActorAlign.START,
         }));
-        const heroText = new St.BoxLayout({
+        this.actor.add_child(scrollContainer(content, 'shadow-weather-scroll'));
+    }
+
+    _hero(state, unit) {
+        const hero = new St.BoxLayout({
             vertical: true,
-            style_class: 'shadow-weather-hero-text',
+            style_class: 'shadow-card shadow-weather-hero',
             x_expand: true,
-            y_align: Clutter.ActorAlign.CENTER,
         });
-        heroText.add_child(new St.Label({
+        const primary = new St.BoxLayout({x_expand: true});
+        const temperature = new St.BoxLayout({vertical: true, x_expand: true});
+        temperature.add_child(new St.Label({
             text: `${Math.round(state.current.temperature)}${unit}`,
             style_class: 'shadow-weather-temperature',
             x_align: Clutter.ActorAlign.START,
         }));
-        heroText.add_child(new St.Label({
+        temperature.add_child(new St.Label({
             text: state.current.condition.label,
             style_class: 'shadow-weather-condition',
             x_align: Clutter.ActorAlign.START,
         }));
+        primary.add_child(temperature);
+        primary.add_child(new St.Bin({
+            style_class: 'shadow-weather-icon-tile',
+            y_align: Clutter.ActorAlign.CENTER,
+            child: new St.Icon({
+                icon_name: state.current.condition.icon,
+                icon_size: 38,
+                style: `color: ${resolveAccent(this.context.settings)};`,
+            }),
+        }));
+        hero.add_child(primary);
+
+        const locationRow = new St.BoxLayout({style_class: 'shadow-weather-location-row'});
         const location = new St.Label({
             text: state.location,
             style_class: 'shadow-weather-location',
@@ -94,93 +123,141 @@ export class WeatherPage extends BasePage {
         });
         location.clutter_text.set_single_line_mode(true);
         location.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
-        heroText.add_child(location);
-        hero.add_child(heroText);
-        content.add_child(hero);
-
-        const metrics = new St.BoxLayout({vertical: true, style_class: 'shadow-weather-metrics'});
-        const firstRow = new St.BoxLayout({style_class: 'shadow-weather-metric-row', x_expand: true});
-        firstRow.add_child(this._metric('Feels like', `${Math.round(state.current.feelsLike)}${unit}`));
-        firstRow.add_child(this._metric('Humidity', `${Math.round(state.current.humidity)}%`));
-        metrics.add_child(firstRow);
-        const secondRow = new St.BoxLayout({style_class: 'shadow-weather-metric-row', x_expand: true});
-        secondRow.add_child(this._metric('Wind', `${Math.round(state.current.wind)} km/h`));
-        secondRow.add_child(this._metric('High / low',
-            `${Math.round(state.today.high)}° / ${Math.round(state.today.low)}°`));
-        metrics.add_child(secondRow);
-        content.add_child(metrics);
-
-        const forecastHeading = new St.BoxLayout({style_class: 'shadow-section-heading', x_expand: true});
-        forecastHeading.add_child(new St.Label({
-            text: 'Next hours',
-            style_class: 'shadow-section-title',
-            x_expand: true,
+        locationRow.add_child(location);
+        locationRow.add_child(new St.Label({
+            text: `Today  ${Math.round(state.today.high)}° / ${Math.round(state.today.low)}°`,
+            style_class: 'shadow-weather-today',
         }));
-        const rainChances = state.forecast
-            .map(hour => hour.precipitationChance)
-            .filter(Number.isFinite);
-        const peakRain = rainChances.length ? Math.max(...rainChances) : null;
-        const forecastContext = peakRain === null
-            ? 'Local time'
-            : `${peakRain > 0 ? `Rain up to ${peakRain}%` : 'Dry'} · Local time`;
-        forecastHeading.add_child(new St.Label({text: forecastContext, style_class: 'shadow-muted'}));
-        content.add_child(forecastHeading);
+        hero.add_child(locationRow);
+        return hero;
+    }
 
-        if (state.forecast.length) {
-            const forecast = new St.BoxLayout({style_class: 'shadow-hourly-row', x_expand: true});
-            for (const hour of state.forecast.slice(0, 5)) {
-                const item = new St.BoxLayout({
-                    vertical: true,
-                    style_class: 'shadow-hourly-item',
-                    x_expand: true,
-                });
-                item.add_child(new St.Label({
-                    text: this._formatHour(hour.time, state.timezone),
-                    style_class: 'shadow-hourly-time',
-                }));
-                item.add_child(new St.Icon({
-                    icon_name: hour.condition.icon,
-                    icon_size: 17,
-                    style_class: 'shadow-hourly-icon',
-                }));
-                item.add_child(new St.Label({
-                    text: `${Math.round(hour.temperature)}°`,
-                    style_class: 'shadow-hourly-temperature',
-                }));
-                forecast.add_child(item);
-            }
-            content.add_child(forecast);
-        } else {
-            content.add_child(new St.Label({
-                text: 'Hourly forecast is temporarily unavailable.',
-                style_class: 'shadow-hourly-empty shadow-muted',
-            }));
+    _selectedMetrics(state, unit) {
+        const candidates = [
+            ['show-weather-feels-like', 'Feels like', `${Math.round(state.current.feelsLike)}${unit}`],
+            ['show-weather-humidity', 'Humidity', `${Math.round(state.current.humidity)}%`],
+            ['show-weather-wind', 'Wind', `${Math.round(state.current.wind)} km/h`],
+            ['show-weather-rain', 'Rain', Number.isFinite(state.current.rainProbability)
+                ? `${Math.round(state.current.rainProbability)}%`
+                : null],
+            ['show-weather-uv', 'UV', Number.isFinite(state.today.uv)
+                ? this._formatUv(state.today.uv)
+                : null],
+        ];
+        return candidates
+            .filter(([key, _label, value]) =>
+                value !== null && this.context.settings.get_boolean(key))
+            .map(([_key, label, value]) => [label, value]);
+    }
+
+    _metricGrid(metrics) {
+        const grid = new St.BoxLayout({
+            vertical: true,
+            style_class: 'shadow-secondary-surface shadow-weather-metrics',
+        });
+        for (let index = 0; index < metrics.length; index += 2) {
+            const row = new St.BoxLayout({style_class: 'shadow-weather-metric-row', x_expand: true});
+            row.add_child(this._metric(...metrics[index]));
+            if (metrics[index + 1])
+                row.add_child(this._metric(...metrics[index + 1]));
+            else
+                row.add_child(new St.Widget({x_expand: true}));
+            grid.add_child(row);
         }
-
-        const footerText = state.status === 'stale'
-            ? `Cached weather · refresh unavailable`
-            : state.status === 'cached'
-                ? `Cached · updated ${formatClock(state.lastSuccessfulRefresh)}`
-                : state.status === 'refreshing'
-                    ? `Updating · last refreshed ${formatClock(state.lastSuccessfulRefresh)}`
-                : `Updated ${formatClock(state.lastSuccessfulRefresh)}`;
-        content.add_child(new St.Label({
-            text: footerText,
-            style_class: 'shadow-provider-footer shadow-muted',
-            x_align: Clutter.ActorAlign.START,
-        }));
-        this.actor.add_child(scrollContainer(content, 'shadow-weather-scroll'));
+        return grid;
     }
 
     _metric(label, value) {
-        const tile = new St.BoxLayout({
+        const metric = new St.BoxLayout({
             vertical: true,
             style_class: 'shadow-weather-metric',
             x_expand: true,
         });
-        tile.add_child(new St.Label({text: label, style_class: 'shadow-metric-label'}));
-        tile.add_child(new St.Label({text: value, style_class: 'shadow-metric-value'}));
-        return tile;
+        metric.add_child(new St.Label({text: label, style_class: 'shadow-metric-label'}));
+        metric.add_child(new St.Label({text: value, style_class: 'shadow-metric-value'}));
+        return metric;
+    }
+
+    _hourlyForecast(state) {
+        const section = new St.BoxLayout({vertical: true, style_class: 'shadow-hourly-section'});
+        section.add_child(new St.Label({
+            text: 'NEXT HOURS',
+            style_class: 'shadow-section-label',
+            x_align: Clutter.ActorAlign.START,
+        }));
+        if (!state.forecast.length) {
+            section.add_child(new St.Label({
+                text: 'Hourly forecast is temporarily unavailable.',
+                style_class: 'shadow-inline-empty shadow-muted',
+            }));
+            return section;
+        }
+        const row = new St.BoxLayout({
+            style_class: 'shadow-secondary-surface shadow-hourly-row',
+            x_expand: true,
+        });
+        for (const hour of state.forecast.slice(0, 4)) {
+            const item = new St.BoxLayout({
+                vertical: true,
+                style_class: 'shadow-hourly-item',
+                x_expand: true,
+            });
+            item.add_child(new St.Label({
+                text: this._formatHour(hour.time, state.timezone),
+                style_class: 'shadow-hourly-time',
+            }));
+            item.add_child(new St.Icon({
+                icon_name: hour.condition.icon,
+                icon_size: 17,
+                style_class: 'shadow-hourly-icon',
+            }));
+            item.add_child(new St.Label({
+                text: `${Math.round(hour.temperature)}°`,
+                style_class: 'shadow-hourly-temperature',
+            }));
+            row.add_child(item);
+        }
+        section.add_child(row);
+        return section;
+    }
+
+    _sunTimes(state) {
+        const row = new St.BoxLayout({style_class: 'shadow-sun-row', x_expand: true});
+        if (state.today.sunrise) {
+            row.add_child(new St.Label({
+                text: `Sunrise  ${this._formatHour(state.today.sunrise, state.timezone)}`,
+                style_class: 'shadow-muted',
+                x_expand: true,
+            }));
+        }
+        if (state.today.sunset) {
+            row.add_child(new St.Label({
+                text: `Sunset  ${this._formatHour(state.today.sunset, state.timezone)}`,
+                style_class: 'shadow-muted',
+            }));
+        }
+        return row;
+    }
+
+    _footerText(state) {
+        if (state.status === 'refreshing')
+            return `Updating… · Updated ${formatClock(state.lastSuccessfulRefresh)}`;
+        if (state.status === 'stale' || state.status === 'cached') {
+            const minutes = Math.max(0, Math.floor(
+                (Date.now() - state.lastSuccessfulRefresh) / 60_000
+            ));
+            const age = minutes < 1 ? 'just now' :
+                minutes < 60 ? `${minutes}m ago` : `${Math.floor(minutes / 60)}h ago`;
+            return `Updated ${age} · Cached`;
+        }
+        return `Updated ${formatClock(state.lastSuccessfulRefresh)}`;
+    }
+
+    _formatUv(value) {
+        const rounded = Math.round(value);
+        const label = value >= 11 ? 'Extreme' : value >= 8 ? 'Very high' :
+            value >= 6 ? 'High' : value >= 3 ? 'Moderate' : 'Low';
+        return `${rounded} ${label}`;
     }
 
     _formatHour(timestamp, timezone) {
