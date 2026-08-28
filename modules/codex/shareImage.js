@@ -87,31 +87,16 @@ function drawText(context, text, x, y, width, size, color, weight = 'Normal', al
     PangoCairo.show_layout(context, layout);
 }
 
-function drawKnot(context, centerX, centerY, radius, color) {
+function drawLogo(context, path, x, y, size) {
+    const image = Cairo.ImageSurface.createFromPNG(path);
     context.save();
-    context.translate(centerX, centerY);
-    setColor(context, color);
-    context.setLineWidth(Math.max(3, radius * 0.12));
-    context.setLineCap(Cairo.LineCap.ROUND);
-    context.setLineJoin(Cairo.LineJoin.ROUND);
-    for (let index = 0; index < 6; index++) {
-        context.save();
-        context.rotate(index * Math.PI / 3);
-        context.moveTo(-radius * 0.24, -radius * 0.42);
-        context.curveTo(
-            -radius * 0.92, -radius * 0.68,
-            -radius * 0.72, -radius,
-            0, -radius
-        );
-        context.curveTo(
-            radius * 0.72, -radius,
-            radius * 0.92, -radius * 0.68,
-            radius * 0.24, -radius * 0.42
-        );
-        context.stroke();
-        context.restore();
-    }
+    context.translate(x, y);
+    context.scale(size / image.getWidth(), size / image.getHeight());
+    context.setSourceSurface(image, 0, 0);
+    context.getSource().setFilter(Cairo.Filter.BEST);
+    context.paint();
     context.restore();
+    image.finish();
 }
 
 export function resolveSharePalette(backgroundTheme, interfaceTheme) {
@@ -135,57 +120,45 @@ export function renderSummary(path, state, options) {
     context.paint();
     fillRounded(context, 55, 45, 1090, 585, 34, palette.card);
 
-    drawKnot(context, 108, 103, 27, accent);
-    drawText(context, 'Codex usage', 150, 71, 500, 28, palette.text, 'Bold');
-    const identity = [state.accountName, state.planLabel].filter(Boolean).join(' · ') || 'Shadowokx Panel';
-    drawText(context, identity, 151, 110, 600, 14, palette.muted, 'Normal');
-    drawText(context, 'SHADOWOKX PANEL', 805, 80, 280, 12, palette.muted, 'Bold', 'right');
+    drawLogo(context, options.logoPath, 92, 72, 62);
+    drawText(context, 'Shadowokx Panel', 176, 72, 560, 25, palette.text, 'Bold');
+    drawText(context, 'ChatGPT / Codex', 177, 110, 500, 14, palette.muted, 'Normal');
 
-    drawText(context, 'WEEKLY CAPACITY', 100, 174, 500, 13, palette.muted, 'Bold');
+    drawText(context, 'WEEKLY LIMIT', 100, 181, 500, 13, palette.muted, 'Bold');
     if (weekly) {
-        drawText(context, `${weekly.remainingPercent}%`, 96, 202, 430, 72, palette.text, 'Bold');
-        drawText(context, 'remaining', 388, 251, 220, 18, palette.muted, 'Normal');
-        fillRounded(context, 100, 316, 1000, 16, 8, palette.track);
+        drawText(context, `${weekly.remainingPercent}%`, 96, 207, 430, 74, accent, 'Bold');
+        drawText(context, 'remaining', 399, 258, 220, 18, palette.muted, 'Normal');
+        fillRounded(context, 100, 320, 1000, 15, 8, palette.track);
         if (weekly.remainingPercent > 0) {
-            fillRounded(context, 100, 316, 1000 * weekly.remainingPercent / 100,
-                16, Math.min(8, 5 * weekly.remainingPercent), accent);
+            fillRounded(context, 100, 320, 1000 * weekly.remainingPercent / 100,
+                15, Math.min(8, 5 * weekly.remainingPercent), accent);
         }
         drawText(context, formatCountdown(weekly.resetsAt, options.nowMs),
-            100, 351, 500, 18, palette.text, 'Bold');
-        drawText(context, `${weekly.usedPercent}% used`, 820, 352, 280, 16, palette.muted, 'Normal', 'right');
-        drawText(context, `Reset ${formatResetDate(weekly.resetsAt)}`,
-            100, 384, 720, 14, palette.muted, 'Normal');
+            100, 358, 500, 18, palette.text, 'Bold');
+        drawText(context, `${weekly.usedPercent}% used`, 820, 359, 280, 16, palette.muted, 'Normal', 'right');
+        drawText(context, formatResetDate(weekly.resetsAt),
+            100, 392, 720, 14, palette.muted, 'Normal');
     } else {
         drawText(context, 'Unavailable', 96, 219, 640, 50, palette.text, 'Bold');
-        drawText(context, 'The current Codex session did not report a weekly window.',
+        drawText(context, 'This Codex session did not report a weekly window.',
             100, 302, 850, 17, palette.muted, 'Normal');
     }
 
-    fillRounded(context, 100, 435, 500, 112, 20, palette.panel);
-    drawText(context, '5-HOUR WINDOW', 126, 459, 300, 12, palette.muted, 'Bold');
+    fillRounded(context, 100, 452, 1000, 102, 18, palette.panel);
+    drawText(context, '5-HOUR WINDOW', 126, 477, 300, 12, palette.muted, 'Bold');
     if (fiveHour) {
-        drawText(context, `${fiveHour.remainingPercent}% left`, 126, 489, 250, 24, palette.text, 'Bold');
+        drawText(context, `${fiveHour.remainingPercent}% remaining`,
+            126, 507, 350, 23, palette.text, 'Bold');
         drawText(context, formatCountdown(fiveHour.resetsAt, options.nowMs),
-            340, 493, 225, 14, palette.muted, 'Normal', 'right');
+            700, 511, 365, 15, palette.muted, 'Normal', 'right');
     } else {
-        drawText(context, 'Not reported', 126, 489, 300, 22, palette.text, 'Bold');
+        drawText(context, 'Unavailable · Not reported by this session',
+            126, 507, 700, 18, palette.muted, 'Normal');
     }
 
-    fillRounded(context, 620, 435, 480, 112, 20, palette.panel);
-    drawText(context, 'SESSION', 646, 459, 200, 12, palette.muted, 'Bold');
-    const credits = state.resetCreditsAvailable > 0
-        ? `${state.resetCreditsAvailable} reset credit${state.resetCreditsAvailable === 1 ? '' : 's'}`
-        : 'Connected';
-    drawText(context, credits, 646, 488, 420, 17, palette.text, 'Bold');
-    if (state.clientVersion) {
-        drawText(context, `Codex ${state.clientVersion}`,
-            646, 518, 420, 13, palette.muted, 'Normal');
-    }
-
-    const status = state.status === 'stale' || state.status === 'cached' ? 'Cached' :
-        state.status === 'refreshing' ? 'Updating' : 'Connected';
-    drawText(context, `${status} · Updated ${formatClock(state.lastSuccessfulRefresh)}`,
-        100, 577, 1000, 14, palette.muted, 'Normal');
+    const cached = state.status === 'stale' || state.status === 'cached' ? ' · Cached' : '';
+    drawText(context, `Updated ${formatClock(state.lastSuccessfulRefresh)}${cached}`,
+        100, 584, 1000, 14, palette.muted, 'Normal');
 
     surface.writeToPNG(path);
     surface.finish();
@@ -285,7 +258,7 @@ export async function exportCodexSummaryImage(state, options = {}) {
         GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_PICTURES) ??
         GLib.build_filenamev([GLib.get_home_dir(), 'Pictures']);
     const directory = Gio.File.new_for_path(
-        options.outputDirectory ? pictures : GLib.build_filenamev([pictures, 'Shadowokx Panel'])
+        options.outputDirectory ? pictures : GLib.build_filenamev([pictures, 'Shadowokx'])
     );
     const cancellable = options.cancellable ?? null;
     await ensureDirectory(directory, cancellable);
@@ -301,19 +274,23 @@ export async function exportCodexSummaryImage(state, options = {}) {
         await stream.close_async(GLib.PRIORITY_DEFAULT, cancellable);
         const workerState = {
             status: state.status,
-            accountName: state.accountName,
-            planLabel: state.planLabel,
             weekly,
             fiveHour,
-            resetCreditsAvailable: state.resetCreditsAvailable,
-            clientVersion: state.clientVersion,
             lastSuccessfulRefresh: state.lastSuccessfulRefresh,
         };
+        const logoPath = Gio.File.new_for_uri(import.meta.url)
+            .get_parent()
+            .get_parent()
+            .get_parent()
+            .get_child('icons')
+            .get_child('chatgpt.png')
+            .get_path();
         const workerOptions = {
             nowMs,
             accent: options.accent,
             backgroundTheme: options.backgroundTheme,
             interfaceTheme: options.interfaceTheme,
+            logoPath,
         };
         await renderInWorker(
             temporary.get_path(),

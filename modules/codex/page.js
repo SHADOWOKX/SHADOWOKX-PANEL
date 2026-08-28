@@ -1,23 +1,23 @@
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
-import Pango from 'gi://Pango';
 import St from 'gi://St';
 
 import {formatClock, formatCountdown, formatResetDate} from '../../lib/format.js';
 import {launchUri} from '../../services/launcher.js';
-import {BasePage} from '../basePage.js';
-import {exportCodexSummaryImage} from './shareImage.js';
 import {
     ProgressMeter,
     clearChildren,
-    iconButton,
-    moduleIconButton,
+    iconTextButton,
+    moduleTextButton,
+    moduleIcon,
     pageTitle,
     resolveAccent,
     scrollContainer,
     stateMessage,
     textButton,
 } from '../../ui/components.js';
+import {BasePage} from '../basePage.js';
+import {exportCodexSummaryImage} from './shareImage.js';
 
 export class CodexPage extends BasePage {
     constructor(context) {
@@ -50,32 +50,11 @@ export class CodexPage extends BasePage {
             return;
         const state = this._provider.getState();
         clearChildren(this.actor);
-
-        const actions = new St.BoxLayout({style_class: 'shadow-title-actions'});
-        const open = moduleIconButton(
-            this.context.extension,
-            'codex',
-            'Open Codex application',
-            () => this._openCodex(),
-            'shadow-icon-button shadow-codex-open-button'
-        );
-        open.set_style('color: ' + resolveAccent(this.context.settings) + ';');
-        actions.add_child(open);
-        const share = iconButton(
-            this._sharing ? 'process-working-symbolic' : 'document-send-symbolic',
-            this._sharing ? 'Creating Codex summary image' : 'Export Codex summary image',
-            () => this._share(state)
-        );
-        share.reactive = !this._sharing && Boolean(state.weekly || state.fiveHour);
-        share.can_focus = share.reactive;
-        if (!share.reactive)
-            share.opacity = 130;
-        actions.add_child(share);
-        const refresh = iconButton('view-refresh-symbolic', 'Refresh Codex usage', () =>
-            this._provider.refresh(true), 'shadow-icon-button shadow-accent-button');
-        refresh.set_style('color: ' + resolveAccent(this.context.settings) + ';');
-        actions.add_child(refresh);
-        this.actor.add_child(pageTitle('Codex', actions));
+        this.actor.add_child(pageTitle(
+            'Codex Usage',
+            this._actions(state),
+            moduleIcon(this.context.extension, 'codex', 19, 'shadow-page-brand-icon')
+        ));
 
         if (state.status === 'loading' && !state.lastSuccessfulRefresh) {
             this.actor.add_child(stateMessage(
@@ -85,42 +64,77 @@ export class CodexPage extends BasePage {
             ));
             return;
         }
-
         if (state.status === 'error' && !state.lastSuccessfulRefresh) {
             this.actor.add_child(stateMessage(
                 'dialog-warning-symbolic',
                 'Codex usage unavailable',
-                state.error ?? 'Shadowokx Panel could not read Codex usage.',
+                state.error ?? 'No usage data has been reported yet.',
                 textButton('Retry', () => this._provider.refresh(true))
             ));
             return;
         }
 
-        const content = new St.BoxLayout({vertical: true, style_class: 'shadow-codex-content'});
-        const identity = [state.accountName, state.planLabel].filter(Boolean).join(' · ');
-        if (identity) {
-            const identityLabel = new St.Label({
-                text: identity,
-                style_class: 'shadow-codex-context shadow-muted',
-                x_expand: true,
-                x_align: Clutter.ActorAlign.START,
-            });
-            identityLabel.clutter_text.set_single_line_mode(true);
-            identityLabel.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
-            content.add_child(identityLabel);
-        }
+        const content = new St.BoxLayout({
+            vertical: true,
+            style_class: 'shadow-codex-content',
+            x_expand: true,
+        });
         if (this._shareNotice)
             content.add_child(this._notice());
-        else if (state.status === 'stale')
-            content.add_child(this._staleBanner());
 
-        content.add_child(this._weeklyHero(state.weekly));
-        content.add_child(this._fiveHourCard(state.fiveHour));
+        let sectionCount = 0;
+        if (this.context.settings.get_boolean('show-codex-weekly')) {
+            content.add_child(this._weeklyHero(state.weekly));
+            sectionCount++;
+        }
+        if (this.context.settings.get_boolean('show-codex-five-hour')) {
+            content.add_child(this._fiveHourSection(state.fiveHour));
+            sectionCount++;
+        }
+        if (sectionCount === 0) {
+            content.add_child(new St.Label({
+                text: 'Enable a usage window in Codex settings.',
+                style_class: 'shadow-inline-empty shadow-muted',
+            }));
+        }
+
         const facts = this._facts(state);
         if (facts)
             content.add_child(facts);
         content.add_child(this._footer(state));
         this.actor.add_child(scrollContainer(content, 'shadow-codex-scroll'));
+    }
+
+    _actions(state) {
+        const actions = new St.BoxLayout({style_class: 'shadow-title-actions'});
+        actions.add_child(moduleTextButton(
+            this.context.extension,
+            'codex',
+            'Open',
+            'Open Codex application',
+            () => this._openCodex(),
+            'shadow-text-button shadow-action-button'
+        ));
+        actions.add_child(iconTextButton(
+            'view-refresh-symbolic',
+            'Refresh',
+            'Refresh Codex usage',
+            () => this._provider.refresh(true),
+            'shadow-text-button shadow-action-button'
+        ));
+        const share = iconTextButton(
+            this._sharing ? 'process-working-symbolic' : 'document-send-symbolic',
+            this._sharing ? 'Saving…' : 'Share',
+            this._sharing ? 'Creating usage image' : 'Create usage image',
+            () => this._share(state),
+            'shadow-text-button shadow-action-button'
+        );
+        share.reactive = !this._sharing && Boolean(state.weekly || state.fiveHour);
+        share.can_focus = share.reactive;
+        if (!share.reactive)
+            share.opacity = 120;
+        actions.add_child(share);
+        return actions;
     }
 
     _notice() {
@@ -137,47 +151,30 @@ export class CodexPage extends BasePage {
             row.add_child(textButton('Open folder', () => {
                 const uri = Gio.File.new_for_path(this._shareNotice.directoryPath).get_uri();
                 launchUri(uri, this.context.logger).catch(() => {});
-            }, 'shadow-text-button shadow-secondary-button'));
+            }, 'shadow-text-button shadow-inline-action'));
         }
         return row;
     }
 
-    _staleBanner() {
-        const stale = new St.BoxLayout({style_class: 'shadow-status-banner', x_expand: true});
-        stale.add_child(new St.Icon({icon_name: 'dialog-warning-symbolic', icon_size: 14}));
-        stale.add_child(new St.Label({
-            text: 'Showing the last successful update',
-            style_class: 'shadow-status-banner-label',
-            x_expand: true,
-        }));
-        return stale;
-    }
-
     _weeklyHero(window) {
-        const card = new St.BoxLayout({vertical: true, style_class: 'shadow-weekly-hero'});
-        const animateProgress = this._popupOpen && Boolean(window) &&
-            this._lastWeeklyPercent !== window.remainingPercent;
-        this._lastWeeklyPercent = window?.remainingPercent ?? null;
-        const heading = new St.BoxLayout({x_expand: true});
-        heading.add_child(new St.Label({
-            text: 'WEEKLY CAPACITY',
-            style_class: 'shadow-hero-kicker',
+        const card = new St.BoxLayout({
+            vertical: true,
+            style_class: 'shadow-card shadow-weekly-hero',
             x_expand: true,
+        });
+        card.add_child(new St.Label({
+            text: 'Weekly',
+            style_class: 'shadow-section-label',
+            x_align: Clutter.ActorAlign.START,
         }));
-        heading.add_child(new St.Label({
-            text: window ? `${window.usedPercent}% used` : 'Unavailable',
-            style_class: 'shadow-usage-remaining',
-        }));
-        card.add_child(heading);
-
         if (!window) {
             card.add_child(new St.Label({
-                text: 'Weekly limit not reported',
+                text: 'Unavailable',
                 style_class: 'shadow-weekly-unavailable',
                 x_align: Clutter.ActorAlign.START,
             }));
             card.add_child(new St.Label({
-                text: 'Codex did not include a weekly usage window in this update.',
+                text: 'Not reported by this Codex session.',
                 style_class: 'shadow-muted',
                 x_align: Clutter.ActorAlign.START,
             }));
@@ -188,6 +185,7 @@ export class CodexPage extends BasePage {
         value.add_child(new St.Label({
             text: `${window.remainingPercent}%`,
             style_class: 'shadow-weekly-value',
+            style: `color: ${resolveAccent(this.context.settings)};`,
         }));
         value.add_child(new St.Label({
             text: 'remaining',
@@ -195,90 +193,113 @@ export class CodexPage extends BasePage {
             y_align: Clutter.ActorAlign.END,
         }));
         card.add_child(value);
-        const width = this.context.settings.get_string('density') === 'compact' ? 270 : 304;
+
+        const width = this.context.settings.get_string('density') === 'compact' ? 286 : 320;
+        const animate = this._popupOpen && this._lastWeeklyPercent !== null &&
+            this._lastWeeklyPercent !== window.remainingPercent &&
+            this.context.settings.get_boolean('animations');
+        this._lastWeeklyPercent = window.remainingPercent;
         card.add_child(new ProgressMeter(
             window.remainingPercent,
             resolveAccent(this.context.settings),
             width,
             'remaining',
-            animateProgress && this.context.settings.get_boolean('animations')
+            animate
         ).actor);
-        const reset = new St.BoxLayout({style_class: 'shadow-weekly-reset', x_expand: true});
-        reset.add_child(new St.Label({
-            text: formatCountdown(window.resetsAt),
-            style_class: 'shadow-usage-countdown',
-            x_expand: true,
-        }));
-        reset.add_child(new St.Label({
-            text: formatResetDate(window.resetsAt),
-            style_class: 'shadow-reset-date',
-        }));
-        card.add_child(reset);
+
+        if (this.context.settings.get_boolean('show-codex-reset-time')) {
+            const reset = new St.BoxLayout({style_class: 'shadow-weekly-reset', x_expand: true});
+            reset.add_child(new St.Label({
+                text: formatCountdown(window.resetsAt),
+                style_class: 'shadow-reset-countdown',
+                x_expand: true,
+            }));
+            reset.add_child(new St.Label({
+                text: formatResetDate(window.resetsAt),
+                style_class: 'shadow-muted',
+            }));
+            card.add_child(reset);
+        }
         return card;
     }
 
-    _fiveHourCard(window) {
-        const card = new St.BoxLayout({style_class: 'shadow-five-hour-card', x_expand: true});
+    _fiveHourSection(window) {
+        const section = new St.BoxLayout({
+            style_class: 'shadow-five-hour-section',
+            x_expand: true,
+        });
         const copy = new St.BoxLayout({vertical: true, x_expand: true});
-        copy.add_child(new St.Label({text: '5-hour window', style_class: 'shadow-card-title'}));
         copy.add_child(new St.Label({
-            text: window ? formatCountdown(window.resetsAt) : 'Not reported by this Codex session',
-            style_class: 'shadow-muted',
+            text: '5-Hour Window',
+            style_class: 'shadow-card-title',
+            x_align: Clutter.ActorAlign.START,
         }));
-        card.add_child(copy);
-        card.add_child(new St.Label({
-            text: window ? `${window.remainingPercent}% left` : 'Unavailable',
-            style_class: window ? 'shadow-five-hour-value' : 'shadow-usage-unavailable-mark',
+        if (!window) {
+            copy.add_child(new St.Label({
+                text: 'Not reported by this Codex session.',
+                style_class: 'shadow-muted',
+                x_align: Clutter.ActorAlign.START,
+            }));
+            section.add_child(copy);
+            section.add_child(new St.Label({
+                text: 'Unavailable',
+                style_class: 'shadow-five-hour-unavailable',
+                y_align: Clutter.ActorAlign.CENTER,
+            }));
+            return section;
+        }
+
+        if (this.context.settings.get_boolean('show-codex-reset-time')) {
+            copy.add_child(new St.Label({
+                text: formatCountdown(window.resetsAt),
+                style_class: 'shadow-muted',
+                x_align: Clutter.ActorAlign.START,
+            }));
+        }
+        section.add_child(copy);
+        section.add_child(new St.Label({
+            text: `${window.remainingPercent}% remaining`,
+            style_class: 'shadow-five-hour-value',
+            style: `color: ${resolveAccent(this.context.settings)};`,
             y_align: Clutter.ActorAlign.CENTER,
         }));
-        return card;
+        return section;
     }
 
     _facts(state) {
         const items = [];
-        if (state.resetCreditsAvailable > 0) {
-            items.push({
-                label: 'Reset credits',
-                value: String(state.resetCreditsAvailable),
-            });
-        }
+        if (state.resetCreditsAvailable > 0)
+            items.push(['Reset credits', String(state.resetCreditsAvailable)]);
         if (state.clientVersion)
-            items.push({label: 'Codex client', value: state.clientVersion});
+            items.push(['Client', state.clientVersion]);
         if (!items.length)
             return null;
-
-        const row = new St.BoxLayout({style_class: 'shadow-codex-facts', x_expand: true});
-        for (const item of items) {
-            const fact = new St.BoxLayout({vertical: true, style_class: 'shadow-codex-fact', x_expand: true});
-            fact.add_child(new St.Label({text: item.label, style_class: 'shadow-metric-label'}));
-            fact.add_child(new St.Label({text: item.value, style_class: 'shadow-metric-value'}));
+        const row = new St.BoxLayout({style_class: 'shadow-metadata-row', x_expand: true});
+        for (const [label, value] of items) {
+            const fact = new St.BoxLayout({vertical: true, x_expand: true});
+            fact.add_child(new St.Label({text: label, style_class: 'shadow-metadata-label'}));
+            fact.add_child(new St.Label({text: value, style_class: 'shadow-metadata-value'}));
             row.add_child(fact);
         }
         return row;
     }
 
     _footer(state) {
-        const footer = new St.BoxLayout({style_class: 'shadow-provider-footer', x_expand: true});
-        const statusText = state.status === 'stale' || state.status === 'cached'
-            ? 'Cached'
-            : state.status === 'refreshing' ? 'Updating…' : 'Connected';
-        footer.add_child(new St.Label({
-            text: statusText,
-            style_class: 'shadow-provider-status',
-            x_expand: true,
-        }));
-        footer.add_child(new St.Label({
-            text: 'Updated ' + formatClock(state.lastSuccessfulRefresh),
-            style_class: 'shadow-muted',
-        }));
-        return footer;
+        let text = `Updated ${formatClock(state.lastSuccessfulRefresh)}`;
+        if (state.status === 'stale' || state.status === 'cached')
+            text += ' · Cached';
+        else if (state.status === 'refreshing')
+            text = `Updating… · ${text}`;
+        return new St.Label({
+            text,
+            style_class: 'shadow-provider-footer shadow-muted',
+            x_align: Clutter.ActorAlign.START,
+        });
     }
 
     _openCodex() {
-        launchUri('codex://', this.context.logger).catch(() => {
-            this._shareNotice = {error: true, text: 'Codex could not be opened.'};
-            this._render();
-        });
+        launchUri('codex://', this.context.logger).catch(() =>
+            this.context.notify?.('Shadowokx Panel', 'Codex could not be opened.'));
     }
 
     async _share(state) {
@@ -306,10 +327,7 @@ export class CodexPage extends BasePage {
             };
         } catch (error) {
             this.context.logger?.debug('codex.share.failed', {code: error.code ?? 'image-export'});
-            this._shareNotice = {
-                error: true,
-                text: 'The summary image could not be saved.',
-            };
+            this._shareNotice = {error: true, text: 'The usage image could not be saved.'};
         } finally {
             this._sharing = false;
             if (!this._destroyed)
