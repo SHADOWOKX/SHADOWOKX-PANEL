@@ -1,7 +1,7 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
-const ALLOWED_SCHEMES = new Set(['codex', 'file', 'obsidian']);
+const ALLOWED_SCHEMES = new Set(['codex']);
 
 export function launchUri(uri, logger = null) {
     const scheme = GLib.uri_parse_scheme(uri);

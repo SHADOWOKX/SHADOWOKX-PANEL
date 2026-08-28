@@ -1,9 +1,0 @@
-{
-  "name": "Shadow Panel",
-  "description": "A focused, modular productivity dashboard in the GNOME top bar.",
-  "uuid": "shadow-panel@shadowokx",
-  "shell-version": ["50"],
-  "settings-schema": "org.gnome.shell.extensions.shadow-panel",
-  "url": "https://github.com/shadowokx/shadow-panel",
-  "version": 5
-}

@@ -6,17 +6,15 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-import {ACCENTS, MODULE_META} from '../lib/constants.js';
-import {chooseInitialModule, resolveModuleOrder} from '../lib/moduleConfig.js';
-import {codexRemainingSummary, notesSummaryCount, weatherSummaryTemperature} from '../lib/summary.js';
+import {ACCENTS, MODULE_IDS, MODULE_META} from '../lib/constants.js';
+import {chooseInitialModule} from '../lib/moduleConfig.js';
+import {codexRemainingSummary, weatherSummaryTemperature} from '../lib/summary.js';
 import {PAGE_FACTORIES} from '../modules/index.js';
 import {
     iconButton,
-    isLightColor,
     moduleIcon,
     pageTitle,
     resolveAccent,
-    resolveCustomBackground,
     stateMessage,
     textButton,
 } from './components.js';
@@ -24,22 +22,18 @@ import {TabStrip} from './tabs.js';
 
 export const ShadowIndicator = GObject.registerClass(
 class ShadowIndicator extends PanelMenu.Button {
-    _init(extension, settings, logger, transientState = null) {
+    _init(extension, settings, logger) {
         super._init(0.5, 'Shadow Panel', false);
         this._extension = extension;
         this._settings = settings;
         this._logger = logger;
-        this._transientState = transientState ?? {};
         this._scheduler = extension.getRuntimeServices().scheduler;
         this._pages = new Map();
         this._subscriptions = [];
         this._activeId = null;
         this._popupOpen = false;
 
-        this._visibleIds = resolveModuleOrder(
-            settings.get_strv('module-order'),
-            settings.get_strv('enabled-modules')
-        );
+        this._visibleIds = [...MODULE_IDS];
         this._buildIndicator();
         this._buildDashboard();
         this._createServicesAndPages();
@@ -67,7 +61,6 @@ class ShadowIndicator extends PanelMenu.Button {
 
         this._addSummaryItem('codex', 'Codex remaining usage');
         this._addSummaryItem('weather', 'Weather temperature');
-        this._addSummaryItem('notes', 'Quick Notes');
         this.add_child(this._indicatorBox);
         const monitorsChangedId = Main.layoutManager.connect('monitors-changed', () =>
             this._syncIndicator());
@@ -99,14 +92,11 @@ class ShadowIndicator extends PanelMenu.Button {
         const density = this._settings.get_string('density');
         const theme = this._settings.get_string('theme');
         const backgroundTheme = this._settings.get_string('background-theme');
-        const customBackground = resolveCustomBackground(this._settings);
         let effectiveTheme;
         if (backgroundTheme === 'light-neutral')
             effectiveTheme = 'light';
-        else if (backgroundTheme === 'claude-gray' || backgroundTheme === 'dark-graphite')
+        else if (backgroundTheme === 'claude-gray' || backgroundTheme === 'graphite')
             effectiveTheme = 'dark';
-        else if (customBackground)
-            effectiveTheme = isLightColor(customBackground) ? 'light' : 'dark';
         else if (theme !== 'auto')
             effectiveTheme = theme;
         else
@@ -124,9 +114,6 @@ class ShadowIndicator extends PanelMenu.Button {
                 ` shadow-bg-${backgroundTheme}` +
                 ` shadow-accent-${accentClass}`,
         });
-        if (customBackground)
-            this._root.style = `background-color: ${customBackground};`;
-
         const header = new St.BoxLayout({style_class: 'shadow-header', x_expand: true});
         const brand = new St.BoxLayout({style_class: 'shadow-brand', x_expand: true});
         const brandIcon = moduleIcon(this._extension, 'codex', 18, 'shadow-brand-icon');
@@ -181,37 +168,25 @@ class ShadowIndicator extends PanelMenu.Button {
             settings: this._settings,
             scheduler: services.scheduler,
             logger: this._logger,
-            notesTransientState: this._transientState.notes ?? null,
         };
         const needsCodex = this._visibleIds.includes('codex') ||
-            this._settings.get_boolean('show-codex-summary');
+            this._settings.get_boolean('show-codex-icon') ||
+            this._settings.get_boolean('show-codex-remaining') ||
+            this._settings.get_boolean('show-codex-reset-countdown');
         if (needsCodex) {
             context.codexProvider = services.codexProvider;
             this._subscriptions.push(context.codexProvider.subscribe(state =>
                 this._updateCodexSummary(state)));
         }
         const needsWeather = this._visibleIds.includes('weather') ||
-            this._settings.get_boolean('show-weather-summary');
+            this._settings.get_boolean('show-weather-icon') ||
+            this._settings.get_boolean('show-weather-temperature') ||
+            this._settings.get_boolean('show-weather-condition');
         if (needsWeather) {
             context.weatherProvider = services.weatherProvider;
             this._subscriptions.push(context.weatherProvider.subscribe(state =>
                 this._updateWeatherSummary(state)));
         }
-        const needsNotes = this._visibleIds.includes('notes') ||
-            this._settings.get_boolean('show-notes-summary');
-        if (needsNotes) {
-            context.noteStore = services.noteStore;
-            context.obsidianService = services.obsidianService;
-            this._subscriptions.push(context.noteStore.subscribe(notes => {
-                this._notes = notes;
-                this._updateNotesSummary(context.noteStore.getStatus());
-            }));
-            this._subscriptions.push(context.obsidianService.subscribe(state => {
-                this._obsidianState = state;
-                this._updateNotesSummary(context.noteStore.getStatus());
-            }));
-        }
-
         for (const id of this._visibleIds) {
             try {
                 const page = PAGE_FACTORIES[id](context);
@@ -330,17 +305,6 @@ class ShadowIndicator extends PanelMenu.Button {
             temperature === null ? 'Weather unavailable' : `Temperature ${temperature} degrees ${unit}`);
     }
 
-    _updateNotesSummary(status) {
-        const count = status?.status === 'loading' ? null : notesSummaryCount(this._notes);
-        const vault = this._obsidianState?.status === 'ready'
-            ? ` · Obsidian ${this._obsidianState.vaultName} linked`
-            : '';
-        this._setSummary('notes', count === null ? null : `${count}`,
-            count === null
-                ? 'Quick Notes loading'
-                : `${count} local ${count === 1 ? 'note' : 'notes'}${vault}`);
-    }
-
     _setSummary(id, value, accessibleName) {
         const summary = this._summaryActors.get(id);
         if (!summary)
@@ -352,17 +316,20 @@ class ShadowIndicator extends PanelMenu.Button {
 
     _syncIndicator() {
         const enabled = {
-            codex: this._settings.get_boolean('show-codex-summary'),
-            weather: this._settings.get_boolean('show-weather-summary'),
-            notes: this._settings.get_boolean('show-notes-summary'),
+            codex: this._settings.get_boolean('show-codex-icon') ||
+                this._settings.get_boolean('show-codex-remaining') ||
+                this._settings.get_boolean('show-codex-reset-countdown'),
+            weather: this._settings.get_boolean('show-weather-icon') ||
+                this._settings.get_boolean('show-weather-temperature') ||
+                this._settings.get_boolean('show-weather-condition'),
         };
-        const showText = this._settings.get_boolean('show-top-bar-text');
+        const showText = true;
         const candidates = [...this._summaryActors].filter(([id, summary]) =>
-            enabled[id] && (summary.value !== null || id === 'codex' || id === 'notes' || !showText));
+            enabled[id] && (summary.value !== null || id === 'codex'));
         const monitorWidth = Main.layoutManager.primaryMonitor?.width ?? global.stage.width;
         const maximumItems = showText
-            ? monitorWidth < 700 ? 1 : monitorWidth < 900 ? 2 : 3
-            : 3;
+            ? monitorWidth < 700 ? 1 : 2
+            : 2;
         const visibleIds = new Set(candidates.slice(0, maximumItems).map(([id]) => id));
         const descriptions = [];
         let visibleCount = 0;
@@ -405,13 +372,6 @@ class ShadowIndicator extends PanelMenu.Button {
             }
         }
         this._extension._flushPendingRebuild();
-    }
-
-    getTransientState() {
-        return {
-            notes: this._pages.get('notes')?.getTransientState?.() ??
-                this._transientState.notes ?? null,
-        };
     }
 
     destroy() {

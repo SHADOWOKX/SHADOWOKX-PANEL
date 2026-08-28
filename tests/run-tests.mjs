@@ -2,12 +2,8 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
 import {clampPercent, formatCountdown, formatResetDate, isHexColor} from '../lib/format.js';
-import {
-    canonicalizeModuleSettings,
-    chooseInitialModule,
-    resolveModuleOrder,
-} from '../lib/moduleConfig.js';
-import {codexRemainingSummary, notesSummaryCount, weatherSummaryTemperature} from '../lib/summary.js';
+import {chooseInitialModule} from '../lib/moduleConfig.js';
+import {codexRemainingSummary, weatherSummaryTemperature} from '../lib/summary.js';
 import {
     normalizeCachedRateLimits,
     normalizeRateLimits,
@@ -15,13 +11,6 @@ import {
 } from '../modules/codex/normalize.js';
 import {CodexProvider} from '../modules/codex/provider.js';
 import {exportCodexSummaryImage, resolveSharePalette} from '../modules/codex/shareImage.js';
-import {
-    ObsidianService,
-    normalizeTargetFolder,
-    renderObsidianFilename,
-    validateObsidianSettings,
-} from '../modules/notes/obsidian.js';
-import {MAX_NOTES, normalizeNotes, NoteStore} from '../modules/notes/store.js';
 import {
     normalizeWeather,
     normalizeWeatherQuery,
@@ -123,19 +112,11 @@ function testFormatting() {
 }
 
 function testModuleConfiguration() {
-    const order = resolveModuleOrder(
-        ['notes', 'codex', 'notes', 'invalid'],
-        ['codex', 'weather', 'notes']
-    );
-    equal(order.join(','), 'notes,codex,weather', 'module order is sanitized');
-    equal(chooseInitialModule(order, true, 'codex', 'weather'), 'codex', 'last tab wins');
-    equal(chooseInitialModule(order, false, 'codex', 'weather'), 'weather', 'default tab wins');
-    const migrated = canonicalizeModuleSettings(
-        ['notes', 'notes', 'removed'],
-        ['tasks', 'tasks']
-    );
-    equal(migrated.order.join(','), 'notes,codex,weather', 'module order is deduplicated');
-    equal(migrated.enabled.join(','), 'codex,weather,notes', 'retired-only modules restore safe defaults');
+    const pages = ['codex', 'weather'];
+    equal(chooseInitialModule(pages, true, 'weather', 'codex'), 'weather', 'last page wins');
+    equal(chooseInitialModule(pages, false, 'weather', 'codex'), 'codex', 'default page wins');
+    equal(chooseInitialModule(pages, true, 'notes', 'codex'), 'codex',
+        'removed pages safely fall back to Codex');
 }
 
 function testCodexNormalization() {
@@ -182,13 +163,11 @@ function testCodexNormalization() {
 
 function testTopBarSummaries() {
     equal(codexRemainingSummary({fiveHour: {remainingPercent: 89.4}, weekly: {remainingPercent: 60}}),
-        89, 'Codex summary prefers five-hour remaining capacity');
-    equal(codexRemainingSummary({fiveHour: null, weekly: {remainingPercent: 57}}),
-        57, 'Codex summary falls back to weekly remaining capacity');
+        60, 'Codex summary prefers the weekly remaining capacity');
+    equal(codexRemainingSummary({fiveHour: {remainingPercent: 57}, weekly: null}),
+        57, 'Codex summary falls back to five-hour remaining capacity');
     equal(weatherSummaryTemperature({current: {temperature: 33.6}}),
         34, 'weather summary rounds temperature');
-    equal(notesSummaryCount([{pinned: true}, {pinned: false}]),
-        2, 'notes summary counts local notes');
 }
 
 function testWeatherNormalization() {
@@ -244,14 +223,6 @@ function testWeatherNormalization() {
 }
 
 function testContentValidation() {
-    const notes = normalizeNotes([
-        {id: '1', text: ' Recent ', pinned: false, updatedAt: 1},
-        {id: '2', text: ' Pinned ', pinned: true, updatedAt: 0},
-        {id: 3, text: 'invalid'},
-    ]);
-    equal(notes.length, 2, 'invalid notes removed');
-    equal(notes[0].id, '2', 'pinned note sorted first');
-    equal(notes[0].text, 'Pinned', 'note whitespace trimmed');
     const observable = new Observable({ready: true});
     let callbackCount = 0;
     rejects(() => observable.subscribe(() => {
@@ -265,125 +236,6 @@ function testContentValidation() {
     equal(logger._sanitize(deeplyNested).one.two.three.four.five.six, '[max-depth]',
         'logger depth limits never return raw nested objects');
     equal(logger._sanitize(12n), '12', 'logger safely normalizes BigInt values');
-}
-
-function testObsidianValidation() {
-    equal(normalizeTargetFolder(' Inbox/QuickNotes '), 'Inbox/QuickNotes',
-        'Obsidian target is normalized');
-    rejects(() => normalizeTargetFolder('../Secrets'), 'parent traversal must be rejected');
-    rejects(() => normalizeTargetFolder('/tmp/outside'), 'absolute target must be rejected');
-    rejects(() => normalizeTargetFolder('Inbox/Bad\nFolder'), 'control characters must be rejected');
-    equal(renderObsidianFilename(
-        'Shadow {date} {time}',
-        new Date(2026, 7, 28, 14, 5, 9)
-    ), 'Shadow 2026-08-28 14-05-09.md', 'filename placeholders are deterministic');
-    const resolved = validateObsidianSettings(
-        '/tmp/example-vault',
-        'Inbox/QuickNotes',
-        'Shadow {timestamp}'
-    );
-    ok(resolved.targetPath.startsWith(resolved.vaultPath + GLib.DIR_SEPARATOR_S),
-        'Obsidian target stays inside the selected vault');
-    ok(new TextEncoder().encode(renderObsidianFilename('😀'.repeat(60))).length <= 183,
-        'Obsidian filenames stay inside the filesystem byte limit');
-    rejects(() => renderObsidianFilename('Shadow\u202eNote'),
-        'Obsidian filename patterns reject bidirectional controls');
-}
-
-async function testAtomicStores() {
-    const notes = new NoteStore(null);
-    await notes.start();
-    await notes.add('Storage note');
-    equal(notes.getState().length, 1, 'note persisted');
-    const noteId = notes.getState()[0].id;
-    await notes.togglePinned(noteId);
-    equal(notes.getState()[0].pinned, true, 'note pin persisted');
-    await notes.update(noteId, 'Edited note');
-    equal(notes.getState()[0].text, 'Edited note', 'note edit persisted');
-    await notes.remove(noteId);
-    equal(notes.getState().length, 0, 'note deletion persisted');
-}
-
-async function testDamagedNotesProtection() {
-    const store = new NoteStore(null);
-    GLib.file_set_contents(store._store.path, '[]\n');
-    await store.start();
-    equal(store.getStatus().canMutate, true, 'healthy Notes storage is writable');
-    GLib.file_set_contents(store._store.path, '{ damaged json');
-    await store.start();
-    equal(store.getStatus().canMutate, false, 'damaged Notes storage becomes read-only');
-    await rejectsAsync(() => store.add('Must not overwrite'),
-        'mutations are rejected after a damaged Notes read');
-    const [loaded, contents] = GLib.file_get_contents(store._store.path);
-    ok(loaded, 'damaged Notes file remains present');
-    equal(new TextDecoder().decode(contents), '{ damaged json',
-        'damaged Notes file is not overwritten');
-}
-
-async function testQueuedNoteCapacity() {
-    const original = Array.from({length: MAX_NOTES - 1}, (_unused, index) => ({
-        id: `existing-${index}`,
-        text: `Existing note ${index}`,
-        pinned: false,
-        createdAt: index + 1,
-        updatedAt: index + 1,
-    }));
-    const store = new NoteStore(null);
-    GLib.file_set_contents(store._store.path, `${JSON.stringify(original)}\n`);
-    await store.start();
-    const results = await Promise.allSettled([store.add('First queued'), store.add('Second queued')]);
-    equal(results.filter(result => result.status === 'fulfilled').length, 1,
-        'only one queued addition may consume the last Notes slot');
-    equal(results.filter(result => result.status === 'rejected').length, 1,
-        'the over-capacity queued addition is rejected');
-    equal(store.getState().length, MAX_NOTES, 'queued additions never exceed the Notes limit');
-    ok(store.getState().some(note => note.id === `existing-${MAX_NOTES - 2}`),
-        'capacity enforcement never silently evicts an existing note');
-}
-
-async function testObsidianWrites() {
-    const vaultPath = GLib.build_filenamev([GLib.get_user_data_dir(), 'test-vault']);
-    GLib.mkdir_with_parents(GLib.build_filenamev([vaultPath, '.obsidian']), 0o700);
-    const values = {
-        'obsidian-vault-path': vaultPath,
-        'obsidian-target-folder': 'Inbox/QuickNotes',
-        'obsidian-filename-pattern': 'Shadow Test Note',
-    };
-    let nextId = 1;
-    const settings = {
-        get_string(key) {
-            return values[key] ?? '';
-        },
-        connect() {
-            return nextId++;
-        },
-        disconnect() {},
-    };
-    const service = new ObsidianService(settings, null);
-    await service.start();
-    equal(service.getState().status, 'ready', 'valid Obsidian vault is detected');
-    const first = await service.save('Unicode note: أهلًا 👋');
-    const second = await service.save('A second note');
-    ok(first.path.startsWith(vaultPath + GLib.DIR_SEPARATOR_S), 'written note stays inside vault');
-    ok(first.path !== second.path, 'existing note is never overwritten');
-    const [loaded, contents] = GLib.file_get_contents(first.path);
-    ok(loaded, 'Obsidian note was written');
-    equal(new TextDecoder().decode(contents), 'Unicode note: أهلًا 👋\n',
-        'Obsidian content is preserved as UTF-8 Markdown');
-    equal(service.getState().lastSavedFile, second.fileName, 'last save metadata is exposed');
-    service.destroy();
-
-    const realVault = GLib.build_filenamev([GLib.get_user_data_dir(), 'real-vault']);
-    const linkedVault = GLib.build_filenamev([GLib.get_user_data_dir(), 'linked-vault']);
-    GLib.mkdir_with_parents(GLib.build_filenamev([realVault, '.obsidian']), 0o700);
-    Gio.File.new_for_path(linkedVault).make_symbolic_link(realVault, null);
-    values['obsidian-vault-path'] = linkedVault;
-    const linkedService = new ObsidianService(settings, null);
-    await linkedService.start();
-    equal(linkedService.getState().status, 'error', 'symlinked vault ancestors are rejected');
-    equal(linkedService.getState().error, 'Symlinked vault paths are not used for safety.',
-        'symlink rejection has a clear recovery message');
-    linkedService.destroy();
 }
 
 async function testCodexShareImage() {
@@ -420,12 +272,10 @@ async function testCodexShareImage() {
         'unix::mode', Gio.FileQueryInfoFlags.NOFOLLOW_SYMLINKS, null);
     equal(info.get_attribute_uint32('unix::mode') & 0o077, 0,
         'Codex summary image is private from creation through export');
-    equal(resolveSharePalette('custom', 'light', '#abcdef').card, '#abcdef',
-        'custom background is reflected in the image palette');
-    equal(resolveSharePalette('custom', 'auto', '#f0f0ed').text, '#222326',
-        'bright custom backgrounds choose readable dark image text');
-    equal(resolveSharePalette('custom', 'light', '#101112').text, '#f6f6f4',
-        'custom image backgrounds choose contrast from the tint itself');
+    equal(resolveSharePalette('graphite', 'dark').card, '#1f2226',
+        'Graphite share palette matches the panel background');
+    equal(resolveSharePalette('gnome', 'light').text, '#222326',
+        'GNOME share palette follows the effective interface theme');
     await rejectsAsync(() => exportCodexSummaryImage({weekly: {remainingPercent: NaN}}, options),
         'malformed usage windows are rejected before image rendering');
 }
@@ -567,14 +417,9 @@ testCodexNormalization();
 testTopBarSummaries();
 testWeatherNormalization();
 testContentValidation();
-testObsidianValidation();
-await testAtomicStores();
-await testObsidianWrites();
 await testCodexShareImage();
 await testProviderFailureIsolation();
 await testCodexProtocolOrdering();
 await testWeatherTrailingRefresh();
-await testQueuedNoteCapacity();
-await testDamagedNotesProtection();
 
 print(`Shadow Panel tests passed (${assertions} assertions)`);

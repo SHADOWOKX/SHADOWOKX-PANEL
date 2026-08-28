@@ -3,7 +3,7 @@
   <schema id="org.gnome.shell.extensions.shadow-panel" path="/org/gnome/shell/extensions/shadow-panel/">
     <key name="debug" type="b">
       <default>false</default>
-      <summary>Enable debug logging</summary>
+      <summary>Enable redacted debug logging</summary>
     </key>
     <key name="panel-placement" type="s">
       <choices>
@@ -14,38 +14,45 @@
       <default>'right'</default>
       <summary>Top bar placement</summary>
     </key>
-    <key name="show-top-bar-text" type="b">
+    <key name="show-codex-icon" type="b">
       <default>true</default>
-      <summary>Show values beside top bar summary icons</summary>
+      <summary>Show the ChatGPT icon in the top bar</summary>
     </key>
-    <key name="show-codex-summary" type="b">
+    <key name="show-codex-remaining" type="b">
       <default>true</default>
-      <summary>Show Codex remaining usage in the top bar</summary>
+      <summary>Show weekly remaining capacity in the top bar</summary>
     </key>
-    <key name="show-weather-summary" type="b">
+    <key name="show-codex-reset-countdown" type="b">
+      <default>false</default>
+      <summary>Show the weekly reset countdown in the top bar</summary>
+    </key>
+    <key name="show-weather-icon" type="b">
+      <default>true</default>
+      <summary>Show the current weather icon in the top bar</summary>
+    </key>
+    <key name="show-weather-temperature" type="b">
       <default>true</default>
       <summary>Show the current temperature in the top bar</summary>
     </key>
-    <key name="show-notes-summary" type="b">
-      <default>true</default>
-      <summary>Show Quick Notes status in the top bar</summary>
+    <key name="show-weather-condition" type="b">
+      <default>false</default>
+      <summary>Show the current weather condition in the top bar</summary>
     </key>
     <key name="remember-last-tab" type="b">
       <default>true</default>
-      <summary>Remember the last selected module</summary>
+      <summary>Remember the last selected page</summary>
     </key>
     <key name="last-selected-tab" type="s">
       <default>'codex'</default>
-      <summary>Last selected module</summary>
+      <summary>Last selected page</summary>
     </key>
     <key name="default-tab" type="s">
       <choices>
         <choice value="codex"/>
         <choice value="weather"/>
-        <choice value="notes"/>
       </choices>
       <default>'codex'</default>
-      <summary>Default module</summary>
+      <summary>Default page</summary>
     </key>
     <key name="refresh-on-open" type="b">
       <default>true</default>
@@ -63,14 +70,6 @@
       <default>'comfortable'</default>
       <summary>Popup density</summary>
     </key>
-    <key name="enabled-modules" type="as">
-      <default>['codex', 'weather', 'notes']</default>
-      <summary>Enabled modules</summary>
-    </key>
-    <key name="module-order" type="as">
-      <default>['codex', 'weather', 'notes']</default>
-      <summary>Module order</summary>
-    </key>
     <key name="theme" type="s">
       <choices>
         <choice value="auto"/>
@@ -78,22 +77,17 @@
         <choice value="light"/>
       </choices>
       <default>'auto'</default>
-      <summary>Color scheme</summary>
+      <summary>Interface color scheme</summary>
     </key>
     <key name="background-theme" type="s">
       <choices>
-        <choice value="default"/>
         <choice value="claude-gray"/>
-        <choice value="dark-graphite"/>
+        <choice value="graphite"/>
+        <choice value="gnome"/>
         <choice value="light-neutral"/>
-        <choice value="custom"/>
       </choices>
       <default>'claude-gray'</default>
-      <summary>Dashboard background treatment</summary>
-    </key>
-    <key name="custom-background" type="s">
-      <default>'#30312f'</default>
-      <summary>Custom dashboard background tint</summary>
+      <summary>Dashboard surface treatment</summary>
     </key>
     <key name="accent-color" type="s">
       <choices>
@@ -102,7 +96,6 @@
         <choice value="cyan"/>
         <choice value="emerald"/>
         <choice value="orange"/>
-        <choice value="red"/>
         <choice value="rose"/>
         <choice value="graphite"/>
         <choice value="custom"/>
@@ -113,6 +106,18 @@
     <key name="custom-accent" type="s">
       <default>'#8b5cf6'</default>
       <summary>Custom accent color</summary>
+    </key>
+    <key name="show-codex-weekly" type="b">
+      <default>true</default>
+      <summary>Show the weekly usage limit</summary>
+    </key>
+    <key name="show-codex-five-hour" type="b">
+      <default>true</default>
+      <summary>Show the five-hour usage window</summary>
+    </key>
+    <key name="show-codex-reset-time" type="b">
+      <default>true</default>
+      <summary>Show reset countdowns and dates</summary>
     </key>
     <key name="codex-refresh-minutes" type="i">
       <range min="5" max="120"/>
@@ -136,26 +141,29 @@
       <default>30</default>
       <summary>Weather refresh interval in minutes</summary>
     </key>
-    <key name="obsidian-vault-path" type="s">
-      <default>''</default>
-      <summary>Absolute path to an Obsidian vault</summary>
+    <key name="show-weather-feels-like" type="b">
+      <default>true</default>
+      <summary>Show feels-like temperature</summary>
     </key>
-    <key name="obsidian-target-folder" type="s">
-      <default>'Inbox/QuickNotes'</default>
-      <summary>Relative destination folder inside the Obsidian vault</summary>
+    <key name="show-weather-humidity" type="b">
+      <default>true</default>
+      <summary>Show humidity</summary>
     </key>
-    <key name="obsidian-filename-pattern" type="s">
-      <default>'Shadow Note {date} {time}'</default>
-      <summary>Filename pattern for notes exported to Obsidian</summary>
+    <key name="show-weather-wind" type="b">
+      <default>true</default>
+      <summary>Show wind speed</summary>
     </key>
-    <key name="notes-save-mode" type="s">
-      <choices>
-        <choice value="local"/>
-        <choice value="obsidian"/>
-        <choice value="both"/>
-      </choices>
-      <default>'local'</default>
-      <summary>Default destination for Quick Notes</summary>
+    <key name="show-weather-rain" type="b">
+      <default>true</default>
+      <summary>Show rain probability</summary>
+    </key>
+    <key name="show-weather-uv" type="b">
+      <default>false</default>
+      <summary>Show the UV index</summary>
+    </key>
+    <key name="show-weather-sun-times" type="b">
+      <default>true</default>
+      <summary>Show sunrise and sunset</summary>
     </key>
   </schema>
 </schemalist>

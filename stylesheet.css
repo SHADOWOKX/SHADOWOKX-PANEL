@@ -649,71 +649,6 @@
   text-align: center;
 }
 
-/* Quick Notes and Obsidian */
-.shadow-vault-card {
-  min-height: 43px;
-  padding: 8px 10px;
-  spacing: 9px;
-}
-
-.shadow-vault-path {
-  max-width: 235px;
-}
-
-.shadow-capture-entry,
-.shadow-entry {
-  min-height: 32px;
-  padding: 6px 8px;
-  border: 1px solid rgba(128, 128, 128, 0.20);
-  border-radius: 8px;
-  background-color: rgba(0, 0, 0, 0.07);
-}
-
-.shadow-notes-page-scroll {
-  min-height: 220px;
-  max-height: 354px;
-  padding-right: 1px;
-}
-
-.shadow-notes-body {
-  spacing: 8px;
-  padding-right: 4px;
-}
-
-.shadow-item-list {
-  spacing: 6px;
-  padding-right: 4px;
-}
-
-.shadow-item-row {
-  padding: 8px;
-  spacing: 5px;
-}
-
-.shadow-item-title {
-  font-size: 12px;
-  font-weight: 550;
-}
-
-.shadow-list-heading {
-  margin: 4px 2px 1px;
-  color: #aeb3bc;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.shadow-empty-list {
-  padding: 24px 12px;
-  color: #aeb3bc;
-  font-size: 12px;
-  text-align: center;
-}
-
-.shadow-note-row {
-  min-height: 40px;
-}
-
 /* Compact density */
 .shadow-compact .shadow-page {
   spacing: 6px;
@@ -727,12 +662,8 @@
   margin-bottom: 9px;
 }
 
-.shadow-compact .shadow-editor,
-.shadow-compact .shadow-capture-card,
-.shadow-compact .shadow-item-row,
 .shadow-compact .shadow-weekly-hero,
-.shadow-compact .shadow-five-hour-card,
-.shadow-compact .shadow-vault-card {
+.shadow-compact .shadow-five-hour-card {
   padding: 7px 8px;
 }
 
@@ -758,10 +689,6 @@
 
 .shadow-compact .shadow-hourly-row {
   min-height: 62px;
-}
-
-.shadow-compact .shadow-notes-page-scroll {
-  max-height: 314px;
 }
 
 .shadow-compact .shadow-weather-scroll {

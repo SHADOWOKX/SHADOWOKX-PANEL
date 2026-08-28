@@ -28,7 +28,7 @@ const PALETTES = Object.freeze({
         canvas: '#252623', card: '#30312f', panel: '#393a37', text: '#f5f3ed',
         muted: '#b6b4ac', track: '#4d4e49', border: '#464742',
     },
-    'dark-graphite': {
+    graphite: {
         canvas: '#15171a', card: '#1f2226', panel: '#292d32', text: '#f5f6f7',
         muted: '#a5abb3', track: '#3a3f46', border: '#343941',
     },
@@ -40,11 +40,6 @@ const PALETTES = Object.freeze({
 
 function parseHex(color) {
     return [1, 3, 5].map(index => Number.parseInt(color.slice(index, index + 2), 16) / 255);
-}
-
-function isLightHex(color) {
-    const [red, green, blue] = parseHex(color).map(channel => channel * 255);
-    return red * 0.2126 + green * 0.7152 + blue * 0.0722 >= 155;
 }
 
 function normalizeShareWindow(value) {
@@ -119,12 +114,7 @@ function drawKnot(context, centerX, centerY, radius, color) {
     context.restore();
 }
 
-export function resolveSharePalette(backgroundTheme, interfaceTheme, customBackground = null) {
-    if (backgroundTheme === 'custom' && /^#[0-9a-fA-F]{6}$/.test(customBackground ?? '')) {
-        const light = isLightHex(customBackground);
-        const base = light ? PALETTES.defaultLight : PALETTES.defaultDark;
-        return {...base, card: customBackground};
-    }
+export function resolveSharePalette(backgroundTheme, interfaceTheme) {
     if (PALETTES[backgroundTheme])
         return PALETTES[backgroundTheme];
     return interfaceTheme === 'light' ? PALETTES.defaultLight : PALETTES.defaultDark;
@@ -133,8 +123,7 @@ export function resolveSharePalette(backgroundTheme, interfaceTheme, customBackg
 export function renderSummary(path, state, options) {
     const palette = resolveSharePalette(
         options.backgroundTheme,
-        options.interfaceTheme,
-        options.customBackground
+        options.interfaceTheme
     );
     const accent = /^#[0-9a-fA-F]{6}$/.test(options.accent ?? '') ? options.accent : '#8b5cf6';
     const weekly = normalizeShareWindow(state.weekly);
@@ -325,7 +314,6 @@ export async function exportCodexSummaryImage(state, options = {}) {
             accent: options.accent,
             backgroundTheme: options.backgroundTheme,
             interfaceTheme: options.interfaceTheme,
-            customBackground: options.customBackground,
         };
         await renderInWorker(
             temporary.get_path(),

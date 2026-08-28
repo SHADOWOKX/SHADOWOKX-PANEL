@@ -2,7 +2,7 @@
 
 Shadow Panel is a compact productivity dashboard for the GNOME top bar, built for Ubuntu 26.04.1 LTS, GNOME Shell 50, Wayland, and modern GJS ES modules.
 
-Its popup behaves like a tiny GNOME application: a minimal `Shadowokx Panel™` wordmark, icon-first expanding tabs, one focused module at a time, and clear loading, cached, empty, and recovery states. Release `1.3.1` contains Codex, Weather, and Quick Notes with optional Obsidian capture.
+Its popup behaves like a tiny GNOME application: a minimal `Shadowokx Panel` wordmark, icon-first expanding tabs, one focused module at a time, and clear loading, cached, empty, and recovery states. Release `2.0.0` contains only Codex Usage and Weather.
 
 ## Screenshots
 

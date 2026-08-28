@@ -55,7 +55,7 @@ dbus-run-session -- sh -eu -c '
   if test "$shadow_loaded" = true; then
     gsettings set org.gnome.shell.extensions.shadow-panel density compact
     gsettings set org.gnome.shell.extensions.shadow-panel background-theme light-neutral
-    gsettings set org.gnome.shell.extensions.shadow-panel module-order "['"'"'notes'"'"', '"'"'weather'"'"', '"'"'codex'"'"']"
+    gsettings set org.gnome.shell.extensions.shadow-panel default-tab weather
     sleep 1
     shadow_info=$(gnome-extensions info shadow-panel@shadowokx 2>/dev/null || true)
     printf "%s\n" "$shadow_info" | grep -q "State: ACTIVE"

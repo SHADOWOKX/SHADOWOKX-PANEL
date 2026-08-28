@@ -298,7 +298,6 @@ export class CodexPage extends BasePage {
                 accent: resolveAccent(this.context.settings),
                 backgroundTheme: this.context.settings.get_string('background-theme'),
                 interfaceTheme,
-                customBackground: this.context.settings.get_string('custom-background'),
             });
             this._shareNotice = {
                 error: false,
