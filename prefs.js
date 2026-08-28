@@ -124,13 +124,13 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
             {value: 'auto', label: 'Auto'},
             {value: 'dark', label: 'Dark'},
             {value: 'light', label: 'Light'},
-        ]));
+        ], 'Auto follows GNOME; Dark and Light recolor every background preset.'));
         interfaceGroup.add(comboRow(settings, 'background-theme', 'Background', [
             {value: 'claude-gray', label: 'Claude Gray'},
             {value: 'graphite', label: 'Graphite'},
             {value: 'gnome', label: 'GNOME'},
             {value: 'light-neutral', label: 'Light Neutral'},
-        ]));
+        ], 'Neutral surfaces remain readable in both light and dark modes.'));
         interfaceGroup.add(comboRow(settings, 'density', 'Density', [
             {value: 'comfortable', label: 'Comfortable'},
             {value: 'compact', label: 'Compact'},

@@ -16,30 +16,22 @@
 }
 
 /* Background tokens */
-.shadow-bg-claude-gray {
-  color: #f4f3ee;
-  background-color: #30312f;
-}
-
-.shadow-bg-graphite {
-  color: #f5f6f7;
-  background-color: #1f2226;
-}
-
-.shadow-bg-light-neutral {
-  color: #252624;
-  background-color: #f4f4f1;
-}
-
-.shadow-theme-dark.shadow-bg-gnome {
+.shadow-theme-dark {
   color: #f4f4f4;
-  background-color: #242424;
 }
 
-.shadow-theme-light.shadow-bg-gnome {
-  color: #242424;
-  background-color: #fafafa;
+.shadow-theme-light {
+  color: #252624;
 }
+
+.shadow-theme-dark.shadow-bg-claude-gray { background-color: #30312f; }
+.shadow-theme-light.shadow-bg-claude-gray { background-color: #efefeb; }
+.shadow-theme-dark.shadow-bg-graphite { background-color: #1f2226; }
+.shadow-theme-light.shadow-bg-graphite { background-color: #e7e9ed; }
+.shadow-theme-dark.shadow-bg-gnome { background-color: #242424; }
+.shadow-theme-light.shadow-bg-gnome { background-color: #fafafa; }
+.shadow-theme-dark.shadow-bg-light-neutral { background-color: #353633; }
+.shadow-theme-light.shadow-bg-light-neutral { background-color: #f4f4f1; }
 
 /* Surface tokens */
 .shadow-card {
@@ -54,19 +46,42 @@
   border-radius: 11px;
 }
 
-.shadow-bg-light-neutral .shadow-card,
-.shadow-theme-light.shadow-bg-gnome .shadow-card {
+.shadow-theme-light .shadow-card {
   border-color: rgba(0, 0, 0, 0.09);
   background-color: rgba(0, 0, 0, 0.025);
 }
 
-.shadow-bg-light-neutral .shadow-secondary-surface,
-.shadow-theme-light.shadow-bg-gnome .shadow-secondary-surface {
+.shadow-theme-light .shadow-secondary-surface {
   border-color: rgba(0, 0, 0, 0.075);
   background-color: rgba(0, 0, 0, 0.018);
 }
 
 /* Text tokens */
+.shadow-theme-dark .shadow-muted,
+.shadow-theme-dark .shadow-metadata-label,
+.shadow-theme-dark .shadow-metric-label,
+.shadow-theme-dark .shadow-hourly-time,
+.shadow-theme-dark .shadow-weather-location,
+.shadow-theme-dark .shadow-provider-footer,
+.shadow-theme-dark .shadow-state-detail,
+.shadow-theme-dark .shadow-weekly-unit,
+.shadow-theme-dark .shadow-five-hour-unavailable {
+  color: #b3b5b2;
+}
+
+.shadow-theme-light .shadow-muted,
+.shadow-theme-light .shadow-metadata-label,
+.shadow-theme-light .shadow-metric-label,
+.shadow-theme-light .shadow-hourly-time,
+.shadow-theme-light .shadow-weather-location,
+.shadow-theme-light .shadow-provider-footer,
+.shadow-theme-light .shadow-state-detail,
+.shadow-theme-light .shadow-weekly-unit,
+.shadow-theme-light .shadow-five-hour-unavailable {
+  color: #686d69;
+}
+
+/* Fallbacks for isolated component previews. */
 .shadow-muted,
 .shadow-metadata-label,
 .shadow-metric-label,
@@ -76,49 +91,7 @@
 .shadow-state-detail,
 .shadow-weekly-unit,
 .shadow-five-hour-unavailable {
-  color: #b8b7b0;
-}
-
-.shadow-bg-graphite .shadow-muted,
-.shadow-bg-graphite .shadow-metadata-label,
-.shadow-bg-graphite .shadow-metric-label,
-.shadow-bg-graphite .shadow-hourly-time,
-.shadow-bg-graphite .shadow-weather-location,
-.shadow-bg-graphite .shadow-provider-footer,
-.shadow-bg-graphite .shadow-state-detail,
-.shadow-bg-graphite .shadow-weekly-unit,
-.shadow-bg-graphite .shadow-five-hour-unavailable,
-.shadow-theme-dark.shadow-bg-gnome .shadow-muted,
-.shadow-theme-dark.shadow-bg-gnome .shadow-metadata-label,
-.shadow-theme-dark.shadow-bg-gnome .shadow-metric-label,
-.shadow-theme-dark.shadow-bg-gnome .shadow-hourly-time,
-.shadow-theme-dark.shadow-bg-gnome .shadow-weather-location,
-.shadow-theme-dark.shadow-bg-gnome .shadow-provider-footer,
-.shadow-theme-dark.shadow-bg-gnome .shadow-state-detail,
-.shadow-theme-dark.shadow-bg-gnome .shadow-weekly-unit,
-.shadow-theme-dark.shadow-bg-gnome .shadow-five-hour-unavailable {
-  color: #aeb3ba;
-}
-
-.shadow-bg-light-neutral .shadow-muted,
-.shadow-bg-light-neutral .shadow-metadata-label,
-.shadow-bg-light-neutral .shadow-metric-label,
-.shadow-bg-light-neutral .shadow-hourly-time,
-.shadow-bg-light-neutral .shadow-weather-location,
-.shadow-bg-light-neutral .shadow-provider-footer,
-.shadow-bg-light-neutral .shadow-state-detail,
-.shadow-bg-light-neutral .shadow-weekly-unit,
-.shadow-bg-light-neutral .shadow-five-hour-unavailable,
-.shadow-theme-light.shadow-bg-gnome .shadow-muted,
-.shadow-theme-light.shadow-bg-gnome .shadow-metadata-label,
-.shadow-theme-light.shadow-bg-gnome .shadow-metric-label,
-.shadow-theme-light.shadow-bg-gnome .shadow-hourly-time,
-.shadow-theme-light.shadow-bg-gnome .shadow-weather-location,
-.shadow-theme-light.shadow-bg-gnome .shadow-provider-footer,
-.shadow-theme-light.shadow-bg-gnome .shadow-state-detail,
-.shadow-theme-light.shadow-bg-gnome .shadow-weekly-unit,
-.shadow-theme-light.shadow-bg-gnome .shadow-five-hour-unavailable {
-  color: #696d68;
+  color: #b3b5b2;
 }
 
 /* Top bar */
@@ -343,13 +316,11 @@
   background-color: rgba(16, 185, 129, 0.10);
 }
 
-.shadow-bg-light-neutral .shadow-inline-error,
-.shadow-theme-light.shadow-bg-gnome .shadow-inline-error {
+.shadow-theme-light .shadow-inline-error {
   color: #9f2635;
 }
 
-.shadow-bg-light-neutral .shadow-inline-success,
-.shadow-theme-light.shadow-bg-gnome .shadow-inline-success {
+.shadow-theme-light .shadow-inline-success {
   color: #176b48;
 }
 
