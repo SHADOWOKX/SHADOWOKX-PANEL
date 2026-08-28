@@ -4,6 +4,7 @@ export class BasePage {
     constructor(context, id) {
         this.context = context;
         this.id = id;
+        this._pageDestroyed = false;
         this.actor = new St.BoxLayout({
             vertical: true,
             style_class: `shadow-page shadow-page-${id}`,
@@ -24,6 +25,9 @@ export class BasePage {
     onPopupClosed() {}
 
     destroy() {
+        if (this._pageDestroyed)
+            return;
+        this._pageDestroyed = true;
         for (const disconnect of this._disconnectors.splice(0)) {
             try {
                 disconnect();

@@ -12,13 +12,13 @@ export class Logger {
         } catch {
             // Debug logging must never interfere with extension operation.
         }
-        console.debug(`[Shadow Panel] ${event} ${serialized}`);
+        console.debug(`[Shadowokx Panel] ${event} ${serialized}`);
     }
 
     warn(event, error = null) {
         const rawMessage = error instanceof Error ? error.message : String(error ?? '');
         const message = this._redactText(rawMessage);
-        console.warn(`[Shadow Panel] ${event}${message ? `: ${message}` : ''}`);
+        console.warn(`[Shadowokx Panel] ${event}${message ? `: ${message}` : ''}`);
     }
 
     _redactText(value) {

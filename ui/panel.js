@@ -41,6 +41,7 @@ class ShadowIndicator extends PanelMenu.Button {
         this._subscriptions = [];
         this._activeId = null;
         this._popupOpen = false;
+        this._destroyed = false;
         this._codexState = null;
         this._weatherState = null;
 
@@ -167,10 +168,14 @@ class ShadowIndicator extends PanelMenu.Button {
         };
 
         this._subscriptions.push(services.codexProvider.subscribe(state => {
+            if (this._destroyed)
+                return;
             this._codexState = state;
             this._syncIndicator();
         }));
         this._subscriptions.push(services.weatherProvider.subscribe(state => {
+            if (this._destroyed)
+                return;
             this._weatherState = state;
             this._syncIndicator();
         }));
@@ -262,7 +267,7 @@ class ShadowIndicator extends PanelMenu.Button {
     }
 
     _syncIndicator() {
-        if (!this._codexSummary || !this._weatherSummary)
+        if (this._destroyed || !this._codexSummary || !this._weatherSummary)
             return;
         const monitorWidth = Main.layoutManager.primaryMonitor?.width ?? global.stage.width;
         const constrained = monitorWidth < 900;
@@ -336,12 +341,19 @@ class ShadowIndicator extends PanelMenu.Button {
     }
 
     destroy() {
+        if (this._destroyed)
+            return;
+        this._destroyed = true;
         for (const unsubscribe of this._subscriptions.splice(0))
             unsubscribe();
         for (const page of this._pages.values())
             page.destroy();
         this._pages.clear();
         this._tabs?.destroy();
+        this._tabs = null;
+        this._codexSummary = null;
+        this._weatherSummary = null;
+        this._fallbackIcon = null;
         super.destroy();
     }
 });

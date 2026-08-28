@@ -55,16 +55,36 @@ dbus-run-session -- sh -eu -c '
   if test "$shadow_loaded" = true; then
     gsettings set org.gnome.shell.extensions.shadow-panel density compact
     gsettings set org.gnome.shell.extensions.shadow-panel background-theme light-neutral
+    gsettings set org.gnome.shell.extensions.shadow-panel theme light
+    gsettings set org.gnome.shell.extensions.shadow-panel accent-color orange
     gsettings set org.gnome.shell.extensions.shadow-panel default-tab weather
+    gsettings get org.gnome.shell.extensions.shadow-panel default-tab | grep -q weather
     sleep 1
     shadow_info=$(gnome-extensions info shadow-panel@shadowokx 2>/dev/null || true)
     printf "%s\n" "$shadow_info" | grep -q "State: ACTIVE"
     gnome-extensions prefs shadow-panel@shadowokx
     sleep 1
+    gnome-extensions disable shadow-panel@shadowokx
+    sleep 0.5
+    shadow_info=$(gnome-extensions info shadow-panel@shadowokx 2>/dev/null || true)
+    if printf "%s\n" "$shadow_info" | grep -q "State: ACTIVE"; then
+      exit 4
+    fi
+    gnome-extensions enable shadow-panel@shadowokx
+    shadow_reloaded=false
+    for shadow_attempt in 1 2 3 4 5 6 7 8 9 10; do
+      shadow_info=$(gnome-extensions info shadow-panel@shadowokx 2>/dev/null || true)
+      if printf "%s\n" "$shadow_info" | grep -q "State: ACTIVE"; then
+        shadow_reloaded=true
+        break
+      fi
+      sleep 0.25
+    done
+    test "$shadow_reloaded" = true
   fi
   test "$shadow_loaded" = true
 ' >"$shadow_session_log" 2>&1 || {
-  printf '%s\n' 'Headless GNOME Shell did not report Shadow Panel as active.' >&2
+  printf '%s\n' 'Headless GNOME Shell did not report Shadowokx Panel as active.' >&2
   tail -n 160 "$shadow_session_log" >&2
   tail -n 160 "$shadow_shell_log" >&2
   exit 1
@@ -72,8 +92,8 @@ dbus-run-session -- sh -eu -c '
 
 if rg -i -U "shadow-panel[\s\S]{0,900}(error|exception|critical|warning)|(js error|gjs-critical|error parsing stylesheet|stylesheet\.css.*(error|warning))[\s\S]{0,900}shadow-panel" \
   "$shadow_shell_log" "$shadow_session_log"; then
-  printf '%s\n' 'Shadow Panel emitted a runtime error.' >&2
+  printf '%s\n' 'Shadowokx Panel emitted a runtime error.' >&2
   exit 1
 fi
 
-printf '%s\n' 'Shadow Panel and its Preferences loaded successfully in an isolated headless GNOME Shell.'
+printf '%s\n' 'Shadowokx Panel and its Preferences loaded successfully in an isolated headless GNOME Shell.'

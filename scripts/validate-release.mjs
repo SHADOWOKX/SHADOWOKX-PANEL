@@ -42,6 +42,17 @@ try {
         throw new Error('semantic version declarations are inconsistent');
     if (!readText('README.md').includes(`Release \`${APP_VERSION}\``))
         throw new Error('README release version is inconsistent');
+    const modules = GLib.build_filenamev([projectDirectory, 'modules']);
+    for (const removed of ['notes', 'tasks', 'todo', 'tools']) {
+        if (GLib.file_test(GLib.build_filenamev([modules, removed]), GLib.FileTest.EXISTS))
+            throw new Error(`removed module directory still exists: ${removed}`);
+    }
+    if (!GLib.file_test(
+        GLib.build_filenamev([projectDirectory, 'icons', 'chatgpt.png']),
+        GLib.FileTest.IS_REGULAR
+    )) {
+        throw new Error('the bundled ChatGPT icon is missing');
+    }
 } catch (error) {
     printerr(`Release validation failed: ${error.message}`);
     System.exit(1);

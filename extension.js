@@ -60,11 +60,21 @@ export default class ShadowPanelExtension extends Extension {
             if (this._indicator?.menu?.isOpen)
                 return GLib.SOURCE_REMOVE;
             this._rebuildPending = false;
-            try {
-                this._createIndicator();
-            } catch (error) {
-                this._logger?.warn('Could not rebuild Shadow Panel', error);
-            }
+            this._destroyIndicator();
+            // Panel roles are released from GNOME Shell's status-area map on
+            // actor destruction. Recreate on the next idle so a replacement
+            // is never rejected and disposed as a duplicate role.
+            this._rebuildId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                this._rebuildId = 0;
+                if (!this._settings)
+                    return GLib.SOURCE_REMOVE;
+                try {
+                    this._createIndicator();
+                } catch (error) {
+                    this._logger?.warn('Could not rebuild Shadowokx Panel', error);
+                }
+                return GLib.SOURCE_REMOVE;
+            });
             return GLib.SOURCE_REMOVE;
         });
     }
@@ -74,38 +84,18 @@ export default class ShadowPanelExtension extends Extension {
             this._queueRebuild();
     }
 
-    _serviceNeeds() {
-        return {
-            codex: true,
-            weather: true,
-        };
-    }
-
     _ensureServices() {
-        const needs = this._serviceNeeds();
-        if (needs.codex && !this._services.codexProvider) {
+        if (!this._services.codexProvider) {
             const provider = new CodexProvider(this._settings, this._scheduler, this._logger);
             this._services.codexProvider = provider;
             provider.start().catch(error =>
                 this._logger.warn('Could not start Codex provider', error));
         }
-        if (needs.weather && !this._services.weatherProvider) {
+        if (!this._services.weatherProvider) {
             const provider = new WeatherProvider(this._settings, this._scheduler, this._logger);
             this._services.weatherProvider = provider;
             provider.start().catch(error =>
                 this._logger.warn('Could not start weather provider', error));
-        }
-        return needs;
-    }
-
-    _releaseUnusedProviders(needs) {
-        if (!needs.codex && this._services.codexProvider) {
-            this._services.codexProvider.destroy();
-            delete this._services.codexProvider;
-        }
-        if (!needs.weather && this._services.weatherProvider) {
-            this._services.weatherProvider.destroy();
-            delete this._services.weatherProvider;
         }
     }
 
@@ -114,17 +104,21 @@ export default class ShadowPanelExtension extends Extension {
     }
 
     _createIndicator() {
-        const needs = this._ensureServices();
+        this._ensureServices();
         const replacement = new ShadowIndicator(
             this,
             this._settings,
             this._logger
         );
-        this._indicator?.destroy();
         this._indicator = replacement;
         const placement = this._settings.get_string('panel-placement');
         Main.panel.addToStatusArea(this.uuid, this._indicator, 0, placement);
-        this._releaseUnusedProviders(needs);
+    }
+
+    _destroyIndicator() {
+        const indicator = this._indicator;
+        this._indicator = null;
+        indicator?.destroy();
     }
 
     disable() {
@@ -132,8 +126,7 @@ export default class ShadowPanelExtension extends Extension {
             GLib.Source.remove(this._rebuildId);
         this._rebuildId = 0;
         this._rebuildPending = false;
-        this._indicator?.destroy();
-        this._indicator = null;
+        this._destroyIndicator();
         for (const service of Object.values(this._services ?? {}))
             service.destroy?.();
         this._services = {};

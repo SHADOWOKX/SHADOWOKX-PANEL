@@ -27,7 +27,7 @@ export class WeatherPage extends BasePage {
     }
 
     _render() {
-        if (!this.actor)
+        if (this._pageDestroyed || !this.actor)
             return;
         const state = this._provider.getState();
         clearChildren(this.actor);

@@ -1,42 +1,43 @@
-# Shadow Panel
+# Shadowokx Panel
 
-Shadow Panel is a compact productivity dashboard for the GNOME top bar, built for Ubuntu 26.04.1 LTS, GNOME Shell 50, Wayland, and modern GJS ES modules.
+Shadowokx Panel is a small GNOME top-bar utility that does two things well: it shows Codex usage limits and useful local weather. It targets Ubuntu 26.04.1 LTS, GNOME Shell 50, Wayland, and modern GJS ES modules.
 
-Its popup behaves like a tiny GNOME application: a minimal `Shadowokx Panel` wordmark, icon-first expanding tabs, one focused module at a time, and clear loading, cached, empty, and recovery states. Release `2.0.0` contains only Codex Usage and Weather.
+Release `2.0.0` deliberately contains only two pages:
+
+1. ChatGPT Codex
+2. Weather
+
+The popup behaves like a compact GNOME application with a quiet product header, two icon-first tabs, one focused page at a time, neutral surfaces, and clear cached or recovery states.
 
 ## Screenshots
 
-Screenshots will be added after the first tagged release.
+Screenshots will be added after the first 2.0 release capture.
 
-- Top bar: `◉ 89%   ☀ 34°   ✎ 3`
-- Codex selected: `[ ◉ Codex ]   ☀   ✎`
-- Weather selected: `◉   [ ☀ Weather ]   ✎`
+- Top bar: `[ChatGPT] 45%   [Weather] 29°`
+- Codex selected: `[ ChatGPT Codex ]   ☀`
+- Weather selected: `ChatGPT   [ ☀ Weather ]`
 
-The Codex value always means **remaining capacity**, never used capacity.
+The Codex percentage always means **remaining capacity**, never consumed capacity.
 
 ## Features
 
-- Configurable top-bar summary for Codex remaining capacity, current temperature, and local Quick Note count. Values collapse to icons, and narrow monitors automatically limit the number of items.
-- Full-contrast symbolic inactive tabs with a compact, lightly tinted icon-and-label active state, remembered/default selection, configurable order, module toggles, and horizontal overflow.
-- A quiet persistent header containing only the `Shadowokx Panel™` wordmark and Settings action.
-- Codex account and rate-limit data from the local machine-readable Codex app-server protocol—no rendered-page scraping and no credential storage.
-- A weekly-first Codex dashboard with a compact five-hour state, reset credits, client version, cache state, and minimal actions.
-- A PNG Share action that exports a polished 1200×675 usage card without overwriting earlier exports.
-- Strong current-weather hero, aligned detail tiles, a clean fixed five-column forecast row, location-aware local times, rain probability context, Celsius/Fahrenheit, caching, offline recovery, and vertical overflow support for large-text accessibility.
-- Quick Capture plus local note create/edit/delete/pin/copy, pinned/recent groups, destination selection, and guarded Obsidian Markdown writes.
-- Open Obsidian and open the configured target folder directly from the Notes page.
-- Auto, dark, and light contrast; Default, Claude-like Gray, Dark Graphite, Light Neutral, and validated Custom Tint backgrounds; two densities; eight accent presets plus custom accent.
-- Native Adwaita preferences for General, Modules, Appearance, Integrations, and About.
+- Compact configurable top-bar fields for the ChatGPT icon, remaining percentage, weekly reset countdown, weather icon, temperature, and condition.
+- Two fixed tabs with icon-only inactive state and a subtle icon-plus-label active state. There is no scrolling tab widget or separator artifact.
+- A weekly-first Codex hero with dominant remaining capacity, remaining-progress meter, reset countdown/date, compact five-hour state, reset credits, client version, refresh, Open Codex, and PNG Share actions.
+- Current-weather hero with condition, location, high/low, up to four optional details, four next-hour forecasts, optional sunrise/sunset, Celsius or Fahrenheit, and location-aware times.
+- Cached Codex and Weather data remain visible during temporary failures.
+- Auto, Dark, and Light modes; Claude Gray, Graphite, GNOME, and Light Neutral backgrounds; Comfortable and Compact density; seven accent presets plus a custom accent.
+- Native Adwaita preferences containing only General, Appearance, Codex, Weather, and About.
 - No telemetry or analytics.
 
 ## Supported platform
 
 - Ubuntu 26.04.1 LTS
-- GNOME Shell 50.x (verified against GNOME Shell 50.1)
-- GJS 1.88 or newer (verified against GJS 1.88.0)
+- GNOME Shell 50.x, verified with GNOME Shell 50.1
+- GJS 1.88 or newer, verified with GJS 1.88.0
 - Wayland
 
-Only GNOME Shell `50` is declared in `metadata.json`. Compatibility with older GNOME releases is not claimed.
+Only GNOME Shell `50` is declared in `metadata.json`.
 
 ## Install on Ubuntu 26.04.1
 
@@ -44,12 +45,15 @@ No root access is required. From the project directory:
 
 ```bash
 ./install.sh
+```
+
+On Wayland, log out and back in after installing or replacing the extension, then enable it:
+
+```bash
 gnome-extensions enable shadow-panel@shadowokx
 ```
 
-On Wayland, log out and back in if Shell has not discovered a newly installed extension. GNOME Shell cannot safely be restarted with `Alt+F2`, `r` on Wayland.
-
-When replacing an already loaded development build, log out and back in before enabling the new build. GNOME Shell 50 intentionally keeps extension ES modules in memory for the life of the Shell process, so disable/enable alone is not a source-code reload on Wayland.
+GNOME Shell keeps extension ES modules in memory for the life of the Shell process, so disable/enable alone is not a complete source-code reload on Wayland.
 
 Open preferences with:
 
@@ -57,132 +61,138 @@ Open preferences with:
 gnome-extensions prefs shadow-panel@shadowokx
 ```
 
-Uninstall only the extension code with:
+Uninstall the extension code with:
 
 ```bash
 ./uninstall.sh
 ```
 
-Uninstalling intentionally preserves user content and caches:
+Provider caches are intentionally preserved under `${XDG_CACHE_HOME:-~/.cache}/shadow-panel/`.
 
-- Quick Notes: `${XDG_DATA_HOME:-~/.local/share}/shadow-panel/notes.json`
-- Provider caches: `${XDG_CACHE_HOME:-~/.cache}/shadow-panel/`
+## Codex provider
 
-## Codex usage source
-
-At refresh time Shadow Panel starts the installed `codex app-server --stdio` executable with a fixed argument vector. It initializes the JSON-lines protocol and calls:
+Shadowokx Panel starts the locally installed `codex app-server --stdio` executable with a fixed argument vector, initializes its JSON-lines protocol, and requests:
 
 ```text
 account/read
 account/rateLimits/read
 ```
 
-The account response can provide account type, plan, and email. Shadow Panel retains only the email local part as a short display label; the complete email is neither cached nor logged. The initialize response supplies the client user-agent, from which only a version string is retained.
+The rate-limit response supplies structured windows containing `usedPercent`, `windowDurationMins`, and `resetsAt`. A roughly 300-minute window is classified as the five-hour window and a roughly 10,080-minute window as weekly. Remaining capacity is calculated as:
 
-The rate-limit response supplies structured windows with `usedPercent`, `windowDurationMins`, and `resetsAt`. A roughly 300-minute window is classified as five-hour capacity and a roughly 10,080-minute window as weekly capacity. The UI derives `remainingPercent = 100 - usedPercent`, labels it explicitly as “left,” and uses five-hour remaining capacity in the top bar when present. Weekly remaining is the fallback when the five-hour window is absent.
+```text
+remaining = 100 - usedPercent
+```
 
-When reported, the page also shows reset-credit count and Codex client version. Less useful provider metadata stays out of the popup. Missing fields are omitted rather than invented. The provider follows the [official Codex App Server protocol documentation](https://developers.openai.com/codex/app-server/).
+The top bar prefers weekly remaining capacity because the weekly limit is the primary product signal, with five-hour remaining as a fallback when weekly is not reported.
 
 Security properties:
 
-- Shadow Panel never reads, stores, displays, prints, or logs OpenAI access tokens.
-- Codex uses its own existing signed-in state.
-- No shell interprets the Codex executable or arguments.
+- No rendered Codex interface is scraped.
+- No OpenAI credentials are read, stored, displayed, or logged.
+- Codex uses its existing signed-in state.
+- No shell interprets the executable or arguments.
 - Raw app-server messages and stderr are not logged.
-- A 15-second timeout cancels and terminates an unresponsive process.
-- Successful normalized responses are cached; background refresh defaults to 15 minutes.
+- Responses are bounded to 1 MiB and a 15-second timeout terminates an unresponsive helper.
+- Account metadata is optional and never blocks a valid rate-limit result.
+- Successful normalized data is cached privately and refreshed at a configurable interval.
 
-## Weather and privacy
+The integration follows the [official Codex App Server documentation](https://developers.openai.com/codex/app-server/).
 
-The configured location is sent to Open-Meteo geocoding, then the selected coordinates are sent to Open-Meteo forecast. No API key is needed. Requests are asynchronous, time-limited, cached, and made only when stale, manually refreshed, or after relevant settings change.
+## Open Codex
 
-The hourly forecast is a fixed five-column actor row rather than a horizontal `St.ScrollView`; this removes the scrollbar artifact completely. Forecast labels use the resolved location timezone, and the section heading summarizes the maximum precipitation chance for those hours. The full Weather body only becomes vertically scrollable when text scaling or available height genuinely requires it.
+The Open action uses the registered `codex://` desktop handler through `Gio.AppInfo`. It does not execute a shell command. If no handler is available, GNOME displays a compact notification.
 
-Quick Notes remain in the local XDG data directory unless the user selects Obsidian or “Local Notes and Obsidian” as the capture destination.
+## Codex share images
 
-## Codex summary images
+Share renders a 1200×675 PNG with Cairo and Pango in a bounded helper process, outside GNOME Shell's UI thread. It contains the official ChatGPT application icon, weekly remaining and used percentages, reset timing, five-hour availability, and update time.
 
-The Share action renders a 1200×675 PNG using Cairo and Pango. It includes the privacy-reduced account/product label, weekly remaining and used percentages, countdown and absolute reset, five-hour state, reset credits/client version when available, and update state.
+Images are created privately and saved without overwriting earlier exports under the configured XDG Pictures directory in `Shadowokx/`, normally:
 
-Images are written to the configured XDG Pictures directory under `Shadowokx Panel/` (normally `~/Pictures/Shadowokx Panel/`). Rendering and PNG encoding run in a bounded helper process rather than on GNOME Shell's UI thread. The exporter uses a private temporary file followed by a non-overwriting atomic move; repeated names receive a numeric suffix. Shell's text-oriented clipboard interface does not offer a dependable cross-desktop PNG path, so the popup confirms the saved filename and provides an **Open folder** action instead of pretending to copy an image.
+```text
+~/Pictures/Shadowokx/
+```
 
-## Obsidian integration
+The popup confirms the filename and provides an Open Folder action. Direct image clipboard transfer is not claimed because GNOME Shell's stable extension clipboard interface is text-oriented.
 
-Configure Preferences → Integrations → Quick Notes and Obsidian:
+The bundled ChatGPT icon is used only to identify the Codex integration. See [NOTICE.md](NOTICE.md).
 
-1. Choose an existing Obsidian vault with the native folder chooser.
-2. Set a relative target such as `Inbox/QuickNotes`.
-3. Set a filename pattern. Supported placeholders are `{date}`, `{time}`, and `{timestamp}`.
-4. Choose Local Notes, Obsidian, or both for the primary Quick Capture action.
+## Weather provider and privacy
 
-The integration is deliberately narrow:
+The configured location is sent to Open-Meteo geocoding. The resolved coordinates are then sent to the Open-Meteo forecast endpoint. No API key is required.
 
-- It verifies that the selected absolute folder exists and contains `.obsidian`.
-- It rejects absolute targets, `..`, backslashes, control characters, and symlinked vault/target components.
-- It creates only the configured target folders and one new private UTF-8 Markdown file per save.
-- It never overwrites a note; duplicate filenames receive a numeric suffix.
-- It does not scan, index, or read unrelated vault files.
-- Opening folders and apps uses allowlisted `file:`, `obsidian:`, and `codex:` URIs without a shell.
+Requests are asynchronous, time-limited, response-size bounded, cached, and made only when stale, manually refreshed, or after a relevant setting changes. A failed refresh never discards the last successful forecast. Full Weather unavailable state is shown only when no valid result has ever been loaded.
+
+The hourly forecast is a fixed four-column actor row. It does not use a horizontal `St.ScrollView`, so no scrollbar or progress-like bar can appear beneath it.
+
+## Appearance
+
+The stylesheet uses a small set of logical surface and text classes rather than page-specific color fragments:
+
+- dashboard background
+- primary card
+- secondary surface
+- primary text
+- muted text
+- accent
+- success and error feedback
+
+Accent is limited to selected tabs, progress, important usage values, weather emphasis, and active controls. It does not tint the whole popup.
 
 ## Architecture
 
 ```text
-extension.js                 extension lifecycle, shared services, migration, rebuilds
-prefs.js                     native Adwaita preferences
-ui/
-  panel.js                   top-bar summary, application header, page lifecycle
-  tabs.js                    icon-first expanding tabs and overflow scrolling
-  components.js              shared accessible St controls and state widgets
-icons/                       crisp six-lobe OpenAI-inspired symbolic mark
+extension.js                 lifecycle, shared providers, rebuild coordination
+prefs.js                     five-page native Adwaita preferences
+icons/chatgpt.png            unmodified official ChatGPT desktop asset
 lib/
-  summary.js                 pure remaining/weather/note summary selection
+  constants.js               release, modules, accent presets
+  format.js                  bounded formatting helpers
+  moduleConfig.js            initial-page selection
+  summary.js                 pure top-bar value selection
 modules/
-  codex/                     provider, normalization, weekly-first page, PNG exporter
-  weather/                   isolated Open-Meteo provider, normalization, page
-  notes/                     local store, guarded Obsidian service, page
+  codex/                     app-server provider, normalization, page, PNG helper
+  weather/                   Open-Meteo provider, normalization, page
 services/
-  jsonStore.js               bounded, cross-instance serialized atomic JSON replacement
-  launcher.js                allowlisted asynchronous URI launching
+  jsonStore.js               bounded private atomic JSON cache
+  launcher.js                allowlisted asynchronous URI launch
   scheduler.js               named cancellable GLib timers
   observable.js              structured state subscriptions
-  logger.js                  minimal redacted diagnostics
+  logger.js                  minimal recursive redaction
+ui/
+  panel.js                   top-bar summary and page lifecycle
+  tabs.js                    fixed accessible two-page tab strip
+  components.js              shared St controls and states
 schemas/                     GSettings schema
-tests/                       pure normalization, validation, persistence, import tests
+tests/                       pure logic, provider, share, and import tests
 ```
 
-Providers and stores return structured state and never import page code. Long-lived content services survive appearance-only UI rebuilds, so draft state and note writes are not raced by theme changes. A failed module gets its own recovery page without taking down the popup. Disabled network modules are not started.
+Provider code never imports page code. Codex failure cannot break Weather, and Weather failure cannot break Codex. All timers, cancellables, subscriptions, subprocesses, and actors are released when the extension is disabled.
 
 ## Development
 
-The end-user installer needs only the normal GNOME desktop tools. For the full development checks on Ubuntu 26.04.1, install the validation utilities if they are not already present:
+The complete checks use the standard Ubuntu GNOME runtime plus:
 
 ```bash
 sudo apt install gjs libglib2.0-bin libxml2-utils unzip ripgrep dbus-daemon
 ```
 
-The headless runtime check additionally expects the GNOME Shell 50/Mutter 18 runtime already provided by the target desktop.
-
-Run strict schema validation, pure logic/storage/Obsidian tests, Shell-side module imports, and package creation:
+Run schema, logic, provider-isolation, import, share-image, and package checks:
 
 ```bash
 ./scripts/check.sh
 ```
 
-Load the extension in a disposable headless GNOME Shell session without touching the active desktop:
+Run an isolated GNOME Shell enable/preferences/rebuild/disable/re-enable check:
 
 ```bash
 ./scripts/runtime-check.sh
 ```
 
-Optionally exercise the installed Codex app-server provider and print only non-secret diagnostics:
+Exercise the live providers with isolated caches:
 
 ```bash
 XDG_CACHE_HOME=/tmp/shadow-panel-codex-check gjs -m tests/live-codex.mjs
-```
-
-Exercise the live Open-Meteo provider with the same isolated-cache approach:
-
-```bash
 XDG_CACHE_HOME=/tmp/shadow-panel-weather-check gjs -m tests/live-weather.mjs
 ```
 
@@ -192,29 +202,20 @@ Build the installable archive:
 ./scripts/package.sh
 ```
 
-The default output is `dist/shadow-panel@shadowokx.shell-extension.zip`.
-
-Show Shadow Panel journal messages:
+Show current-session extension messages:
 
 ```bash
 ./scripts/logs.sh
 ```
 
-Normal operation is quiet. Enable debug logging only while diagnosing a problem; diagnostic fields are redacted by key name and raw provider payloads are never logged.
-
-## Data integrity
-
-Local note files and caches are size-bounded. Note reads/writes are serialized by absolute path across extension instances and use `Gio.File.replace_contents_async()` with private, replace-destination flags, so the JSON file is atomically replaced. A malformed or oversized note file is left untouched and Notes becomes read-only until the problem is resolved. Obsidian capture and Codex image export both use private temporary files followed by non-overwriting moves. Preferences stay in GSettings.
+Normal operation is quiet. Debug logging is disabled by default and never includes raw provider payloads or credentials.
 
 ## Known limitations
 
-- The local Codex app-server is structured and documented, but its schema can evolve with the installed Codex client. The provider is isolated for replacement or adaptation.
-- Some accounts or sessions report only weekly capacity. Shadow Panel keeps the five-hour card explicitly unavailable and never fabricates a value.
-- The protocol currently provides an email rather than a separate friendly display name; Shadow Panel shows and stores only the email local part.
-- The bundled symbolic mark is an original brand-faithful six-lobe glyph, not a redistributed ChatGPT application asset.
-- Share saves PNG files and exposes their folder; direct image clipboard transfer is intentionally not claimed because GNOME Shell's stable extension clipboard API is text-oriented.
-- Quick Capture is optimized for up to 500 short notes of 2,000 Unicode characters each, not full document editing.
-- Obsidian capture creates Markdown notes but intentionally does not browse, search, modify, or synchronize existing vault content.
+- Some Codex accounts or sessions report only weekly capacity. The five-hour section remains compactly unavailable and no value is invented.
+- The local Codex app-server schema can evolve with future Codex releases; its provider is isolated so it can be updated without changing the page.
+- Share saves PNG files and opens their folder; it does not claim binary clipboard support.
+- Weather location entry uses safe text validation rather than a network-backed search chooser.
 
 ## Troubleshooting
 
@@ -228,22 +229,17 @@ gnome-extensions info shadow-panel@shadowokx
 
 ### Codex usage is unavailable
 
-Confirm the client is installed and signed in:
+Confirm that Codex is installed and signed in:
 
 ```bash
 codex --version
-codex doctor --summary
 ```
 
-Shadow Panel also checks the Codex binary bundled with the ChatGPT desktop app. It never asks for an API key.
+Shadowokx Panel also checks the Codex binary bundled with the ChatGPT desktop application. It never requests an API key.
 
 ### Weather cannot find a location
 
-Use a city and country, for example `Cairo, Egypt`, then refresh. The last successful forecast remains visible as cached data during temporary network failures.
-
-### Obsidian needs attention
-
-Choose the vault root—not a subfolder—and confirm it contains `.obsidian`. The target folder must be relative to that vault and cannot contain `.` or `..` path segments.
+Use a city and country such as `Cairo, Egypt`, then refresh. The last successful forecast remains visible during temporary network failures.
 
 ### Inspect warnings
 
@@ -251,12 +247,6 @@ Choose the vault root—not a subfolder—and confirm it contains `.obsidian`. T
 ./scripts/logs.sh
 ```
 
-If the popup fails to load, disable the extension before editing or reinstalling it:
-
-```bash
-gnome-extensions disable shadow-panel@shadowokx
-```
-
 ## License
 
-GPL-3.0-or-later. See [LICENSE](LICENSE).
+GPL-3.0-or-later for the extension source. See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md) for the bundled brand asset notice.

@@ -33,6 +33,10 @@ print(JSON.stringify({
     location: state.location ?? null,
     unit: state.unit ?? null,
     currentAvailable: Boolean(state.current),
+    rainAvailable: Number.isFinite(state.current?.rainProbability),
+    uvAvailable: Number.isFinite(state.today?.uv),
+    sunTimesAvailable: Number.isFinite(state.today?.sunrise) &&
+        Number.isFinite(state.today?.sunset),
     forecastHours: state.forecast?.length ?? 0,
     error: state.error ?? null,
 }, null, 2));

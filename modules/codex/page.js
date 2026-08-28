@@ -46,7 +46,7 @@ export class CodexPage extends BasePage {
     }
 
     _render() {
-        if (!this.actor)
+        if (this._destroyed || this._pageDestroyed || !this.actor)
             return;
         const state = this._provider.getState();
         clearChildren(this.actor);

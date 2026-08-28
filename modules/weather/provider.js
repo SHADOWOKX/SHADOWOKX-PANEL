@@ -23,7 +23,7 @@ export class WeatherProvider extends Observable {
         this._settings = settings;
         this._scheduler = scheduler;
         this._logger = logger;
-        this._session = new Soup.Session({timeout: 15, user_agent: `Shadow Panel/${APP_VERSION}`});
+        this._session = new Soup.Session({timeout: 15, user_agent: `Shadowokx Panel/${APP_VERSION}`});
         this._cache = new JsonStore(
             GLib.build_filenamev([GLib.get_user_cache_dir(), 'shadow-panel']),
             'weather.json',

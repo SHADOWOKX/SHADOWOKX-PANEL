@@ -21,6 +21,7 @@ gnome-extensions pack \
   --extra-source="$shadow_project_dir/ui" \
   --extra-source="$shadow_project_dir/icons" \
   --extra-source="$shadow_project_dir/README.md" \
+  --extra-source="$shadow_project_dir/NOTICE.md" \
   --extra-source="$shadow_project_dir/LICENSE" \
   "$shadow_project_dir"
 

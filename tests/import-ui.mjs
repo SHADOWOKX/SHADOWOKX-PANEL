@@ -5,4 +5,4 @@ import '../services/launcher.js';
 import '../ui/components.js';
 import '../ui/tabs.js';
 
-print('Shadow Panel shell-side modules parsed successfully');
+print('Shadowokx Panel shell-side modules parsed successfully');

@@ -27,7 +27,7 @@ export class Observable {
             try {
                 listener(state);
             } catch {
-                console.error('[Shadow Panel] state listener failed');
+                console.error('[Shadowokx Panel] state listener failed');
             }
         }
     }

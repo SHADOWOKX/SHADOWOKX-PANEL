@@ -163,7 +163,7 @@ export class CodexProvider extends Observable {
             params: {
                 clientInfo: {
                     name: 'shadow-panel',
-                    title: 'Shadow Panel',
+                    title: 'Shadowokx Panel',
                     version: APP_VERSION,
                 },
                 capabilities: {

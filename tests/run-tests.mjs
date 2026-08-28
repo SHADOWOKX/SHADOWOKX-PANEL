@@ -1,6 +1,7 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
+import {MODULE_IDS} from '../lib/constants.js';
 import {clampPercent, formatCountdown, formatResetDate, isHexColor} from '../lib/format.js';
 import {chooseInitialModule} from '../lib/moduleConfig.js';
 import {codexRemainingSummary, weatherSummaryTemperature} from '../lib/summary.js';
@@ -113,9 +114,10 @@ function testFormatting() {
 
 function testModuleConfiguration() {
     const pages = ['codex', 'weather'];
+    equal(MODULE_IDS.join(','), pages.join(','), 'only Codex and Weather are registered');
     equal(chooseInitialModule(pages, true, 'weather', 'codex'), 'weather', 'last page wins');
     equal(chooseInitialModule(pages, false, 'weather', 'codex'), 'codex', 'default page wins');
-    equal(chooseInitialModule(pages, true, 'notes', 'codex'), 'codex',
+    equal(chooseInitialModule(pages, true, 'removed', 'codex'), 'codex',
         'removed pages safely fall back to Codex');
 }
 
@@ -352,6 +354,13 @@ async function testProviderFailureIsolation() {
     };
     const weatherState = await weather.refresh(true);
     equal(weatherState.status, 'success', 'Weather live data survives a cache-write failure');
+    weather._resolveLocation = async () => {
+        throw new Error('network unavailable');
+    };
+    const cachedWeather = await weather.refresh(true);
+    equal(cachedWeather.status, 'stale', 'failed Weather refresh keeps the last valid state');
+    equal(cachedWeather.current.temperature, 29,
+        'failed Weather refresh never replaces the last valid temperature');
     weather.destroy();
 }
 
@@ -436,4 +445,4 @@ await testProviderFailureIsolation();
 await testCodexProtocolOrdering();
 await testWeatherTrailingRefresh();
 
-print(`Shadow Panel tests passed (${assertions} assertions)`);
+print(`Shadowokx Panel tests passed (${assertions} assertions)`);

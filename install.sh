@@ -40,6 +40,7 @@ mkdir -p "$shadow_stage/$shadow_uuid"
 
 cp "$shadow_project_dir/extension.js" \
   "$shadow_project_dir/metadata.json" \
+  "$shadow_project_dir/NOTICE.md" \
   "$shadow_project_dir/prefs.js" \
   "$shadow_project_dir/stylesheet.css" \
   "$shadow_stage/$shadow_uuid/"
@@ -66,13 +67,13 @@ if test -e "$shadow_destination" || test -L "$shadow_destination"; then
   mv "$shadow_destination" "$shadow_backup"
 fi
 if ! mv "$shadow_stage/$shadow_uuid" "$shadow_destination"; then
-  printf '%s\n' 'Installation failed; attempting to restore the previous Shadow Panel version.' >&2
+  printf '%s\n' 'Installation failed; attempting to restore the previous Shadowokx Panel version.' >&2
   exit 1
 fi
 shadow_swap_complete=true
 
 printf '%s\n' \
-  "Installed Shadow Panel to $shadow_destination" \
+  "Installed Shadowokx Panel to $shadow_destination" \
   "Enable it with: gnome-extensions enable $shadow_uuid" \
   'On Wayland, log out and back in if GNOME Shell has not discovered the extension yet.' \
   'When upgrading an active copy, log out and back in before enabling so Shell clears its ES-module cache.'

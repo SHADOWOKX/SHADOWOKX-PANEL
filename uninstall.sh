@@ -15,5 +15,5 @@ gnome-extensions disable "$shadow_uuid" 2>/dev/null || true
 rm -rf -- "$shadow_destination"
 
 printf '%s\n' \
-  'Shadow Panel was removed.' \
-  'Local content and provider caches were preserved under the XDG data/cache directories.'
+  'Shadowokx Panel was removed.' \
+  'Provider caches were preserved under the XDG cache directory.'
