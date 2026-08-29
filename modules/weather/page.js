@@ -4,7 +4,6 @@ import St from 'gi://St';
 
 import {formatClock} from '../../lib/format.js';
 import {
-    clearChildren,
     iconButton,
     pageTitle,
     resolveAccent,
@@ -30,57 +29,58 @@ export class WeatherPage extends BasePage {
         if (this._pageDestroyed || !this.actor)
             return;
         const state = this._provider.getState();
-        clearChildren(this.actor);
-        this.actor.add_child(pageTitle('Weather', iconButton(
-            'view-refresh-symbolic',
-            'Refresh weather',
-            () => this._provider.refresh(true),
-            'shadow-icon-button shadow-action-icon-button'
-        )));
+        this.replaceContent(page => {
+            page.add_child(pageTitle('Weather', iconButton(
+                'view-refresh-symbolic',
+                'Refresh weather',
+                () => this._provider.refresh(true),
+                'shadow-icon-button shadow-action-icon-button'
+            )));
 
-        if (state.status === 'loading' && !state.lastSuccessfulRefresh) {
-            this.actor.add_child(stateMessage(
-                'content-loading-symbolic',
-                'Loading weather',
-                'Contacting Open-Meteo…'
-            ));
-            return;
-        }
-        if (state.status === 'error' && !state.lastSuccessfulRefresh) {
-            this.actor.add_child(stateMessage(
-                'network-error-symbolic',
-                'Weather unavailable',
-                state.error,
-                textButton('Retry', () => this._provider.refresh(true))
-            ));
-            return;
-        }
+            if (state.status === 'loading' && !state.lastSuccessfulRefresh) {
+                page.add_child(stateMessage(
+                    'content-loading-symbolic',
+                    'Loading weather',
+                    'Contacting Open-Meteo…'
+                ));
+                return;
+            }
+            if (state.status === 'error' && !state.lastSuccessfulRefresh) {
+                page.add_child(stateMessage(
+                    'network-error-symbolic',
+                    'Weather unavailable',
+                    state.error,
+                    textButton('Retry', () => this._provider.refresh(true))
+                ));
+                return;
+            }
 
-        const unit = '°';
-        const content = new St.BoxLayout({
-            vertical: true,
-            style_class: 'shadow-weather-content',
-            x_expand: true,
+            const unit = '°';
+            const content = new St.BoxLayout({
+                vertical: true,
+                style_class: 'shadow-weather-content',
+                x_expand: true,
+            });
+            content.add_child(this._hero(state, unit));
+
+            const metrics = this._selectedMetrics(state, unit).slice(0, 4);
+            if (metrics.length)
+                content.add_child(this._metricGrid(metrics));
+
+            content.add_child(this._hourlyForecast(state));
+
+            if (this.context.settings.get_boolean('show-weather-sun-times') &&
+                (state.today.sunrise || state.today.sunset)) {
+                content.add_child(this._sunTimes(state));
+            }
+
+            content.add_child(new St.Label({
+                text: this._footerText(state),
+                style_class: 'shadow-provider-footer shadow-muted',
+                x_align: Clutter.ActorAlign.START,
+            }));
+            page.add_child(scrollContainer(content, 'shadow-weather-scroll'));
         });
-        content.add_child(this._hero(state, unit));
-
-        const metrics = this._selectedMetrics(state, unit).slice(0, 4);
-        if (metrics.length)
-            content.add_child(this._metricGrid(metrics));
-
-        content.add_child(this._hourlyForecast(state));
-
-        if (this.context.settings.get_boolean('show-weather-sun-times') &&
-            (state.today.sunrise || state.today.sunset)) {
-            content.add_child(this._sunTimes(state));
-        }
-
-        content.add_child(new St.Label({
-            text: this._footerText(state),
-            style_class: 'shadow-provider-footer shadow-muted',
-            x_align: Clutter.ActorAlign.START,
-        }));
-        this.actor.add_child(scrollContainer(content, 'shadow-weather-scroll'));
     }
 
     _hero(state, unit) {

@@ -7,11 +7,6 @@ import St from 'gi://St';
 import {ACCENTS, MODULE_META} from '../lib/constants.js';
 import {clampPercent, isHexColor} from '../lib/format.js';
 
-export function clearChildren(actor) {
-    for (const child of actor.get_children())
-        child.destroy();
-}
-
 export function resolveAccent(settings) {
     const preset = settings.get_string('accent-color');
     if (preset === 'custom') {
@@ -168,16 +163,15 @@ export class ProgressMeter {
 
 export function scrollContainer(child, styleClass = 'shadow-list-scroll') {
     const scroll = new St.ScrollView({
-        style_class: `${styleClass} shadow-clean-scroll`,
+        style_class: styleClass,
         overlay_scrollbars: true,
         hscrollbar_policy: St.PolicyType.NEVER,
-        vscrollbar_policy: St.PolicyType.AUTOMATIC,
+        // EXTERNAL keeps wheel/touchpad scrolling and the adjustment while
+        // leaving scrollbar chrome out of this compact popup.
+        vscrollbar_policy: St.PolicyType.EXTERNAL,
         x_expand: true,
         y_expand: true,
     });
-    const scrollbar = scroll.get_vscroll_bar();
-    scrollbar.reactive = false;
-    scrollbar.can_focus = false;
     scroll.set_child(child);
     return scroll;
 }

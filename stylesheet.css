@@ -256,22 +256,6 @@
   padding-right: 2px;
 }
 
-/* Keep wheel/touch scrolling while removing Yaru's gray scrollbar handle. */
-.shadow-clean-scroll StScrollBar {
-  min-width: 0;
-  min-height: 0;
-  width: 0;
-  height: 0;
-  padding: 0;
-}
-
-.shadow-clean-scroll StScrollBar StBin#trough,
-.shadow-clean-scroll StScrollBar > .vhandle,
-.shadow-clean-scroll StScrollBar > .hhandle {
-  background-color: transparent;
-  border: 0;
-}
-
 .shadow-section-label {
   font-size: 10px;
   font-weight: 760;

@@ -24,6 +24,30 @@ export class BasePage {
 
     onPopupClosed() {}
 
+    replaceContent(build) {
+        if (this._pageDestroyed || !this.actor)
+            return false;
+
+        const staging = new St.BoxLayout({vertical: true});
+        try {
+            build(staging);
+        } catch (error) {
+            staging.destroy();
+            this.context.logger?.warn(`Could not render ${this.id} page`, error);
+            return false;
+        }
+
+        const nextChildren = staging.get_children();
+        for (const child of nextChildren)
+            staging.remove_child(child);
+        for (const child of this.actor.get_children())
+            child.destroy();
+        for (const child of nextChildren)
+            this.actor.add_child(child);
+        staging.destroy();
+        return true;
+    }
+
     destroy() {
         if (this._pageDestroyed)
             return;

@@ -7,7 +7,6 @@ import {codexUsageStatus} from '../../lib/summary.js';
 import {launchUri} from '../../services/launcher.js';
 import {
     ProgressMeter,
-    clearChildren,
     iconButton,
     moduleTextButton,
     moduleIcon,
@@ -49,59 +48,60 @@ export class CodexPage extends BasePage {
         if (this._destroyed || this._pageDestroyed || !this.actor)
             return;
         const state = this._provider.getState();
-        clearChildren(this.actor);
-        this.actor.add_child(pageTitle(
-            'Codex Usage',
-            this._actions(state),
-            moduleIcon(this.context.extension, 'codex', 19, 'shadow-page-brand-icon')
-        ));
-
-        if (state.status === 'loading' && !state.lastSuccessfulRefresh) {
-            this.actor.add_child(stateMessage(
-                'content-loading-symbolic',
-                'Loading Codex usage',
-                'Reading limits from the local Codex app-server…'
+        this.replaceContent(page => {
+            page.add_child(pageTitle(
+                'Codex Usage',
+                this._actions(state),
+                moduleIcon(this.context.extension, 'codex', 19, 'shadow-page-brand-icon')
             ));
-            return;
-        }
-        if (state.status === 'error' && !state.lastSuccessfulRefresh) {
-            this.actor.add_child(stateMessage(
-                'dialog-warning-symbolic',
-                'Codex usage unavailable',
-                state.error ?? 'No usage data has been reported yet.',
-                textButton('Retry', () => this._provider.refresh(true))
-            ));
-            return;
-        }
 
-        const content = new St.BoxLayout({
-            vertical: true,
-            style_class: 'shadow-codex-content',
-            x_expand: true,
+            if (state.status === 'loading' && !state.lastSuccessfulRefresh) {
+                page.add_child(stateMessage(
+                    'content-loading-symbolic',
+                    'Loading Codex usage',
+                    'Reading limits from the local Codex app-server…'
+                ));
+                return;
+            }
+            if (state.status === 'error' && !state.lastSuccessfulRefresh) {
+                page.add_child(stateMessage(
+                    'dialog-warning-symbolic',
+                    'Codex usage unavailable',
+                    state.error ?? 'No usage data has been reported yet.',
+                    textButton('Retry', () => this._provider.refresh(true))
+                ));
+                return;
+            }
+
+            const content = new St.BoxLayout({
+                vertical: true,
+                style_class: 'shadow-codex-content',
+                x_expand: true,
+            });
+            let sectionCount = 0;
+            if (this.context.settings.get_boolean('show-codex-weekly')) {
+                content.add_child(this._weeklyHero(state.weekly));
+                sectionCount++;
+            }
+            if (this.context.settings.get_boolean('show-codex-five-hour')) {
+                content.add_child(this._fiveHourSection(state.fiveHour));
+                sectionCount++;
+            }
+            if (sectionCount === 0) {
+                content.add_child(new St.Label({
+                    text: 'Enable a usage window in Codex settings.',
+                    style_class: 'shadow-inline-empty shadow-muted',
+                }));
+            }
+
+            content.add_child(this._tokenActivity(state.tokenUsage));
+
+            const facts = this._facts(state);
+            if (facts)
+                content.add_child(facts);
+            content.add_child(this._footer(state));
+            page.add_child(scrollContainer(content, 'shadow-codex-scroll'));
         });
-        let sectionCount = 0;
-        if (this.context.settings.get_boolean('show-codex-weekly')) {
-            content.add_child(this._weeklyHero(state.weekly));
-            sectionCount++;
-        }
-        if (this.context.settings.get_boolean('show-codex-five-hour')) {
-            content.add_child(this._fiveHourSection(state.fiveHour));
-            sectionCount++;
-        }
-        if (sectionCount === 0) {
-            content.add_child(new St.Label({
-                text: 'Enable a usage window in Codex settings.',
-                style_class: 'shadow-inline-empty shadow-muted',
-            }));
-        }
-
-        content.add_child(this._tokenActivity(state.tokenUsage));
-
-        const facts = this._facts(state);
-        if (facts)
-            content.add_child(facts);
-        content.add_child(this._footer(state));
-        this.actor.add_child(scrollContainer(content, 'shadow-codex-scroll'));
     }
 
     _actions(state) {
