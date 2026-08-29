@@ -17,6 +17,7 @@ import {
     normalizeWeatherQuery,
     weatherCacheMatchesSettings,
     weatherCondition,
+    weatherSearchQueries,
 } from '../modules/weather/normalize.js';
 import {WeatherProvider} from '../modules/weather/provider.js';
 import {Observable} from '../services/observable.js';
@@ -212,6 +213,11 @@ function testWeatherNormalization() {
         ok(weatherCondition(code).label !== 'Unknown conditions', `WMO code ${code} is mapped`);
     equal(normalizeWeatherQuery('  Cairo\n\u202e Egypt  '), 'Cairo Egypt',
         'weather queries remove controls and normalize whitespace');
+    equal(normalizeWeatherQuery('  port-said , Egypt  '), 'port-said, Egypt',
+        'weather queries normalize comma spacing');
+    equal(weatherSearchQueries('port-said , Egypt').join('|'),
+        'port-said, Egypt|port said, Egypt',
+        'hyphenated places get a safe relaxed fallback query');
     const longQuery = normalizeWeatherQuery('😀'.repeat(121));
     equal([...longQuery].length, 120, 'weather query length is capped by Unicode code point');
     ok(Boolean(encodeURIComponent(longQuery)), 'weather query truncation preserves valid Unicode');
@@ -230,6 +236,39 @@ function testWeatherNormalization() {
         'Weather cache from another location is rejected');
     ok(!weatherCacheMatchesSettings(cached, 'Cairo, Egypt', 'fahrenheit'),
         'Weather cache from another unit is rejected');
+}
+
+async function testWeatherLocationFallback() {
+    const provider = new WeatherProvider(new FakeSettings({
+        'weather-refresh-minutes': 30,
+        'weather-location': 'port-said , Egypt',
+        'weather-unit': 'celsius',
+    }), inertScheduler, null);
+    const requests = [];
+    provider._getJson = async url => {
+        requests.push(url);
+        if (requests.length === 1)
+            return {};
+        return {results: [{
+            name: 'Port Said',
+            admin1: 'Port Said',
+            country: 'Egypt',
+            latitude: 31.2565,
+            longitude: 32.2841,
+        }]};
+    };
+    const location = await provider._resolveLocation(provider._locationQuery(), null);
+    equal(requests.length, 2, 'Weather retries a hyphenated city with spaces');
+    ok(requests[1].includes('port%20said%2C%20Egypt'),
+        'Weather fallback keeps the country qualifier');
+    equal(location.query, 'port-said, Egypt',
+        'Weather caches against the normalized user query');
+    equal(location.displayName, 'Port Said, Egypt',
+        'Weather removes duplicate administrative labels');
+    equal(provider._friendlyError(new Error('weather-location-not-found')),
+        'Location not found. Try “City, Country” without abbreviations.',
+        'missing locations get an actionable error');
+    provider.destroy();
 }
 
 function testContentValidation() {
@@ -440,6 +479,7 @@ testCodexNormalization();
 testTopBarSummaries();
 testWeatherNormalization();
 testContentValidation();
+await testWeatherLocationFallback();
 await testCodexShareImage();
 await testProviderFailureIsolation();
 await testCodexProtocolOrdering();

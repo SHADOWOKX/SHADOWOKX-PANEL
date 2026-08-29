@@ -41,8 +41,25 @@ export function normalizeWeatherQuery(value) {
     const clean = query
         .replace(/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, ' ')
         .replace(/\s+/g, ' ')
+        .replace(/\s*,\s*/g, ', ')
         .trim();
     return [...clean].slice(0, 120).join('') || 'Cairo, Egypt';
+}
+
+export function weatherSearchQueries(value) {
+    const query = normalizeWeatherQuery(value);
+    const candidates = [query];
+    const comma = query.indexOf(',');
+    const place = comma >= 0 ? query.slice(0, comma) : query;
+    const qualifier = comma >= 0 ? query.slice(comma) : '';
+    const relaxedPlace = place
+        .replace(/[-\u2010-\u2015]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const relaxed = `${relaxedPlace}${qualifier}`;
+    if (relaxedPlace && relaxed !== query)
+        candidates.push(relaxed);
+    return candidates;
 }
 
 function validCondition(condition) {

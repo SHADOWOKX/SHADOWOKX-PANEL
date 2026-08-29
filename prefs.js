@@ -40,11 +40,12 @@ function spinRow(settings, key, title, min, max, step, subtitle = '') {
     return row;
 }
 
-function entryRow(settings, key, title, validator) {
+function entryRow(settings, key, title, validator, transform = value => value) {
     const row = new Adw.EntryRow({title, text: settings.get_string(key)});
     row.connect('changed', () => {
-        const value = row.text.trim();
-        if (validator(value)) {
+        const rawValue = row.text.trim();
+        const value = transform(rawValue);
+        if (rawValue && validator(value)) {
             row.remove_css_class('error');
             settings.set_string(key, value);
         } else {
@@ -229,7 +230,8 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
             settings,
             'weather-location',
             'Location',
-            value => value.length > 0 && normalizeWeatherQuery(value) === value
+            value => value.length > 0,
+            normalizeWeatherQuery
         ));
         provider.add(comboRow(settings, 'weather-unit', 'Temperature unit', [
             {value: 'celsius', label: 'Celsius'},

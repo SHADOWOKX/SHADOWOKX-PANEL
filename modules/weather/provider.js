@@ -8,6 +8,7 @@ import {JsonStore} from '../../services/jsonStore.js';
 import {
     normalizeWeather,
     normalizeWeatherQuery,
+    weatherSearchQueries,
     weatherCacheMatchesSettings,
 } from './normalize.js';
 
@@ -163,7 +164,7 @@ export class WeatherProvider extends Observable {
                 ...previous,
                 status: hasCache ? 'stale' : 'error',
                 stale: hasCache,
-                error: 'Weather is temporarily unavailable. Check the location or connection.',
+                error: this._friendlyError(error),
             };
             this._setState(state);
             this._logger?.debug('weather.refresh.failed', {message: error.message});
@@ -178,14 +179,19 @@ export class WeatherProvider extends Observable {
         if (this._resolvedLocation?.query === query)
             return this._resolvedLocation;
 
-        const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}` +
-            '&count=1&language=en&format=json';
-        const payload = await this._getJson(url, cancellable);
-        const result = payload.results?.[0];
+        let result = null;
+        for (const candidate of weatherSearchQueries(query)) {
+            const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(candidate)}` +
+                '&count=1&language=en&format=json';
+            const payload = await this._getJson(url, cancellable);
+            result = payload.results?.[0] ?? null;
+            if (result)
+                break;
+        }
         if (!result || !Number.isFinite(result.latitude) || result.latitude < -90 ||
             result.latitude > 90 || !Number.isFinite(result.longitude) ||
             result.longitude < -180 || result.longitude > 180)
-            throw new Error('Location not found');
+            throw new Error('weather-location-not-found');
         const truncate = (value, maximum) => [...value].slice(0, maximum).join('');
         const cleanPart = value => typeof value === 'string'
             ? truncate(value.replace(/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, '')
@@ -195,7 +201,7 @@ export class WeatherProvider extends Observable {
         if (!name)
             throw new Error('Location not found');
         const suffix = [cleanPart(result.admin1), cleanPart(result.country)]
-            .filter(Boolean)
+            .filter(part => part && part.toLocaleLowerCase() !== name.toLocaleLowerCase())
             .join(', ');
         this._resolvedLocation = {
             query,
@@ -221,6 +227,14 @@ export class WeatherProvider extends Observable {
             'forecast_days=2',
         ];
         return this._getJson(`https://api.open-meteo.com/v1/forecast?${params.join('&')}`, cancellable);
+    }
+
+    _friendlyError(error) {
+        if (error.message === 'weather-location-not-found')
+            return 'Location not found. Try “City, Country” without abbreviations.';
+        if (/HTTP 429/.test(error.message))
+            return 'Open-Meteo is busy. The last forecast will refresh automatically.';
+        return 'Weather is temporarily unavailable. Check the connection and try again.';
     }
 
     async _getJson(url, cancellable) {
