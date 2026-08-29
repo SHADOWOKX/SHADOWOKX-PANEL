@@ -99,6 +99,76 @@ function normalizeSpendControl(limit) {
     };
 }
 
+function normalizeTokenCount(value) {
+    return Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+function normalizeUsageDate(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value))
+        return null;
+    const parsed = new Date(`${value}T00:00:00Z`);
+    return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+        ? value
+        : null;
+}
+
+function localDateKey(nowMs) {
+    const date = new Date(nowMs);
+    if (!Number.isFinite(date.getTime()))
+        return null;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+export function normalizeAccountTokenUsage(response, nowMs = Date.now()) {
+    if (!response || typeof response !== 'object')
+        return null;
+    const buckets = Array.isArray(response.dailyUsageBuckets)
+        ? response.dailyUsageBuckets
+            .map(bucket => ({
+                date: normalizeUsageDate(bucket?.startDate),
+                tokens: normalizeTokenCount(bucket?.tokens),
+            }))
+            .filter(bucket => bucket.date && bucket.tokens !== null)
+        : [];
+    const peakBucket = buckets.reduce((peak, bucket) =>
+        !peak || bucket.tokens > peak.tokens ? bucket : peak, null);
+    const reportedPeak = normalizeTokenCount(response.summary?.peakDailyTokens);
+    const peakDailyTokens = reportedPeak ?? peakBucket?.tokens ?? null;
+    const peakDate = buckets.find(bucket => bucket.tokens === peakDailyTokens)?.date ?? null;
+    const todayTokens = buckets.find(bucket => bucket.date === localDateKey(nowMs))?.tokens ?? null;
+    const lifetimeTokens = normalizeTokenCount(response.summary?.lifetimeTokens);
+    if (lifetimeTokens === null && todayTokens === null && peakDailyTokens === null)
+        return null;
+    return {
+        lifetimeTokens,
+        todayTokens,
+        peakDailyTokens,
+        peakDate,
+        peakHour: null,
+        granularity: 'daily',
+    };
+}
+
+function normalizeCachedTokenUsage(value) {
+    if (!value || typeof value !== 'object')
+        return null;
+    const tokenUsage = {
+        lifetimeTokens: normalizeTokenCount(value.lifetimeTokens),
+        todayTokens: normalizeTokenCount(value.todayTokens),
+        peakDailyTokens: normalizeTokenCount(value.peakDailyTokens),
+        peakDate: normalizeUsageDate(value.peakDate),
+        peakHour: null,
+        granularity: 'daily',
+    };
+    return tokenUsage.lifetimeTokens !== null || tokenUsage.todayTokens !== null ||
+        tokenUsage.peakDailyTokens !== null
+        ? tokenUsage
+        : null;
+}
+
 export function normalizeRateLimits(response, nowMs = Date.now(), metadata = {}) {
     if (!response || typeof response !== 'object')
         throw new Error('Codex returned an invalid rate-limit response');
@@ -144,6 +214,7 @@ export function normalizeRateLimits(response, nowMs = Date.now(), metadata = {})
             ? Math.max(0, Math.min(999, Math.round(response.rateLimitResetCredits.availableCount)))
             : 0,
         resetCreditDetails,
+        tokenUsage: normalizeAccountTokenUsage(metadata.usageResponse, nowMs),
         lastSuccessfulRefresh: nowMs,
     };
 }
@@ -173,6 +244,7 @@ export function normalizeCachedRateLimits(value) {
         resetCreditsAvailable: Number.isFinite(value.resetCreditsAvailable)
             ? Math.max(0, Math.min(999, Math.round(value.resetCreditsAvailable)))
             : 0,
+        tokenUsage: normalizeCachedTokenUsage(value.tokenUsage),
         lastSuccessfulRefresh: value.lastSuccessfulRefresh,
     };
 }

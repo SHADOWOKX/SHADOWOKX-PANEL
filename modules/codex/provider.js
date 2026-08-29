@@ -32,6 +32,7 @@ export class CodexProvider extends Observable {
             fiveHour: null,
             weekly: null,
             resetCreditsAvailable: 0,
+            tokenUsage: null,
             lastSuccessfulRefresh: null,
         });
         this._settings = settings;
@@ -110,6 +111,7 @@ export class CodexProvider extends Observable {
             const state = normalizeRateLimits(response.rateLimitsResponse, Date.now(), {
                 accountResponse: response.accountResponse,
                 initializeResponse: response.initializeResponse,
+                usageResponse: response.usageResponse,
             });
             if (this._destroyed)
                 return this.getState();
@@ -262,21 +264,32 @@ export class CodexProvider extends Observable {
                 {
                     jsonrpc: '2.0',
                     id: 2,
+                    method: 'account/usage/read',
+                    params: {},
+                },
+                {
+                    jsonrpc: '2.0',
+                    id: 3,
                     method: 'account/read',
                     params: {refreshToken: false},
                 },
-                {jsonrpc: '2.0', id: 3, method: 'account/rateLimits/read'},
+                {jsonrpc: '2.0', id: 4, method: 'account/rateLimits/read'},
             ]);
 
+            let usageResponse = null;
             let accountResponse = null;
             let rateLimitsResponse = null;
             for (let count = 0; count < 512; count++) {
                 const message = await readMessage();
                 if (message.id === 2) {
                     if (!message.error)
-                        accountResponse = message.result ?? null;
+                        usageResponse = message.result ?? null;
                 }
                 if (message.id === 3) {
+                    if (!message.error)
+                        accountResponse = message.result ?? null;
+                }
+                if (message.id === 4) {
                     if (message.error)
                         throw new Error('codex-request-failed');
                     if (!message.result)
@@ -290,6 +303,7 @@ export class CodexProvider extends Observable {
                         initializeResponse,
                         accountResponse,
                         rateLimitsResponse,
+                        usageResponse,
                     };
                 }
             }

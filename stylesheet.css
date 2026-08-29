@@ -327,6 +327,18 @@
   spacing: 8px;
 }
 
+.shadow-usage-heading {
+  min-height: 22px;
+}
+
+.shadow-usage-state {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background-color: rgba(128, 128, 128, 0.10);
+  font-size: 10px;
+  font-weight: 650;
+}
+
 .shadow-weekly-value-row {
   spacing: 7px;
 }
@@ -391,6 +403,19 @@
 .shadow-metadata-row {
   padding: 3px 2px;
   spacing: 20px;
+}
+
+.shadow-token-activity {
+  padding: 10px 11px;
+  spacing: 7px;
+}
+
+.shadow-token-row {
+  spacing: 18px;
+}
+
+.shadow-token-note {
+  font-size: 10px;
 }
 
 .shadow-metadata-label,

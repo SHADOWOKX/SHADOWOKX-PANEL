@@ -4,9 +4,10 @@ import GLib from 'gi://GLib';
 import {MODULE_IDS} from '../lib/constants.js';
 import {clampPercent, formatCountdown, formatResetDate, isHexColor} from '../lib/format.js';
 import {chooseInitialModule} from '../lib/moduleConfig.js';
-import {codexRemainingSummary, weatherSummaryTemperature} from '../lib/summary.js';
+import {codexRemainingSummary, codexUsageStatus, weatherSummaryTemperature} from '../lib/summary.js';
 import {
     normalizeCachedRateLimits,
+    normalizeAccountTokenUsage,
     normalizeRateLimits,
     planLabel,
 } from '../modules/codex/normalize.js';
@@ -123,6 +124,7 @@ function testModuleConfiguration() {
 }
 
 function testCodexNormalization() {
+    const nowMs = new Date(2026, 7, 29, 12).getTime();
     const state = normalizeRateLimits({
         rateLimits: {
             planType: 'plus',
@@ -134,9 +136,16 @@ function testCodexNormalization() {
             availableCount: 1,
             credits: [{status: 'available', title: 'Reset now', expiresAt: 2_100_000_000}],
         },
-    }, 1234, {
+    }, nowMs, {
         accountResponse: {account: {email: 'shadow@example.test', planType: 'plus', type: 'chatgpt'}},
         initializeResponse: {userAgent: 'codex-cli/0.150.0-alpha.12.2'},
+        usageResponse: {
+            summary: {lifetimeTokens: 885_281_875, peakDailyTokens: 284_458_873},
+            dailyUsageBuckets: [
+                {startDate: '2026-08-09', tokens: 284_458_873},
+                {startDate: '2026-08-29', tokens: 5_822_658},
+            ],
+        },
     });
     equal(state.fiveHour.usedPercent, 68, 'five-hour usage');
     equal(state.fiveHour.remainingPercent, 32, 'five-hour remaining');
@@ -145,7 +154,11 @@ function testCodexNormalization() {
     equal(state.planLabel, 'Codex Plus', 'plan gets a friendly label');
     equal(state.clientVersion, '0.150.0-alpha.12.2', 'client version is normalized');
     equal(state.resetCreditsAvailable, 1, 'reset-credit count is normalized');
-    equal(state.lastSuccessfulRefresh, 1234, 'Codex refresh timestamp');
+    equal(state.tokenUsage.todayTokens, 5_822_658, 'today token usage is normalized');
+    equal(state.tokenUsage.lifetimeTokens, 885_281_875, 'lifetime token usage is normalized');
+    equal(state.tokenUsage.peakDate, '2026-08-09', 'peak token day keeps the real bucket date');
+    equal(state.tokenUsage.peakHour, null, 'peak hour is not fabricated from daily buckets');
+    equal(state.lastSuccessfulRefresh, nowMs, 'Codex refresh timestamp');
     equal(planLabel('__proto__'), 'Codex account', 'prototype names cannot become plan labels');
 
     const weeklyOnly = normalizeRateLimits({
@@ -162,6 +175,22 @@ function testCodexNormalization() {
         lastSuccessfulRefresh: Date.now() + 10 * 60 * 1000,
         weekly: {usedPercent: 1, resetsAt: 2_000_000_000},
     }), null, 'future Codex caches are rejected');
+    equal(normalizeAccountTokenUsage({
+        summary: {lifetimeTokens: Number.MAX_SAFE_INTEGER + 1},
+        dailyUsageBuckets: [{startDate: 'invalid', tokens: 100}],
+    }), null, 'unsafe or undated token activity is rejected');
+    const cachedUsage = normalizeCachedRateLimits({
+        lastSuccessfulRefresh: Date.now(),
+        weekly: {usedPercent: 10, resetsAt: 2_000_000_000},
+        tokenUsage: {
+            lifetimeTokens: 12_345,
+            todayTokens: 678,
+            peakDailyTokens: 9_000,
+            peakDate: '2026-08-20',
+        },
+    });
+    equal(cachedUsage.tokenUsage.todayTokens, 678,
+        'validated token activity survives a cached refresh');
 }
 
 function testTopBarSummaries() {
@@ -169,6 +198,9 @@ function testTopBarSummaries() {
         60, 'Codex summary prefers the weekly remaining capacity');
     equal(codexRemainingSummary({fiveHour: {remainingPercent: 57}, weekly: null}),
         57, 'Codex summary falls back to five-hour remaining capacity');
+    equal(codexUsageStatus(61).emoji, '🟢', 'comfortable usage status');
+    equal(codexUsageStatus(29).emoji, '🟠', 'limited usage status');
+    equal(codexUsageStatus(4).emoji, '🔴', 'low usage status');
     equal(weatherSummaryTemperature({current: {temperature: 33.6}}),
         34, 'weather summary rounds temperature');
 }
@@ -417,13 +449,15 @@ case "$initialize" in
 esac
 printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"userAgent":"codex-cli/9.9.9"}}'
 IFS= read -r initialized
-IFS= read -r account
-IFS= read -r limits
-case "$initialized:$account:$limits" in
-  *'"method":"initialized"'*':'*'"id":2'*':'*'"id":3'*) ;;
-  *) exit 3 ;;
-esac
-printf '%s\n' '{"jsonrpc":"2.0","id":3,"result":{"rateLimits":{"primary":{"usedPercent":10,"windowDurationMins":10080,"resetsAt":2000000000}}}}'
+    IFS= read -r usage
+    IFS= read -r account
+    IFS= read -r limits
+    case "$initialized:$usage:$account:$limits" in
+      *'"method":"initialized"'*':'*'"id":2'*':'*'"id":3'*':'*'"id":4'*) ;;
+      *) exit 3 ;;
+    esac
+    printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"summary":{"lifetimeTokens":1234,"peakDailyTokens":900},"dailyUsageBuckets":[{"startDate":"2026-08-29","tokens":334}]}}'
+    printf '%s\n' '{"jsonrpc":"2.0","id":4,"result":{"rateLimits":{"primary":{"usedPercent":10,"windowDurationMins":10080,"resetsAt":2000000000}}}}'
 sleep 5
 `;
     GLib.file_set_contents(fakeServer, source);
@@ -441,6 +475,8 @@ sleep 5
         equal(state.weekly.remainingPercent, 90,
             'Codex accepts valid limits without waiting for optional account metadata');
         equal(state.clientVersion, '9.9.9', 'Codex initialize metadata is retained');
+        equal(state.tokenUsage.lifetimeTokens, 1234,
+            'Codex protocol reads account token activity before rate limits');
     } finally {
         provider.destroy();
         GLib.unlink(fakeServer);

@@ -3,6 +3,7 @@ import Gio from 'gi://Gio';
 import St from 'gi://St';
 
 import {formatClock, formatCountdown, formatResetDate} from '../../lib/format.js';
+import {codexUsageStatus} from '../../lib/summary.js';
 import {launchUri} from '../../services/launcher.js';
 import {
     ProgressMeter,
@@ -94,6 +95,8 @@ export class CodexPage extends BasePage {
             }));
         }
 
+        content.add_child(this._tokenActivity(state.tokenUsage));
+
         const facts = this._facts(state);
         if (facts)
             content.add_child(facts);
@@ -137,11 +140,21 @@ export class CodexPage extends BasePage {
             style_class: 'shadow-card shadow-weekly-hero',
             x_expand: true,
         });
-        card.add_child(new St.Label({
+        const heading = new St.BoxLayout({style_class: 'shadow-usage-heading', x_expand: true});
+        heading.add_child(new St.Label({
             text: 'Weekly',
             style_class: 'shadow-section-label',
             x_align: Clutter.ActorAlign.START,
+            x_expand: true,
         }));
+        if (window) {
+            const status = codexUsageStatus(window.remainingPercent);
+            heading.add_child(new St.Label({
+                text: `${status.emoji} ${status.label}`,
+                style_class: 'shadow-usage-state',
+            }));
+        }
+        card.add_child(heading);
         if (!window) {
             card.add_child(new St.Label({
                 text: 'Unavailable',
@@ -232,13 +245,78 @@ export class CodexPage extends BasePage {
             }));
         }
         section.add_child(copy);
+        const status = codexUsageStatus(window.remainingPercent);
         section.add_child(new St.Label({
-            text: `${window.remainingPercent}% remaining`,
+            text: `${status.emoji} ${window.remainingPercent}% remaining`,
             style_class: 'shadow-five-hour-value',
             style: `color: ${resolveAccent(this.context.settings)};`,
             y_align: Clutter.ActorAlign.CENTER,
         }));
         return section;
+    }
+
+    _tokenActivity(usage) {
+        const card = new St.BoxLayout({
+            vertical: true,
+            style_class: 'shadow-secondary-surface shadow-token-activity',
+            x_expand: true,
+        });
+        card.add_child(new St.Label({
+            text: 'TOKEN ACTIVITY',
+            style_class: 'shadow-section-label',
+            x_align: Clutter.ActorAlign.START,
+        }));
+        if (!usage) {
+            card.add_child(new St.Label({
+                text: 'Tokens and peak time · Not reported by Codex',
+                style_class: 'shadow-token-note shadow-muted',
+                x_align: Clutter.ActorAlign.START,
+            }));
+            return card;
+        }
+
+        const metrics = [
+            ['Today', this._formatTokens(usage.todayTokens)],
+            ['Lifetime', this._formatTokens(usage.lifetimeTokens)],
+            ['Peak day', this._formatUsageDate(usage.peakDate)],
+            ['Peak tokens', this._formatTokens(usage.peakDailyTokens)],
+        ];
+        for (let index = 0; index < metrics.length; index += 2) {
+            const row = new St.BoxLayout({style_class: 'shadow-token-row', x_expand: true});
+            row.add_child(this._tokenMetric(...metrics[index]));
+            row.add_child(this._tokenMetric(...metrics[index + 1]));
+            card.add_child(row);
+        }
+        card.add_child(new St.Label({
+            text: 'Peak hour · Not reported (Codex provides daily totals)',
+            style_class: 'shadow-token-note shadow-muted',
+            x_align: Clutter.ActorAlign.START,
+        }));
+        return card;
+    }
+
+    _tokenMetric(label, value) {
+        const metric = new St.BoxLayout({vertical: true, x_expand: true});
+        metric.add_child(new St.Label({text: label, style_class: 'shadow-metadata-label'}));
+        metric.add_child(new St.Label({
+            text: value ?? 'Not reported',
+            style_class: 'shadow-metadata-value',
+        }));
+        return metric;
+    }
+
+    _formatTokens(value) {
+        return Number.isSafeInteger(value) ? new Intl.NumberFormat('en-US').format(value) : null;
+    }
+
+    _formatUsageDate(value) {
+        if (typeof value !== 'string')
+            return null;
+        const [year, month, day] = value.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
+        return Number.isFinite(date.getTime())
+            ? date.toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'})
+            : null;
     }
 
     _facts(state) {
