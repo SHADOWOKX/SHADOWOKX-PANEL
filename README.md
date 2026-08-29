@@ -2,7 +2,7 @@
 
 Shadowokx Panel is a small GNOME top-bar utility that does two things well: it shows Codex usage limits and useful local weather. It targets Ubuntu 26.04.1 LTS, GNOME Shell 50, Wayland, and modern GJS ES modules.
 
-Release `2.0.0` deliberately contains only two pages:
+Release `2.0.1` deliberately contains only two pages:
 
 1. ChatGPT Codex
 2. Weather
@@ -23,7 +23,8 @@ The Codex percentage always means **remaining capacity**, never consumed capacit
 
 - Compact configurable top-bar fields for the ChatGPT icon, remaining percentage, weekly reset countdown, weather icon, temperature, and condition.
 - Two fixed tabs with icon-only inactive state and a subtle icon-plus-label active state. There is no scrolling tab widget or separator artifact.
-- A weekly-first Codex hero with dominant remaining capacity, remaining-progress meter, reset countdown/date, compact five-hour state, reset credits, client version, refresh, Open Codex, and PNG Share actions.
+- A weekly-first Codex hero with dominant remaining capacity, remaining-progress meter, tasteful 🟢/🟡/🟠/🔴 state cues, reset countdown/date, compact five-hour state, reset credits, client version, refresh, Open Codex, and PNG Share actions.
+- Verified Codex token activity for today, lifetime total, peak day, and peak-day tokens when the signed-in app-server reports them. Peak hour is shown as unsupported because the provider exposes daily buckets, not hourly timestamps.
 - Current-weather hero with condition, location, high/low, up to four optional details, four next-hour forecasts, optional sunrise/sunset, Celsius or Fahrenheit, and location-aware times.
 - Cached Codex and Weather data remain visible during temporary failures.
 - Auto, Dark, and Light modes; Claude Gray, Graphite, GNOME, and Light Neutral backgrounds; Comfortable and Compact density; seven accent presets plus a custom accent.
@@ -75,6 +76,7 @@ Shadowokx Panel starts the locally installed `codex app-server --stdio` executab
 
 ```text
 account/read
+account/usage/read
 account/rateLimits/read
 ```
 
@@ -85,6 +87,8 @@ remaining = 100 - usedPercent
 ```
 
 The top bar prefers weekly remaining capacity because the weekly limit is the primary product signal, with five-hour remaining as a fallback when weekly is not reported.
+
+`account/usage/read` supplies optional account token-activity summaries and daily buckets. The panel validates and displays only reported integer counts and dates. It never estimates a peak hour from daily data or parses private session transcripts as a substitute.
 
 Security properties:
 
@@ -113,7 +117,7 @@ Images are created privately and saved without overwriting earlier exports under
 ~/Pictures/Shadowokx/
 ```
 
-The popup confirms the filename and provides an Open Folder action. Direct image clipboard transfer is not claimed because GNOME Shell's stable extension clipboard interface is text-oriented.
+A transient GNOME notification confirms the filename and provides an Open Folder action. No green success row is inserted into the popup. Direct image clipboard transfer is not claimed because GNOME Shell's stable extension clipboard interface is text-oriented.
 
 The bundled ChatGPT icon is used only to identify the Codex integration. See [NOTICE.md](NOTICE.md).
 
@@ -123,7 +127,7 @@ The configured location is sent to Open-Meteo geocoding. The resolved coordinate
 
 Requests are asynchronous, time-limited, response-size bounded, cached, and made only when stale, manually refreshed, or after a relevant setting changes. A failed refresh never discards the last successful forecast. Full Weather unavailable state is shown only when no valid result has ever been loaded.
 
-The hourly forecast is a fixed four-column actor row. It does not use a horizontal `St.ScrollView`, so no scrollbar or progress-like bar can appear beneath it.
+The hourly forecast is a fixed four-column actor row. It does not use a horizontal `St.ScrollView`, so no scrollbar or progress-like bar can appear beneath it. The page remains wheel/touch scrollable while its vertical scrollbar chrome is hidden.
 
 ## Appearance
 
@@ -135,7 +139,7 @@ The stylesheet uses a small set of logical surface and text classes rather than 
 - primary text
 - muted text
 - accent
-- success and error feedback
+- status and recovery feedback
 
 Accent is limited to selected tabs, progress, important usage values, weather emphasis, and active controls. It does not tint the whole popup.
 
@@ -213,6 +217,7 @@ Normal operation is quiet. Debug logging is disabled by default and never includ
 ## Known limitations
 
 - Some Codex accounts or sessions report only weekly capacity. The five-hour section remains compactly unavailable and no value is invented.
+- Token activity can be unavailable for unsupported authentication modes or older Codex versions. App-server currently reports daily buckets, so peak hour remains explicitly unsupported.
 - The local Codex app-server schema can evolve with future Codex releases; its provider is isolated so it can be updated without changing the page.
 - Share saves PNG files and opens their folder; it does not claim binary clipboard support.
 - Weather location entry uses safe text validation rather than a network-backed search chooser.
