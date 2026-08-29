@@ -186,6 +186,11 @@ export class CodexProvider extends Observable {
             }
             return GLib.SOURCE_REMOVE;
         });
+        let initializeResponse = null;
+        let usageResponse = null;
+        let usageSettled = false;
+        let accountResponse = null;
+        let rateLimitsResponse = null;
 
         try {
             const output = this._process.get_stdin_pipe();
@@ -247,7 +252,6 @@ export class CodexProvider extends Observable {
 
             await writeMessages([initializeRequest]);
 
-            let initializeResponse = null;
             for (let count = 0; count < 512 && !initializeResponse; count++) {
                 const message = await readMessage();
                 if (message.id === 1) {
@@ -276,12 +280,10 @@ export class CodexProvider extends Observable {
                 {jsonrpc: '2.0', id: 4, method: 'account/rateLimits/read'},
             ]);
 
-            let usageResponse = null;
-            let accountResponse = null;
-            let rateLimitsResponse = null;
             for (let count = 0; count < 512; count++) {
                 const message = await readMessage();
                 if (message.id === 2) {
+                    usageSettled = true;
                     if (!message.error)
                         usageResponse = message.result ?? null;
                 }
@@ -296,9 +298,10 @@ export class CodexProvider extends Observable {
                         throw new Error('codex-invalid-response');
                     rateLimitsResponse = message.result;
                 }
-                // Account metadata is optional. Never discard valid rate limits
-                // because an older app-server does not implement account/read.
-                if (rateLimitsResponse) {
+                // Account metadata is optional. Token activity is also optional,
+                // but wait for its response so out-of-order JSON-RPC messages do
+                // not incorrectly look like an unsupported Codex version.
+                if (rateLimitsResponse && usageSettled) {
                     return {
                         initializeResponse,
                         accountResponse,
@@ -309,6 +312,16 @@ export class CodexProvider extends Observable {
             }
             throw new Error('codex-invalid-response');
         } catch (error) {
+            // A non-compliant older server may ignore the optional usage method.
+            // Preserve a valid rate-limit response at the global timeout.
+            if (timedOut && rateLimitsResponse) {
+                return {
+                    initializeResponse,
+                    accountResponse,
+                    rateLimitsResponse,
+                    usageResponse: null,
+                };
+            }
             if (timedOut)
                 throw new Error('codex-timeout');
             throw error;

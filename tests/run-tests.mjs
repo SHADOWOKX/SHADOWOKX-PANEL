@@ -456,8 +456,8 @@ IFS= read -r initialized
       *'"method":"initialized"'*':'*'"id":2'*':'*'"id":3'*':'*'"id":4'*) ;;
       *) exit 3 ;;
     esac
-    printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"summary":{"lifetimeTokens":1234,"peakDailyTokens":900},"dailyUsageBuckets":[{"startDate":"2026-08-29","tokens":334}]}}'
     printf '%s\n' '{"jsonrpc":"2.0","id":4,"result":{"rateLimits":{"primary":{"usedPercent":10,"windowDurationMins":10080,"resetsAt":2000000000}}}}'
+    printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"summary":{"lifetimeTokens":1234,"peakDailyTokens":900},"dailyUsageBuckets":[{"startDate":"2026-08-29","tokens":334}]}}'
 sleep 5
 `;
     GLib.file_set_contents(fakeServer, source);
@@ -476,7 +476,7 @@ sleep 5
             'Codex accepts valid limits without waiting for optional account metadata');
         equal(state.clientVersion, '9.9.9', 'Codex initialize metadata is retained');
         equal(state.tokenUsage.lifetimeTokens, 1234,
-            'Codex protocol reads account token activity before rate limits');
+            'Codex waits for out-of-order account token activity');
     } finally {
         provider.destroy();
         GLib.unlink(fakeServer);
