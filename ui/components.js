@@ -1,6 +1,7 @@
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import Pango from 'gi://Pango';
 import St from 'gi://St';
 
 import {ACCENTS, MODULE_META} from '../lib/constants.js';
@@ -82,28 +83,6 @@ export function moduleTextButton(
     return button;
 }
 
-export function iconTextButton(
-    iconName,
-    label,
-    accessibleName,
-    callback,
-    styleClass = 'shadow-text-button'
-) {
-    const content = new St.BoxLayout({style_class: 'shadow-button-content'});
-    content.add_child(new St.Icon({icon_name: iconName, icon_size: 15}));
-    content.add_child(new St.Label({text: label, y_align: Clutter.ActorAlign.CENTER}));
-    const button = new St.Button({
-        style_class: styleClass,
-        can_focus: true,
-        reactive: true,
-        track_hover: true,
-        accessible_name: accessibleName,
-        child: content,
-    });
-    button.connect('clicked', callback);
-    return button;
-}
-
 export function textButton(label, callback, styleClass = 'shadow-text-button') {
     const button = new St.Button({
         label,
@@ -120,12 +99,15 @@ export function pageTitle(title, action = null, leading = null) {
     const box = new St.BoxLayout({style_class: 'shadow-page-title-row', x_expand: true});
     if (leading)
         box.add_child(leading);
-    box.add_child(new St.Label({
+    const label = new St.Label({
         text: title,
         style_class: 'shadow-page-title',
         x_expand: true,
         y_align: Clutter.ActorAlign.CENTER,
-    }));
+    });
+    label.clutter_text.set_single_line_mode(true);
+    label.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
+    box.add_child(label);
     if (action)
         box.add_child(action);
     return box;
@@ -186,13 +168,16 @@ export class ProgressMeter {
 
 export function scrollContainer(child, styleClass = 'shadow-list-scroll') {
     const scroll = new St.ScrollView({
-        style_class: styleClass,
+        style_class: `${styleClass} shadow-clean-scroll`,
         overlay_scrollbars: true,
         hscrollbar_policy: St.PolicyType.NEVER,
         vscrollbar_policy: St.PolicyType.AUTOMATIC,
         x_expand: true,
         y_expand: true,
     });
+    const scrollbar = scroll.get_vscroll_bar();
+    scrollbar.reactive = false;
+    scrollbar.can_focus = false;
     scroll.set_child(child);
     return scroll;
 }

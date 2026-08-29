@@ -3,6 +3,7 @@ import GObject from 'gi://GObject';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
@@ -44,6 +45,7 @@ class ShadowIndicator extends PanelMenu.Button {
         this._destroyed = false;
         this._codexState = null;
         this._weatherState = null;
+        this._notificationSource = null;
 
         this._buildIndicator();
         this._buildDashboard();
@@ -162,7 +164,8 @@ class ShadowIndicator extends PanelMenu.Button {
             settings: this._settings,
             scheduler: services.scheduler,
             logger: this._logger,
-            notify: (title, message) => Main.notify(title, message),
+            notify: (title, message, options = {}) =>
+                this._notify(title, message, options),
             codexProvider: services.codexProvider,
             weatherProvider: services.weatherProvider,
         };
@@ -340,6 +343,30 @@ class ShadowIndicator extends PanelMenu.Button {
         this._extension._flushPendingRebuild();
     }
 
+    _notify(title, body, options = {}) {
+        if (this._destroyed)
+            return;
+        if (!this._notificationSource) {
+            this._notificationSource = new MessageTray.Source({
+                title: 'Shadowokx Panel',
+                'icon-name': 'dialog-information-symbolic',
+            });
+            this._notificationSource.connect('destroy', () => {
+                this._notificationSource = null;
+            });
+            Main.messageTray.add(this._notificationSource);
+        }
+        const notification = new MessageTray.Notification({
+            source: this._notificationSource,
+            title,
+            body,
+            'is-transient': true,
+        });
+        if (options.actionLabel && typeof options.action === 'function')
+            notification.addAction(options.actionLabel, options.action);
+        this._notificationSource.addNotification(notification);
+    }
+
     destroy() {
         if (this._destroyed)
             return;
@@ -354,6 +381,8 @@ class ShadowIndicator extends PanelMenu.Button {
         this._codexSummary = null;
         this._weatherSummary = null;
         this._fallbackIcon = null;
+        this._notificationSource?.destroy();
+        this._notificationSource = null;
         super.destroy();
     }
 });

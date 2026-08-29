@@ -5,7 +5,7 @@ import St from 'gi://St';
 import {formatClock} from '../../lib/format.js';
 import {
     clearChildren,
-    iconTextButton,
+    iconButton,
     pageTitle,
     resolveAccent,
     scrollContainer,
@@ -31,12 +31,11 @@ export class WeatherPage extends BasePage {
             return;
         const state = this._provider.getState();
         clearChildren(this.actor);
-        this.actor.add_child(pageTitle('Weather', iconTextButton(
+        this.actor.add_child(pageTitle('Weather', iconButton(
             'view-refresh-symbolic',
-            'Refresh',
             'Refresh weather',
             () => this._provider.refresh(true),
-            'shadow-text-button shadow-action-button'
+            'shadow-icon-button shadow-action-icon-button'
         )));
 
         if (state.status === 'loading' && !state.lastSuccessfulRefresh) {
@@ -97,11 +96,14 @@ export class WeatherPage extends BasePage {
             style_class: 'shadow-weather-temperature',
             x_align: Clutter.ActorAlign.START,
         }));
-        temperature.add_child(new St.Label({
+        const condition = new St.Label({
             text: state.current.condition.label,
             style_class: 'shadow-weather-condition',
             x_align: Clutter.ActorAlign.START,
-        }));
+        });
+        condition.clutter_text.set_single_line_mode(true);
+        condition.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
+        temperature.add_child(condition);
         primary.add_child(temperature);
         primary.add_child(new St.Bin({
             style_class: 'shadow-weather-icon-tile',

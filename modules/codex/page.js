@@ -7,7 +7,7 @@ import {launchUri} from '../../services/launcher.js';
 import {
     ProgressMeter,
     clearChildren,
-    iconTextButton,
+    iconButton,
     moduleTextButton,
     moduleIcon,
     pageTitle,
@@ -23,7 +23,6 @@ export class CodexPage extends BasePage {
     constructor(context) {
         super(context, 'codex');
         this._provider = context.codexProvider;
-        this._shareNotice = null;
         this._sharing = false;
         this._destroyed = false;
         this._popupOpen = false;
@@ -79,9 +78,6 @@ export class CodexPage extends BasePage {
             style_class: 'shadow-codex-content',
             x_expand: true,
         });
-        if (this._shareNotice)
-            content.add_child(this._notice());
-
         let sectionCount = 0;
         if (this.context.settings.get_boolean('show-codex-weekly')) {
             content.add_child(this._weeklyHero(state.weekly));
@@ -115,19 +111,17 @@ export class CodexPage extends BasePage {
             () => this._openCodex(),
             'shadow-text-button shadow-action-button'
         ));
-        actions.add_child(iconTextButton(
+        actions.add_child(iconButton(
             'view-refresh-symbolic',
-            'Refresh',
             'Refresh Codex usage',
             () => this._provider.refresh(true),
-            'shadow-text-button shadow-action-button'
+            'shadow-icon-button shadow-action-icon-button'
         ));
-        const share = iconTextButton(
+        const share = iconButton(
             this._sharing ? 'process-working-symbolic' : 'document-send-symbolic',
-            this._sharing ? 'Saving…' : 'Share',
             this._sharing ? 'Creating usage image' : 'Create usage image',
             () => this._share(state),
-            'shadow-text-button shadow-action-button'
+            'shadow-icon-button shadow-action-icon-button'
         );
         share.reactive = !this._sharing && Boolean(state.weekly || state.fiveHour);
         share.can_focus = share.reactive;
@@ -135,25 +129,6 @@ export class CodexPage extends BasePage {
             share.opacity = 120;
         actions.add_child(share);
         return actions;
-    }
-
-    _notice() {
-        const row = new St.BoxLayout({
-            style_class: this._shareNotice.error ? 'shadow-inline-error' : 'shadow-inline-success',
-            x_expand: true,
-        });
-        row.add_child(new St.Label({
-            text: this._shareNotice.text,
-            x_expand: true,
-            y_align: Clutter.ActorAlign.CENTER,
-        }));
-        if (this._shareNotice.directoryPath) {
-            row.add_child(textButton('Open folder', () => {
-                const uri = Gio.File.new_for_path(this._shareNotice.directoryPath).get_uri();
-                launchUri(uri, this.context.logger).catch(() => {});
-            }, 'shadow-text-button shadow-inline-action'));
-        }
-        return row;
     }
 
     _weeklyHero(window) {
@@ -306,7 +281,6 @@ export class CodexPage extends BasePage {
         if (this._sharing || (!state.weekly && !state.fiveHour))
             return;
         this._sharing = true;
-        this._shareNotice = null;
         this._render();
         try {
             const configuredTheme = this.context.settings.get_string('theme');
@@ -320,14 +294,17 @@ export class CodexPage extends BasePage {
                 backgroundTheme: this.context.settings.get_string('background-theme'),
                 interfaceTheme,
             });
-            this._shareNotice = {
-                error: false,
-                text: `Saved ${result.fileName}`,
-                directoryPath: result.directoryPath,
-            };
+            const uri = Gio.File.new_for_path(result.directoryPath).get_uri();
+            this.context.notify?.('Usage image saved', result.fileName, {
+                actionLabel: 'Open folder',
+                action: () => launchUri(uri, this.context.logger).catch(() => {}),
+            });
         } catch (error) {
             this.context.logger?.debug('codex.share.failed', {code: error.code ?? 'image-export'});
-            this._shareNotice = {error: true, text: 'The usage image could not be saved.'};
+            this.context.notify?.(
+                'Share failed',
+                'The usage image could not be saved.'
+            );
         } finally {
             this._sharing = false;
             if (!this._destroyed)

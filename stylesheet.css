@@ -166,6 +166,13 @@
   font-size: 11px;
 }
 
+.shadow-action-icon-button {
+  min-width: 27px;
+  min-height: 27px;
+  padding: 5px;
+  background-color: rgba(128, 128, 128, 0.08);
+}
+
 .shadow-icon-button:hover,
 .shadow-text-button:hover,
 .shadow-tab:hover {
@@ -249,6 +256,22 @@
   padding-right: 2px;
 }
 
+/* Keep wheel/touch scrolling while removing Yaru's gray scrollbar handle. */
+.shadow-clean-scroll StScrollBar {
+  min-width: 0;
+  min-height: 0;
+  width: 0;
+  height: 0;
+  padding: 0;
+}
+
+.shadow-clean-scroll StScrollBar StBin#trough,
+.shadow-clean-scroll StScrollBar > .vhandle,
+.shadow-clean-scroll StScrollBar > .hhandle {
+  background-color: transparent;
+  border: 0;
+}
+
 .shadow-section-label {
   font-size: 10px;
   font-weight: 760;
@@ -295,38 +318,6 @@
   max-width: 280px;
   font-size: 11px;
   text-align: center;
-}
-
-.shadow-inline-error,
-.shadow-inline-success {
-  min-height: 30px;
-  padding: 6px 8px;
-  border-radius: 8px;
-  spacing: 6px;
-  font-size: 11px;
-}
-
-.shadow-inline-error {
-  color: #ffb4ab;
-  background-color: rgba(239, 68, 68, 0.10);
-}
-
-.shadow-inline-success {
-  color: #9ed8bb;
-  background-color: rgba(16, 185, 129, 0.10);
-}
-
-.shadow-theme-light .shadow-inline-error {
-  color: #9f2635;
-}
-
-.shadow-theme-light .shadow-inline-success {
-  color: #176b48;
-}
-
-.shadow-inline-action {
-  min-height: 24px;
-  padding: 3px 6px;
 }
 
 /* Codex */
