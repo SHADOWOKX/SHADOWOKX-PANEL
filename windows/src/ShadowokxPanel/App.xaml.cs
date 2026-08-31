@@ -60,10 +60,13 @@ public partial class App : Application, IAsyncDisposable
             return _exitTask ??= ExitCoreAsync();
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
+        Task disposeTask;
         lock (_lifecycleSync)
-            return new ValueTask(_disposeTask ??= DisposeCoreAsync());
+            disposeTask = _disposeTask ??= DisposeCoreAsync();
+        await disposeTask;
+        GC.SuppressFinalize(this);
     }
 
     private async Task ExitCoreAsync()
