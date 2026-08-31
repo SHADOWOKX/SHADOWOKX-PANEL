@@ -55,6 +55,33 @@ function entryRow(settings, key, title, validator, transform = value => value) {
     return row;
 }
 
+function customAccentRow(settings) {
+    const row = new Adw.ActionRow({
+        title: 'Custom accent',
+        subtitle: 'Uses the native GTK color selector and stores #RRGGBB only.',
+    });
+    const initial = new Gdk.RGBA();
+    initial.parse(isHexColor(settings.get_string('custom-accent'))
+        ? settings.get_string('custom-accent')
+        : ACCENTS.rose);
+    const button = new Gtk.ColorDialogButton({
+        dialog: new Gtk.ColorDialog({title: 'Choose Shadowokx Panel accent', with_alpha: false}),
+        rgba: initial,
+        valign: Gtk.Align.CENTER,
+    });
+    button.connect('notify::rgba', () => {
+        const rgba = button.rgba;
+        const byte = channel => Math.max(0, Math.min(255, Math.round(channel * 255)))
+            .toString(16).padStart(2, '0');
+        settings.set_string('custom-accent',
+            `#${byte(rgba.red)}${byte(rgba.green)}${byte(rgba.blue)}`);
+        settings.set_string('accent-color', 'custom');
+    });
+    row.add_suffix(button);
+    row.activatable_widget = button;
+    return row;
+}
+
 function addToast(window, title) {
     window.add_toast(new Adw.Toast({title, timeout: 3}));
 }
@@ -122,16 +149,19 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
         });
         const interfaceGroup = new Adw.PreferencesGroup({title: 'Interface'});
         interfaceGroup.add(comboRow(settings, 'theme', 'Theme', [
-            {value: 'auto', label: 'Auto'},
+            {value: 'auto', label: 'Follow System'},
             {value: 'dark', label: 'Dark'},
             {value: 'light', label: 'Light'},
-        ], 'Auto follows GNOME; Dark and Light recolor every background preset.'));
-        interfaceGroup.add(comboRow(settings, 'background-theme', 'Background', [
-            {value: 'claude-gray', label: 'Claude Gray'},
+        ], 'Follow System tracks GNOME; Dark and Light recolor every surface preset.'));
+        interfaceGroup.add(comboRow(settings, 'background-theme', 'Surface preset', [
+            {value: 'claude-gray', label: 'Shadow'},
             {value: 'graphite', label: 'Graphite'},
             {value: 'gnome', label: 'GNOME'},
-            {value: 'light-neutral', label: 'Light Neutral'},
-        ], 'Neutral surfaces remain readable in both light and dark modes.'));
+            {value: 'light-neutral', label: 'Soft Neutral'},
+            {value: 'midnight', label: 'Midnight'},
+            {value: 'nord', label: 'Nord'},
+            {value: 'amoled', label: 'AMOLED'},
+        ], 'Semantic surfaces remain readable in both light and dark modes.'));
         interfaceGroup.add(comboRow(settings, 'density', 'Density', [
             {value: 'comfortable', label: 'Comfortable'},
             {value: 'compact', label: 'Compact'},
@@ -154,18 +184,17 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
             description: 'Applied only to progress, selected controls, and important values.',
         });
         accent.add(comboRow(settings, 'accent-color', 'Color', [
-            ...Object.keys(ACCENTS).map(value => ({
-                value,
-                label: value[0].toUpperCase() + value.slice(1),
-            })),
+            {value: 'rose', label: 'Rose · Current'},
+            {value: 'blue', label: 'Blue'},
+            {value: 'cyan', label: 'Cyan'},
+            {value: 'emerald', label: 'Emerald'},
+            {value: 'purple', label: 'Violet'},
+            {value: 'orange', label: 'Orange'},
+            {value: 'amber', label: 'Amber'},
+            {value: 'graphite', label: 'Graphite · Monochrome'},
             {value: 'custom', label: 'Custom'},
         ]));
-        accent.add(entryRow(
-            settings,
-            'custom-accent',
-            'Custom accent (#RRGGBB)',
-            value => isHexColor(value)
-        ));
+        accent.add(customAccentRow(settings));
         page.add(accent);
         return page;
     }

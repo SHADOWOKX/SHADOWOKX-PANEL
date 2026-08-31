@@ -2,7 +2,7 @@
 
 Shadowokx Panel is a small GNOME top-bar utility that does two things well: it shows Codex usage limits and useful local weather. It targets Ubuntu 26.04.1 LTS, GNOME Shell 50, Wayland, and modern GJS ES modules.
 
-Release `2.1.1` deliberately contains only two pages:
+Release `2.2.0` deliberately contains only two pages:
 
 1. ChatGPT Codex
 2. Weather
@@ -11,7 +11,7 @@ The popup behaves like a compact GNOME application with a quiet product header, 
 
 ## Screenshots
 
-Screenshots will be added after the first 2.0 release capture.
+Release screenshots are captured during the GNOME Shell visual-QA workflow.
 
 - Top bar: `[ChatGPT] 45%   [Weather] 29°`
 - Codex selected: `[ ● ChatGPT Codex | Weather ]`
@@ -23,12 +23,12 @@ The Codex percentage always means **remaining capacity**, never consumed capacit
 
 - Compact configurable top-bar fields for the ChatGPT icon, remaining percentage, weekly reset countdown, weather icon, temperature, and condition.
 - Two equal-width segmented tabs with icon and text labels, a restrained accent state, keyboard navigation, and no separator artifact.
-- A weekly-first Codex hero with dominant remaining capacity, remaining-progress meter, compact status pill, reset countdown/date, compact five-hour state, reset credits, relative freshness, refresh, Open Codex, and PNG Share actions.
-- Verified Codex token activity with compact lifetime and peak totals, full peak date, and a seven-day bar sparkline only when the signed-in app-server reports real daily buckets. Exact lifetime totals remain available in a tooltip.
+- A weekly-first Codex hero with dominant remaining capacity, remaining-progress meter, compact status pill, reset countdown/date, compact five-hour state, reset credits, refresh, icon-only Open Codex, and PNG Share actions.
+- Verified Codex token activity with compact lifetime and peak totals, full peak date, and a native Cairo line-and-area sparkline only when the signed-in app-server reports at least two real daily buckets. Exact lifetime totals remain available in a tooltip.
 - Content-driven current-weather hero with condition, shortened and ellipsized location, high/low, up to five optional details including real UV, up to 12 horizontally scrollable forecast hours, optional hourly rain, sunrise/sunset, Celsius or Fahrenheit, and location-aware times.
 - Natural-height pages: each page expands only to its own content height and gains vertical scrolling only when the monitor or text scale cannot fit that content safely.
 - Cached Codex and Weather data remain visible during temporary failures.
-- Auto, Dark, and Light modes; Claude Gray, Graphite, GNOME, and Light Neutral backgrounds; Comfortable and Compact density; Narrow, Standard, and Wide panel widths; seven accent presets plus a custom accent.
+- Follow System, Dark, and Light modes; Shadow, Graphite, GNOME, Soft Neutral, Midnight, Nord, and AMOLED surfaces; Comfortable and Compact density; Narrow, Standard, and Wide panel widths; eight accent presets plus a native custom-color selector.
 - Native Adwaita preferences containing only General, Appearance, Codex, Weather, and About.
 - No telemetry or analytics.
 
@@ -89,9 +89,9 @@ remaining = 100 - usedPercent
 
 The top bar prefers weekly remaining capacity because the weekly limit is the primary product signal, with five-hour remaining as a fallback when weekly is not reported.
 
-`account/usage/read` supplies optional account token-activity summaries and daily buckets. The panel validates and displays only reported integer counts and dates. It never estimates a peak hour from daily data or parses private session transcripts as a substitute.
+`account/usage/read` supplies optional account token-activity summaries and `dailyUsageBuckets`. Every chart point is the validated `tokens` value for the bucket's reported `startDate`; it is not a lifetime snapshot or an inferred delta. Buckets are deduplicated by date, ordered oldest to newest, restricted to the current seven-day calendar window, and never padded with invented zeroes. The panel never estimates a peak hour from daily data or parses private session transcripts as a substitute.
 
-The mini graph is built once per rendered state from those validated daily buckets using lightweight `St.Widget` bars. It has no redraw timer or animation loop. If fewer than two real daily buckets exist, the graph is omitted. Usage pace and reset projection are also omitted because the rate-limit endpoint supplies only a current snapshot, not enough history for an honest rate calculation.
+The 54-pixel mini graph is drawn by a native `St.DrawingArea` with Cairo: a two-pixel rounded accent line, a restrained gradient area fill, and one endpoint dot. Its X positions preserve real calendar gaps and its Y scale keeps a truthful zero baseline. It has no redraw timer or animation loop. With fewer than two real daily buckets the card says “Not enough history yet.” All-zero, duplicate, corrupt, missing-day, single-point, and large-spike inputs are covered by pure tests.
 
 Security properties:
 
@@ -130,9 +130,9 @@ The configured location is sent to Open-Meteo geocoding. The resolved coordinate
 
 Requests are asynchronous, time-limited, response-size bounded, cached, and made only when stale, manually refreshed, or after a relevant setting changes. A failed refresh never discards the last successful forecast. Full Weather unavailable state is shown only when no valid result has ever been loaded.
 
-The hourly forecast keeps up to 12 validated hours in a bounded horizontal `St.ScrollView`; roughly four are visible at once and additional hours remain available to touchpad or horizontal-wheel scrolling. Both horizontal and vertical scrollbar chrome use `EXTERNAL` policies, so content remains scrollable without an intrusive track.
+The hourly forecast keeps up to 12 validated hours in one bounded horizontal `St.ScrollView`. It uses exact four-column pages, so no partial fifth item or scrollbar artifact leaks through the rounded card. Additional pages remain available to touchpad or horizontal-wheel scrolling; the hourly view never creates vertical overflow.
 
-The main page scroll view measures its content's preferred height and uses the smaller of that natural height or the active monitor's safe available height. Codex and Weather therefore resize independently when selected. A constrained monitor or large text scale keeps wheel/touchpad scrolling while hiding only the scrollbar chrome. Changes to GNOME's text-scaling factor rebuild the layout so the measurement cannot become stale.
+The main page remeasures resolved, styled content after every render and page switch. It compares that natural height with the active monitor's real GNOME work area after dynamically measuring the dashboard header, tabs, page title, padding, and other non-scroll chrome. Vertical policy is `NEVER` when content fits and hidden-chrome `EXTERNAL` only for genuine overflow. Codex and Weather resize independently, switching resets the new page to the top, monitor changes trigger a refit, and text-scale changes rebuild the measured layout.
 
 ## Appearance
 
@@ -148,6 +148,8 @@ The stylesheet uses a small set of logical surface and text classes rather than 
 
 Accent is limited to selected tabs, progress, important usage values, weather emphasis, and active controls. It does not tint the whole popup.
 
+The custom accent uses GTK 4's native color dialog and stores one validated `#RRGGBB` value in GSettings. Invalid values fall back to Rose. Appearance changes are applied by a coordinated indicator rebuild as soon as the popup is closed, avoiding actor replacement while the user is interacting with it.
+
 ## Architecture
 
 ```text
@@ -158,9 +160,10 @@ lib/
   constants.js               release, modules, accent presets
   format.js                  bounded formatting helpers
   moduleConfig.js            initial-page selection
+  sparkline.js               validated history and pure chart geometry
   summary.js                 pure top-bar value selection
 modules/
-  codex/                     app-server provider, normalization, page, PNG helper
+  codex/                     app-server provider, normalization, page, Cairo chart, PNG helper
   weather/                   Open-Meteo provider, normalization, page
 services/
   jsonStore.js               bounded private atomic JSON cache
@@ -203,6 +206,9 @@ Open the real popup in an isolated Wayland Shell, switch both pages repeatedly, 
 ```bash
 ./scripts/ui-smoke.sh
 SHADOW_UI_DENSITY=compact SHADOW_UI_WIDTH=narrow ./scripts/ui-smoke.sh
+SHADOW_UI_HEIGHT=420 SHADOW_EXPECT_SCROLL=true ./scripts/ui-smoke.sh
+SHADOW_TEXT_SCALE=1.5 SHADOW_EXPECT_SCROLL=true ./scripts/ui-smoke.sh
+SHADOW_UI_THEME=light SHADOW_UI_BACKGROUND=nord SHADOW_UI_ACCENT=blue ./scripts/ui-smoke.sh
 ```
 
 Exercise the live providers with isolated caches:
@@ -229,7 +235,8 @@ Normal operation is quiet. Debug logging is disabled by default and never includ
 ## Known limitations
 
 - Some Codex accounts or sessions report only weekly capacity. The five-hour section remains compactly unavailable and no value is invented.
-- Token activity can be unavailable for unsupported authentication modes or older Codex versions. Peak hour is not displayed because the provider exposes daily buckets, not hourly timestamps.
+- Token activity can be unavailable for unsupported authentication modes or older Codex versions. The graph needs two actual buckets, does not interpolate missing dates, and may therefore show fewer than seven points. Peak hour is not displayed because the provider exposes daily buckets, not hourly timestamps.
+- GNOME Shell 50 does not expose one dependable extension-facing system-accent API across the targeted Ubuntu environment, so Follow System covers light/dark mode while accent selection remains explicit.
 - Burn rate and limit runway are not displayed because the app-server returns a current rate-limit snapshot, not enough historical snapshots to calculate them honestly.
 - The local Codex app-server schema can evolve with future Codex releases; its provider is isolated so it can be updated without changing the page.
 - Share saves PNG files and opens their folder; it does not claim binary clipboard support.

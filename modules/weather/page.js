@@ -10,6 +10,7 @@ import {
     iconButton,
     pageTitle,
     resolveAccent,
+    resetScrollPosition,
     scrollContainer,
     sectionTitle,
     stateMessage,
@@ -40,9 +41,12 @@ export class WeatherPage extends BasePage {
     }
 
     activate() {
-        fitScrollToContent(this._scroll, this._scrollContent, this.context);
-        const adjustment = this._scroll?.vadjustment ?? this._scroll?.vscroll?.adjustment;
-        adjustment?.set_value(0);
+        this.fit();
+        resetScrollPosition(this._scroll);
+    }
+
+    fit() {
+        fitScrollToContent(this._scroll, this._scrollContent, this.context, this.actor);
     }
 
     _render() {
@@ -105,9 +109,9 @@ export class WeatherPage extends BasePage {
 
             this._scrollContent = content;
             this._scroll = scrollContainer(content, 'shadow-weather-scroll');
-            fitScrollToContent(this._scroll, content, this.context);
             page.add_child(this._scroll);
         });
+        this.fit();
     }
 
     _actions(state) {
@@ -247,50 +251,70 @@ export class WeatherPage extends BasePage {
             return section;
         }
         const row = new St.BoxLayout({style_class: 'shadow-hourly-row'});
-        const itemWidth = this.context.settings.get_string('density') === 'compact' ? 78 : 88;
-        for (const hour of state.forecast) {
-            const item = new St.BoxLayout({
-                vertical: true,
-                style_class: 'shadow-hourly-item',
-                width: itemWidth,
-                accessible_name: `${this._formatHour(hour.time, state.timezone)}, ` +
-                    `${Math.round(hour.temperature)} degrees`,
+        const clipWidth = this._hourlyClipWidth();
+        for (let offset = 0; offset < state.forecast.length; offset += 4) {
+            const page = new St.BoxLayout({
+                style_class: 'shadow-hourly-page',
+                width: clipWidth,
             });
-            item.add_child(new St.Label({
-                text: this._formatHour(hour.time, state.timezone),
-                style_class: 'shadow-hourly-time',
-            }));
-            item.add_child(new St.Icon({
-                icon_name: hour.condition.icon,
-                icon_size: 17,
-                style_class: 'shadow-hourly-icon',
-            }));
-            item.add_child(new St.Label({
-                text: `${Math.round(hour.temperature)}°`,
-                style_class: 'shadow-hourly-temperature',
-            }));
-            if (this.context.settings.get_boolean('show-weather-rain') &&
-                Number.isFinite(hour.precipitationChance)) {
-                item.add_child(new St.Label({
-                    text: `${Math.round(hour.precipitationChance)}%`,
-                    style_class: 'shadow-hourly-precipitation',
-                }));
-            }
-            row.add_child(item);
+            for (const hour of state.forecast.slice(offset, offset + 4))
+                page.add_child(this._hourlyItem(hour, state));
+            while (page.get_children().length < 4)
+                page.add_child(new St.Widget({x_expand: true}));
+            row.add_child(page);
         }
         const scroll = horizontalScrollContainer(row, 'shadow-hourly-scroll');
+        scroll.width = clipWidth;
+        scroll.x_align = Clutter.ActorAlign.CENTER;
+        this._hourlyScroll = scroll;
         section.add_child(new St.Bin({
             style_class: 'shadow-secondary-surface shadow-hourly-frame',
             width: this._hourlyViewportWidth(),
+            clip_to_allocation: true,
             child: scroll,
         }));
         return section;
+    }
+
+    _hourlyItem(hour, state) {
+        const item = new St.BoxLayout({
+            vertical: true,
+            style_class: 'shadow-hourly-item',
+            x_expand: true,
+            accessible_name: `${this._formatHour(hour.time, state.timezone)}, ` +
+                `${Math.round(hour.temperature)} degrees`,
+        });
+        item.add_child(new St.Label({
+            text: this._formatHour(hour.time, state.timezone),
+            style_class: 'shadow-hourly-time',
+        }));
+        item.add_child(new St.Icon({
+            icon_name: hour.condition.icon,
+            icon_size: 17,
+            style_class: 'shadow-hourly-icon',
+        }));
+        item.add_child(new St.Label({
+            text: `${Math.round(hour.temperature)}°`,
+            style_class: 'shadow-hourly-temperature',
+        }));
+        if (this.context.settings.get_boolean('show-weather-rain') &&
+            Number.isFinite(hour.precipitationChance)) {
+            item.add_child(new St.Label({
+                text: `${Math.round(hour.precipitationChance)}%`,
+                style_class: 'shadow-hourly-precipitation',
+            }));
+        }
+        return item;
     }
 
     _hourlyViewportWidth() {
         const widths = {narrow: 346, standard: 382, wide: 416};
         const configured = this.context.settings.get_string('panel-width');
         return widths[configured] ?? widths.standard;
+    }
+
+    _hourlyClipWidth() {
+        return Math.max(280, this._hourlyViewportWidth() - 14);
     }
 
     _weatherInsight(state) {

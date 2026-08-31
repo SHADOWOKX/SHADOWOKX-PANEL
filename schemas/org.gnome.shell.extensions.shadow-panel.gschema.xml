@@ -94,6 +94,9 @@
         <choice value="graphite"/>
         <choice value="gnome"/>
         <choice value="light-neutral"/>
+        <choice value="midnight"/>
+        <choice value="nord"/>
+        <choice value="amoled"/>
       </choices>
       <default>'claude-gray'</default>
       <summary>Dashboard surface treatment</summary>
@@ -105,6 +108,7 @@
         <choice value="cyan"/>
         <choice value="emerald"/>
         <choice value="orange"/>
+        <choice value="amber"/>
         <choice value="rose"/>
         <choice value="graphite"/>
         <choice value="custom"/>

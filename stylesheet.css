@@ -1,4 +1,4 @@
-/* Shadowokx Panel 2.0 — focused Codex and Weather utility */
+/* Shadowokx Panel 2.2 — focused Codex and Weather utility */
 
 .shadow-menu-item {
   padding: 0;
@@ -35,6 +35,12 @@
 .shadow-theme-light.shadow-bg-gnome { background-color: #fafafa; }
 .shadow-theme-dark.shadow-bg-light-neutral { background-color: #353633; }
 .shadow-theme-light.shadow-bg-light-neutral { background-color: #f4f4f1; }
+.shadow-theme-dark.shadow-bg-midnight { background-color: #1c2333; }
+.shadow-theme-light.shadow-bg-midnight { background-color: #edf1f7; }
+.shadow-theme-dark.shadow-bg-nord { background-color: #2e3440; }
+.shadow-theme-light.shadow-bg-nord { background-color: #eceff4; }
+.shadow-theme-dark.shadow-bg-amoled { background-color: #08090a; }
+.shadow-theme-light.shadow-bg-amoled { background-color: #f8f8f8; }
 
 /* Surface tokens */
 .shadow-card {
@@ -273,8 +279,8 @@
 
 /* Reusable compact status */
 .shadow-status-pill {
-  min-height: 19px;
-  padding: 2px 7px;
+  min-height: 20px;
+  padding: 2px 8px;
   spacing: 5px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -464,30 +470,23 @@
 }
 
 .shadow-token-sparkline {
-  height: 38px;
-  padding: 4px 3px 0;
-  spacing: 5px;
+  height: 54px;
   border-radius: 9px;
   background-color: rgba(128, 128, 128, 0.045);
-}
-
-.shadow-spark-column {
-  text-align: center;
-}
-
-.shadow-spark-bar-slot {
-  height: 34px;
-}
-
-.shadow-spark-bar {
-  min-width: 8px;
-  border-radius: 4px 4px 2px 2px;
-  opacity: 215;
 }
 
 .shadow-spark-label {
   color: #9ea19e;
   font-size: 9px;
+}
+
+.shadow-token-history-empty {
+  min-height: 40px;
+  padding: 12px 8px;
+  border-radius: 9px;
+  background-color: rgba(128, 128, 128, 0.045);
+  font-size: 10px;
+  text-align: center;
 }
 
 .shadow-theme-light .shadow-spark-label {
@@ -578,6 +577,10 @@
 }
 
 .shadow-hourly-row {
+  spacing: 0;
+}
+
+.shadow-hourly-page {
   padding: 7px 6px;
   spacing: 3px;
 }
@@ -611,10 +614,6 @@
 
 .shadow-hourly-frame {
   padding: 0;
-}
-
-.shadow-hourly-scroll {
-  max-height: 101px;
 }
 
 .shadow-sun-row {

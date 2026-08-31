@@ -2,7 +2,7 @@ import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import St from 'gi://St';
 
-import {formatCountdown, formatRelativeAge, formatResetDate} from '../../lib/format.js';
+import {formatCountdown, formatResetDate} from '../../lib/format.js';
 import {codexUsageStatus} from '../../lib/summary.js';
 import {launchUri} from '../../services/launcher.js';
 import {
@@ -16,6 +16,7 @@ import {
     moduleIcon,
     pageTitle,
     resolveAccent,
+    resetScrollPosition,
     scrollContainer,
     sectionTitle,
     stateMessage,
@@ -24,6 +25,7 @@ import {
 } from '../../ui/components.js';
 import {BasePage} from '../basePage.js';
 import {exportCodexSummaryImage} from './shareImage.js';
+import {tokenSparkline} from './sparkline.js';
 
 export class CodexPage extends BasePage {
     constructor(context) {
@@ -52,7 +54,12 @@ export class CodexPage extends BasePage {
     }
 
     activate() {
-        fitScrollToContent(this._scroll, this._scrollContent, this.context);
+        this.fit();
+        resetScrollPosition(this._scroll);
+    }
+
+    fit() {
+        fitScrollToContent(this._scroll, this._scrollContent, this.context, this.actor);
     }
 
     _render() {
@@ -118,9 +125,9 @@ export class CodexPage extends BasePage {
                 content.add_child(facts);
             this._scrollContent = content;
             this._scroll = scrollContainer(content, 'shadow-codex-scroll');
-            fitScrollToContent(this._scroll, content, this.context);
             page.add_child(this._scroll);
         });
+        this.fit();
     }
 
     _actions(state) {
@@ -293,7 +300,7 @@ export class CodexPage extends BasePage {
         const heading = new St.BoxLayout({style_class: 'shadow-token-heading', x_expand: true});
         heading.add_child(sectionTitle('Token activity'));
         if (usage?.dailyBuckets?.length >= 2)
-            heading.add_child(statusPill(this.context.settings, '7-day history', 'neutral'));
+            heading.add_child(statusPill(this.context.settings, '7-day history', 'info'));
         card.add_child(heading);
         if (!usage) {
             card.add_child(new St.Label({
@@ -320,6 +327,11 @@ export class CodexPage extends BasePage {
             const sparkline = this._tokenSparkline(usage.dailyBuckets);
             if (sparkline)
                 card.add_child(sparkline);
+            else
+                card.add_child(new St.Label({
+                    text: 'Not enough history yet',
+                    style_class: 'shadow-token-history-empty shadow-muted',
+                }));
 
             const stats = new St.BoxLayout({style_class: 'shadow-token-row', x_expand: true});
             if (Number.isSafeInteger(usage.peakDailyTokens))
@@ -336,36 +348,15 @@ export class CodexPage extends BasePage {
     _tokenSparkline(buckets) {
         if (!Array.isArray(buckets) || buckets.length < 2)
             return null;
-        const maximum = Math.max(...buckets.map(bucket => bucket.tokens));
-        if (!(maximum > 0))
-            return null;
         const sparkline = new St.BoxLayout({
             vertical: true,
             style_class: 'shadow-token-sparkline-wrap',
             x_expand: true,
         });
-        const chart = new St.BoxLayout({style_class: 'shadow-token-sparkline', x_expand: true});
-        for (const bucket of buckets) {
-            const column = new St.BoxLayout({
-                vertical: true,
-                style_class: 'shadow-spark-column',
-                x_expand: true,
-                accessible_name: `${this._formatUsageDate(bucket.date)}, ` +
-                    `${this._formatTokens(bucket.tokens)} tokens`,
-            });
-            const bar = new St.Widget({
-                style_class: 'shadow-spark-bar',
-                height: 7 + Math.round(bucket.tokens / maximum * 27),
-                style: `background-color: ${resolveAccent(this.context.settings)};`,
-                y_align: Clutter.ActorAlign.END,
-            });
-            column.add_child(new St.Bin({
-                style_class: 'shadow-spark-bar-slot',
-                child: bar,
-                y_align: Clutter.ActorAlign.END,
-            }));
-            chart.add_child(column);
-        }
+        const chart = tokenSparkline(buckets, resolveAccent(this.context.settings));
+        chart.accessible_name = buckets.map(bucket =>
+            `${this._formatUsageDate(bucket.date)}, ${this._formatTokens(bucket.tokens)} tokens`
+        ).join('; ');
         sparkline.add_child(chart);
         sparkline.add_child(new St.Label({text: 'Last 7 days', style_class: 'shadow-spark-label'}));
         return sparkline;
@@ -451,26 +442,15 @@ export class CodexPage extends BasePage {
     }
 
     _facts(state) {
-        const showUpdated = Number.isFinite(state.lastSuccessfulRefresh);
-        if (!(state.resetCreditsAvailable > 0) && !showUpdated)
+        if (!(state.resetCreditsAvailable > 0))
             return null;
         const row = new St.BoxLayout({style_class: 'shadow-metadata-row', x_expand: true});
-        if (state.resetCreditsAvailable > 0) {
-            row.add_child(new St.Label({
-                text: `${state.resetCreditsAvailable} reset credit` +
-                    (state.resetCreditsAvailable === 1 ? '' : 's'),
-                style_class: 'shadow-metadata-value',
-                x_expand: true,
-            }));
-        } else {
-            row.add_child(new St.Widget({x_expand: true}));
-        }
-        if (showUpdated) {
-            row.add_child(new St.Label({
-                text: `Updated ${formatRelativeAge(state.lastSuccessfulRefresh)}`,
-                style_class: 'shadow-metadata-label',
-            }));
-        }
+        row.add_child(new St.Label({
+            text: `${state.resetCreditsAvailable} reset credit` +
+                (state.resetCreditsAvailable === 1 ? '' : 's'),
+            style_class: 'shadow-metadata-value',
+            x_expand: true,
+        }));
         return row;
     }
 

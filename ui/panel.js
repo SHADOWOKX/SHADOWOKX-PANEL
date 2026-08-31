@@ -92,8 +92,10 @@ class ShadowIndicator extends PanelMenu.Button {
         this.add_child(this._indicatorBox);
         attachTooltip(this, () => this._indicatorTooltipText());
 
-        const monitorsChangedId = Main.layoutManager.connect('monitors-changed', () =>
-            this._syncIndicator());
+        const monitorsChangedId = Main.layoutManager.connect('monitors-changed', () => {
+            this._syncIndicator();
+            this._pages.get(this._activeId)?.fit?.();
+        });
         this._subscriptions.push(() => Main.layoutManager.disconnect(monitorsChangedId));
         this._syncIndicator();
     }
@@ -177,7 +179,7 @@ class ShadowIndicator extends PanelMenu.Button {
             notify: (title, message, options = {}) =>
                 this._notify(title, message, options),
             pageWidth: this._pageStack.width,
-            getMaxScrollHeight: () => this._maxScrollHeight(),
+            fitPageScroll: (scroll, pageActor) => this._fitPageScroll(scroll, pageActor),
             codexProvider: services.codexProvider,
             weatherProvider: services.weatherProvider,
         };
@@ -222,12 +224,38 @@ class ShadowIndicator extends PanelMenu.Button {
             this._select(initial);
     }
 
-    _maxScrollHeight() {
+    _activeWorkArea() {
         const monitor = Main.layoutManager.findMonitorForActor(this) ??
             Main.layoutManager.primaryMonitor;
-        const height = monitor?.height ?? global.stage.height;
-        const reserve = this._settings.get_string('density') === 'compact' ? 168 : 184;
-        return Math.max(220, height - Main.panel.height - reserve);
+        if (Number.isInteger(monitor?.index))
+            return Main.layoutManager.getWorkAreaForMonitor(monitor.index);
+        return monitor ?? {x: 0, y: 0, width: global.stage.width, height: global.stage.height};
+    }
+
+    _fitPageScroll(scroll, pageActor) {
+        const natural = scroll?._shadowNaturalHeight;
+        if (!scroll || !Number.isFinite(natural))
+            return;
+
+        scroll.height = natural;
+        scroll.vscrollbar_policy = St.PolicyType.NEVER;
+        if (pageActor && (!pageActor.visible || pageActor !== this._pages.get(this._activeId)?.actor))
+            return;
+
+        // The work area already excludes the GNOME panel and other struts.
+        // Measure all dashboard chrome with the scroll view at natural height,
+        // then subtract only the overflow plus a small edge safety margin.
+        const workArea = this._activeWorkArea();
+        const safeEdgeMargin = 12;
+        const maximumRootHeight = Math.max(1, workArea.height - safeEdgeMargin);
+        const [, desiredRootHeight] = this._root.get_preferred_height(-1);
+        const nonScrollHeight = Math.max(0, Math.ceil(desiredRootHeight) - natural);
+        const maximumViewport = Math.max(1, maximumRootHeight - nonScrollHeight);
+        const fittedHeight = Math.min(natural, maximumViewport);
+        scroll.height = fittedHeight;
+        scroll.vscrollbar_policy = fittedHeight < natural
+            ? St.PolicyType.EXTERNAL
+            : St.PolicyType.NEVER;
     }
 
     _moduleErrorPage(id) {

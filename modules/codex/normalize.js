@@ -133,21 +133,28 @@ function recentUsageBuckets(buckets, nowMs) {
             const ageDays = Math.round((todayMs - bucketMs) / 86_400_000);
             return ageDays >= 0 && ageDays < 7;
         })
-        .sort((left, right) => left.date.localeCompare(right.date));
+        .sort((left, right) => left.date.localeCompare(right.date))
+        .slice(-7);
+}
+
+function uniqueUsageBuckets(buckets) {
+    const byDate = new Map();
+    for (const bucket of buckets)
+        byDate.set(bucket.date, bucket);
+    return [...byDate.values()].sort((left, right) => left.date.localeCompare(right.date));
 }
 
 export function normalizeAccountTokenUsage(response, nowMs = Date.now()) {
     if (!response || typeof response !== 'object')
         return null;
-    const buckets = Array.isArray(response.dailyUsageBuckets)
+    const buckets = uniqueUsageBuckets(Array.isArray(response.dailyUsageBuckets)
         ? response.dailyUsageBuckets
             .map(bucket => ({
                 date: normalizeUsageDate(bucket?.startDate),
                 tokens: normalizeTokenCount(bucket?.tokens),
             }))
             .filter(bucket => bucket.date && bucket.tokens !== null)
-        : [];
-    buckets.sort((left, right) => left.date.localeCompare(right.date));
+        : []);
     const peakBucket = buckets.reduce((peak, bucket) =>
         !peak || bucket.tokens > peak.tokens ? bucket : peak, null);
     const reportedPeak = normalizeTokenCount(response.summary?.peakDailyTokens);
@@ -176,11 +183,10 @@ function normalizeCachedTokenUsage(value) {
     if (!value || typeof value !== 'object')
         return null;
     const dailyBuckets = Array.isArray(value.dailyBuckets)
-        ? value.dailyBuckets.slice(0, 7).map(bucket => ({
+        ? uniqueUsageBuckets(value.dailyBuckets.map(bucket => ({
             date: normalizeUsageDate(bucket?.date),
             tokens: normalizeTokenCount(bucket?.tokens),
-        })).filter(bucket => bucket.date && bucket.tokens !== null)
-            .sort((left, right) => left.date.localeCompare(right.date))
+        })).filter(bucket => bucket.date && bucket.tokens !== null)).slice(-7)
         : [];
     const tokenUsage = {
         lifetimeTokens: normalizeTokenCount(value.lifetimeTokens),

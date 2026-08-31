@@ -196,7 +196,10 @@ export function statusPill(settings, text, tone = 'neutral') {
     });
     const dot = new St.Widget({
         style_class: 'shadow-status-dot',
-        style: tone === 'accent' ? `background-color: ${resolveAccent(settings)};` : null,
+        y_align: Clutter.ActorAlign.CENTER,
+        style: tone === 'accent' || tone === 'info'
+            ? `background-color: ${resolveAccent(settings)};`
+            : null,
     });
     pill.add_child(dot);
     pill.add_child(new St.Label({
@@ -265,34 +268,38 @@ export function scrollContainer(child, styleClass = 'shadow-list-scroll') {
         style_class: styleClass,
         overlay_scrollbars: true,
         hscrollbar_policy: St.PolicyType.NEVER,
-        // EXTERNAL keeps wheel/touchpad scrolling and the adjustment while
-        // leaving scrollbar chrome out of this compact popup.
-        vscrollbar_policy: St.PolicyType.EXTERNAL,
+        vscrollbar_policy: St.PolicyType.NEVER,
         x_expand: true,
     });
     scroll.set_child(child);
     return scroll;
 }
 
-export function fitScrollToContent(scroll, child, context) {
+export function fitScrollToContent(scroll, child, context, pageActor = null) {
     if (!scroll || !child)
         return;
     const width = Math.max(1, (context.pageWidth ?? 386) - 4);
-    if (!Number.isFinite(scroll._shadowNaturalHeight)) {
-        const [, naturalHeight] = child.get_preferred_height(width);
-        scroll._shadowNaturalHeight = Math.max(1, Math.ceil(naturalHeight));
-    }
-    const maximum = Math.max(220, context.getMaxScrollHeight?.() ?? 540);
-    scroll.height = Math.min(scroll._shadowNaturalHeight, maximum);
+    const [, naturalHeight] = child.get_preferred_height(width);
+    scroll._shadowNaturalHeight = Math.max(1, Math.ceil(naturalHeight));
+    if (typeof context.fitPageScroll === 'function')
+        context.fitPageScroll(scroll, pageActor);
+    else
+        scroll.height = scroll._shadowNaturalHeight;
+}
+
+export function resetScrollPosition(scroll) {
+    const adjustment = scroll?.vadjustment ?? scroll?.vscroll?.adjustment;
+    adjustment?.set_value(0);
 }
 
 export function horizontalScrollContainer(child, styleClass = 'shadow-horizontal-scroll') {
     const scroll = new St.ScrollView({
         style_class: styleClass,
-        overlay_scrollbars: true,
+        overlay_scrollbars: false,
         hscrollbar_policy: St.PolicyType.EXTERNAL,
         vscrollbar_policy: St.PolicyType.NEVER,
         x_expand: true,
+        clip_to_allocation: true,
     });
     scroll.set_child(child);
     return scroll;

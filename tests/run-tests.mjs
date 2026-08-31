@@ -10,6 +10,7 @@ import {
     isHexColor,
 } from '../lib/format.js';
 import {chooseInitialModule} from '../lib/moduleConfig.js';
+import {normalizeSparklineBuckets, sparklineCoordinates} from '../lib/sparkline.js';
 import {codexRemainingSummary, codexUsageStatus, weatherSummaryTemperature} from '../lib/summary.js';
 import {
     normalizeCachedRateLimits,
@@ -30,6 +31,8 @@ import {
 import {WeatherProvider} from '../modules/weather/provider.js';
 import {Observable} from '../services/observable.js';
 import {Logger} from '../services/logger.js';
+import {JsonStore} from '../services/jsonStore.js';
+import {Scheduler} from '../services/scheduler.js';
 
 if (GLib.getenv('SHADOW_PANEL_TEST_ISOLATED') !== '1')
     throw new Error('Refusing to run persistence tests without an isolated XDG environment');
@@ -132,6 +135,55 @@ function testModuleConfiguration() {
     equal(chooseInitialModule(pages, false, 'weather', 'codex'), 'codex', 'default page wins');
     equal(chooseInitialModule(pages, true, 'removed', 'codex'), 'codex',
         'removed pages safely fall back to Codex');
+}
+
+function testSparklineData() {
+    const normalized = normalizeSparklineBuckets([
+        {date: '2026-08-30', tokens: 20},
+        {date: 'invalid', tokens: 99},
+        {date: '2026-02-31', tokens: 99},
+        {date: '2026-08-28', tokens: 10},
+        {date: '2026-08-30', tokens: 25},
+        {date: '2026-08-29', tokens: -1},
+    ]);
+    equal(normalized.length, 2, 'sparkline rejects corrupt values and deduplicates dates');
+    equal(normalized[0].date, '2026-08-28', 'sparkline points are chronological');
+    equal(normalized[1].tokens, 25, 'the last valid duplicate daily bucket wins');
+
+    const missingDay = sparklineCoordinates([
+        {date: '2026-08-28', tokens: 10},
+        {date: '2026-08-30', tokens: 20},
+    ], 100, 50);
+    equal(Math.round(missingDay[0].x), 4, 'sparkline starts at the oldest real day');
+    equal(Math.round(missingDay[1].x), 96, 'missing days remain an honest chronological gap');
+    ok(missingDay.every(point => Number.isFinite(point.x) && Number.isFinite(point.y)),
+        'sparkline coordinates remain finite');
+
+    const allZero = sparklineCoordinates([
+        {date: '2026-08-28', tokens: 0},
+        {date: '2026-08-29', tokens: 0},
+    ], 120, 54);
+    equal(allZero[0].y, 50, 'all-zero history renders on the zero baseline');
+    equal(sparklineCoordinates([{date: '2026-08-29', tokens: 4}], 120, 54).length, 0,
+        'one point does not produce a meaningless chart');
+    const spike = sparklineCoordinates([
+        {date: '2026-08-28', tokens: 1},
+        {date: '2026-08-29', tokens: Number.MAX_SAFE_INTEGER},
+    ], 120, 54);
+    ok(spike[0].y > spike[1].y, 'large spikes retain truthful zero-based scale');
+    equal(normalizeSparklineBuckets(normalized, Number.NaN).length, 2,
+        'invalid history limits cannot disable the storage bound');
+}
+
+function testSchedulerLifecycle() {
+    const scheduler = new Scheduler(null);
+    scheduler.every('codex-refresh', 3600, () => null);
+    scheduler.every('codex-refresh', 3600, () => null);
+    equal(scheduler._sources.size, 1, 'rescheduling replaces the previous named timer');
+    scheduler.every('weather-refresh', 3600, () => null);
+    equal(scheduler._sources.size, 2, 'providers keep one timer each');
+    scheduler.destroy();
+    equal(scheduler._sources.size, 0, 'scheduler teardown removes every timer source');
 }
 
 function testCodexNormalization() {
@@ -491,6 +543,53 @@ async function testProviderFailureIsolation() {
     weather.destroy();
 }
 
+async function testPersistenceAndRefreshCoalescing() {
+    const cacheDirectory = GLib.build_filenamev([GLib.get_user_cache_dir(), 'corrupt-cache-test']);
+    GLib.mkdir_with_parents(cacheDirectory, 0o700);
+    GLib.file_set_contents(GLib.build_filenamev([cacheDirectory, 'state.json']), '{broken json');
+    const store = new JsonStore(cacheDirectory, 'state.json', null, 4096);
+    const fallback = {safe: true};
+    equal((await store.read(fallback)).safe, true,
+        'corrupt JSON caches fall back without crashing');
+
+    const dates = Array.from({length: 10}, (_value, index) => ({
+        date: `2026-08-${String(index + 1).padStart(2, '0')}`,
+        tokens: index + 1,
+    }));
+    const cached = normalizeCachedRateLimits({
+        lastSuccessfulRefresh: Date.now(),
+        weekly: {usedPercent: 10, resetsAt: 2_000_000_000},
+        tokenUsage: {
+            lifetimeTokens: 100,
+            dailyBuckets: [...dates, {...dates.at(-1), tokens: 99}],
+        },
+    });
+    equal(cached.tokenUsage.dailyBuckets.length, 7,
+        'cached token history remains bounded to seven daily buckets');
+    equal(cached.tokenUsage.dailyBuckets[0].date, '2026-08-04',
+        'history bounds retain the newest chronological days');
+    equal(cached.tokenUsage.dailyBuckets.at(-1).tokens, 99,
+        'duplicate cached days keep the latest valid value');
+
+    const provider = new CodexProvider(
+        new FakeSettings({'codex-refresh-minutes': 15}),
+        inertScheduler,
+        null
+    );
+    let calls = 0;
+    let release = null;
+    provider._refresh = () => {
+        calls++;
+        return new Promise(resolve => { release = resolve; });
+    };
+    const first = provider.refresh(true);
+    const second = provider.refresh(true);
+    equal(calls, 1, 'rapid Codex refreshes coalesce into one app-server request');
+    release(provider.getState());
+    await Promise.all([first, second]);
+    provider.destroy();
+}
+
 async function testCodexProtocolOrdering() {
     const fakeServer = GLib.build_filenamev([
         GLib.get_tmp_dir(),
@@ -567,6 +666,8 @@ async function testWeatherTrailingRefresh() {
 
 testFormatting();
 testModuleConfiguration();
+testSparklineData();
+testSchedulerLifecycle();
 testCodexNormalization();
 testTopBarSummaries();
 testWeatherNormalization();
@@ -575,6 +676,7 @@ testContentValidation();
 await testWeatherLocationFallback();
 await testCodexShareImage();
 await testProviderFailureIsolation();
+await testPersistenceAndRefreshCoalescing();
 await testCodexProtocolOrdering();
 await testWeatherTrailingRefresh();
 
