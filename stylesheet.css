@@ -62,7 +62,6 @@
 .shadow-theme-dark .shadow-metric-label,
 .shadow-theme-dark .shadow-hourly-time,
 .shadow-theme-dark .shadow-weather-location,
-.shadow-theme-dark .shadow-provider-footer,
 .shadow-theme-dark .shadow-state-detail,
 .shadow-theme-dark .shadow-weekly-unit,
 .shadow-theme-dark .shadow-five-hour-unavailable {
@@ -74,7 +73,6 @@
 .shadow-theme-light .shadow-metric-label,
 .shadow-theme-light .shadow-hourly-time,
 .shadow-theme-light .shadow-weather-location,
-.shadow-theme-light .shadow-provider-footer,
 .shadow-theme-light .shadow-state-detail,
 .shadow-theme-light .shadow-weekly-unit,
 .shadow-theme-light .shadow-five-hour-unavailable {
@@ -87,7 +85,6 @@
 .shadow-metric-label,
 .shadow-hourly-time,
 .shadow-weather-location,
-.shadow-provider-footer,
 .shadow-state-detail,
 .shadow-weekly-unit,
 .shadow-five-hour-unavailable {
@@ -135,8 +132,7 @@
 }
 
 /* Controls */
-.shadow-title-actions,
-.shadow-button-content {
+.shadow-title-actions {
   spacing: 5px;
 }
 
@@ -157,13 +153,6 @@
   padding: 5px 9px;
   font-size: 12px;
   font-weight: 620;
-}
-
-.shadow-action-button {
-  min-height: 27px;
-  padding: 4px 7px;
-  background-color: rgba(128, 128, 128, 0.08);
-  font-size: 11px;
 }
 
 .shadow-action-icon-button {
@@ -256,10 +245,11 @@
   padding-right: 2px;
 }
 
-.shadow-section-label {
-  font-size: 10px;
-  font-weight: 760;
-  letter-spacing: 0.75px;
+.shadow-section-title {
+  min-height: 18px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1px;
 }
 
 .shadow-card-title {
@@ -270,11 +260,6 @@
 .shadow-inline-empty {
   padding: 16px 12px;
   text-align: center;
-}
-
-.shadow-provider-footer {
-  padding: 1px 2px 0;
-  font-size: 10px;
 }
 
 /* Loading and first-run errors */
@@ -306,9 +291,9 @@
 
 /* Codex */
 .shadow-weekly-hero {
-  min-height: 157px;
-  padding: 14px 15px;
-  spacing: 8px;
+  min-height: 174px;
+  padding: 15px;
+  spacing: 7px;
 }
 
 .shadow-usage-heading {
@@ -316,7 +301,7 @@
 }
 
 .shadow-usage-state {
-  padding: 3px 7px;
+  padding: 3px 8px;
   border-radius: 999px;
   background-color: rgba(128, 128, 128, 0.10);
   font-size: 10px;
@@ -346,14 +331,24 @@
 }
 
 .shadow-progress-track {
-  height: 7px;
-  border-radius: 4px;
-  background-color: rgba(128, 128, 128, 0.22);
+  height: 9px;
+  border-radius: 5px;
+  background-color: rgba(128, 128, 128, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.08);
 }
 
 .shadow-progress-fill {
-  height: 7px;
-  border-radius: 4px;
+  height: 9px;
+  border-radius: 5px;
+}
+
+.shadow-progress-legend {
+  min-height: 15px;
+  font-size: 10px;
+}
+
+.shadow-progress-available {
+  font-weight: 650;
 }
 
 .shadow-weekly-reset {
@@ -367,10 +362,9 @@
 }
 
 .shadow-five-hour-section {
-  min-height: 47px;
-  padding: 8px 3px;
+  min-height: 50px;
+  padding: 9px 11px;
   spacing: 10px;
-  border-top: 1px solid rgba(128, 128, 128, 0.15);
 }
 
 .shadow-five-hour-value {
@@ -385,21 +379,54 @@
 }
 
 .shadow-metadata-row {
-  padding: 3px 2px;
-  spacing: 20px;
+  min-height: 25px;
+  padding: 4px 3px;
+  spacing: 12px;
 }
 
 .shadow-token-activity {
-  padding: 10px 11px;
-  spacing: 7px;
+  padding: 12px 13px;
+  spacing: 9px;
+}
+
+.shadow-token-primary-row {
+  min-height: 48px;
+  spacing: 18px;
 }
 
 .shadow-token-row {
+  padding-top: 2px;
   spacing: 18px;
 }
 
 .shadow-token-note {
+  padding: 2px 0;
+  font-size: 11px;
+}
+
+.shadow-token-metric {
+  min-width: 120px;
+}
+
+.shadow-token-label {
+  color: #b3b5b2;
   font-size: 10px;
+}
+
+.shadow-theme-light .shadow-token-label {
+  color: #686d69;
+}
+
+.shadow-token-primary-value {
+  font-size: 22px;
+  font-weight: 740;
+  font-feature-settings: "tnum";
+}
+
+.shadow-token-value {
+  font-size: 12px;
+  font-weight: 650;
+  font-feature-settings: "tnum";
 }
 
 .shadow-metadata-label,
@@ -416,13 +443,13 @@
 
 /* Weather */
 .shadow-weather-hero {
-  min-height: 126px;
-  padding: 13px 14px 11px;
-  spacing: 9px;
+  min-height: 132px;
+  padding: 14px;
+  spacing: 10px;
 }
 
 .shadow-weather-temperature {
-  font-size: 39px;
+  font-size: 41px;
   font-weight: 740;
   font-feature-settings: "tnum";
 }
@@ -441,6 +468,7 @@
 }
 
 .shadow-weather-location-row {
+  min-height: 20px;
   spacing: 8px;
 }
 
@@ -454,8 +482,8 @@
 }
 
 .shadow-weather-metrics {
-  padding: 7px;
-  spacing: 3px;
+  padding: 8px;
+  spacing: 4px;
 }
 
 .shadow-weather-metric-row {
@@ -464,16 +492,16 @@
 
 .shadow-weather-metric {
   min-width: 132px;
-  padding: 5px 7px;
+  padding: 6px 8px;
 }
 
 .shadow-hourly-section {
-  spacing: 6px;
+  spacing: 7px;
 }
 
 .shadow-hourly-row {
-  min-height: 70px;
-  padding: 6px;
+  min-height: 74px;
+  padding: 7px 6px;
   spacing: 4px;
 }
 
@@ -500,9 +528,9 @@
 }
 
 .shadow-sun-row {
-  min-height: 25px;
-  padding: 2px 3px;
-  font-size: 11px;
+  min-height: 42px;
+  padding: 7px 10px;
+  spacing: 18px;
 }
 
 /* Compact density */

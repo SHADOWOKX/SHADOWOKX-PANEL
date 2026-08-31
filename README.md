@@ -2,7 +2,7 @@
 
 Shadowokx Panel is a small GNOME top-bar utility that does two things well: it shows Codex usage limits and useful local weather. It targets Ubuntu 26.04.1 LTS, GNOME Shell 50, Wayland, and modern GJS ES modules.
 
-Release `2.0.2` deliberately contains only two pages:
+Release `2.0.3` deliberately contains only two pages:
 
 1. ChatGPT Codex
 2. Weather

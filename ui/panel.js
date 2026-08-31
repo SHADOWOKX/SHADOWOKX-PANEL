@@ -144,7 +144,7 @@ class ShadowIndicator extends PanelMenu.Button {
             layout_manager: new Clutter.BinLayout(),
             x_expand: true,
             y_expand: true,
-            height: density === 'compact' ? 354 : 394,
+            height: density === 'compact' ? 372 : 430,
         });
         this._root.add_child(this._pageStack);
 

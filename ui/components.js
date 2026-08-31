@@ -55,24 +55,20 @@ export function iconButton(iconName, accessibleName, callback, styleClass = 'sha
     return button;
 }
 
-export function moduleTextButton(
+export function moduleIconButton(
     extension,
     moduleId,
-    label,
     accessibleName,
     callback,
-    styleClass = 'shadow-text-button'
+    styleClass = 'shadow-icon-button'
 ) {
-    const content = new St.BoxLayout({style_class: 'shadow-button-content'});
-    content.add_child(moduleIcon(extension, moduleId, 16, 'shadow-button-brand-icon'));
-    content.add_child(new St.Label({text: label, y_align: Clutter.ActorAlign.CENTER}));
     const button = new St.Button({
         style_class: styleClass,
         can_focus: true,
         reactive: true,
         track_hover: true,
         accessible_name: accessibleName,
-        child: content,
+        child: moduleIcon(extension, moduleId, 16, 'shadow-button-brand-icon'),
     });
     button.connect('clicked', callback);
     return button;
@@ -108,6 +104,18 @@ export function pageTitle(title, action = null, leading = null) {
     return box;
 }
 
+export function sectionTitle(text, styleClass = 'shadow-section-title') {
+    const label = new St.Label({
+        text,
+        style_class: styleClass,
+        x_expand: true,
+        x_align: Clutter.ActorAlign.START,
+    });
+    label.clutter_text.set_single_line_mode(true);
+    label.clutter_text.set_ellipsize(Pango.EllipsizeMode.NONE);
+    return label;
+}
+
 export function stateMessage(iconName, title, detail, action = null) {
     const box = new St.BoxLayout({
         vertical: true,
@@ -140,14 +148,14 @@ export class ProgressMeter {
         this.actor = new St.Widget({
             style_class: 'shadow-progress-track',
             width,
-            height: 7,
+            height: 9,
             clip_to_allocation: true,
             accessible_name: `${value}% ${meaning}`,
         });
         this._fill = new St.Widget({
             style_class: 'shadow-progress-fill',
             width: animate ? 0 : targetWidth,
-            height: 7,
+            height: 9,
             style: `background-color: ${accent};`,
         });
         this.actor.add_child(this._fill);

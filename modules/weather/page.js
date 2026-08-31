@@ -2,12 +2,12 @@ import Clutter from 'gi://Clutter';
 import Pango from 'gi://Pango';
 import St from 'gi://St';
 
-import {formatClock} from '../../lib/format.js';
 import {
     iconButton,
     pageTitle,
     resolveAccent,
     scrollContainer,
+    sectionTitle,
     stateMessage,
     textButton,
 } from '../../ui/components.js';
@@ -23,6 +23,11 @@ export class WeatherPage extends BasePage {
     onPopupOpened() {
         if (this.context.settings.get_boolean('refresh-on-open') && this._provider.isStale())
             this._provider.refresh(false);
+    }
+
+    activate() {
+        const adjustment = this._scroll?.vadjustment ?? this._scroll?.vscroll?.adjustment;
+        adjustment?.set_value(0);
     }
 
     _render() {
@@ -74,12 +79,8 @@ export class WeatherPage extends BasePage {
                 content.add_child(this._sunTimes(state));
             }
 
-            content.add_child(new St.Label({
-                text: this._footerText(state),
-                style_class: 'shadow-provider-footer shadow-muted',
-                x_align: Clutter.ActorAlign.START,
-            }));
-            page.add_child(scrollContainer(content, 'shadow-weather-scroll'));
+            this._scroll = scrollContainer(content, 'shadow-weather-scroll');
+            page.add_child(this._scroll);
         });
     }
 
@@ -127,7 +128,7 @@ export class WeatherPage extends BasePage {
         location.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
         locationRow.add_child(location);
         locationRow.add_child(new St.Label({
-            text: `Today  ${Math.round(state.today.high)}° / ${Math.round(state.today.low)}°`,
+            text: `H ${Math.round(state.today.high)}°  ·  L ${Math.round(state.today.low)}°`,
             style_class: 'shadow-weather-today',
         }));
         hero.add_child(locationRow);
@@ -182,11 +183,7 @@ export class WeatherPage extends BasePage {
 
     _hourlyForecast(state) {
         const section = new St.BoxLayout({vertical: true, style_class: 'shadow-hourly-section'});
-        section.add_child(new St.Label({
-            text: 'NEXT HOURS',
-            style_class: 'shadow-section-label',
-            x_align: Clutter.ActorAlign.START,
-        }));
+        section.add_child(sectionTitle('Next hours'));
         if (!state.forecast.length) {
             section.add_child(new St.Label({
                 text: 'Hourly forecast is temporarily unavailable.',
@@ -224,35 +221,30 @@ export class WeatherPage extends BasePage {
     }
 
     _sunTimes(state) {
-        const row = new St.BoxLayout({style_class: 'shadow-sun-row', x_expand: true});
+        const row = new St.BoxLayout({
+            style_class: 'shadow-secondary-surface shadow-sun-row',
+            x_expand: true,
+        });
         if (state.today.sunrise) {
-            row.add_child(new St.Label({
-                text: `Sunrise  ${this._formatHour(state.today.sunrise, state.timezone)}`,
-                style_class: 'shadow-muted',
-                x_expand: true,
-            }));
+            row.add_child(this._sunMetric(
+                'Sunrise',
+                this._formatHour(state.today.sunrise, state.timezone)
+            ));
         }
         if (state.today.sunset) {
-            row.add_child(new St.Label({
-                text: `Sunset  ${this._formatHour(state.today.sunset, state.timezone)}`,
-                style_class: 'shadow-muted',
-            }));
+            row.add_child(this._sunMetric(
+                'Sunset',
+                this._formatHour(state.today.sunset, state.timezone)
+            ));
         }
         return row;
     }
 
-    _footerText(state) {
-        if (state.status === 'refreshing')
-            return `Updating… · Updated ${formatClock(state.lastSuccessfulRefresh)}`;
-        if (state.status === 'stale' || state.status === 'cached') {
-            const minutes = Math.max(0, Math.floor(
-                (Date.now() - state.lastSuccessfulRefresh) / 60_000
-            ));
-            const age = minutes < 1 ? 'just now' :
-                minutes < 60 ? `${minutes}m ago` : `${Math.floor(minutes / 60)}h ago`;
-            return `Updated ${age} · Cached`;
-        }
-        return `Updated ${formatClock(state.lastSuccessfulRefresh)}`;
+    _sunMetric(label, value) {
+        const metric = new St.BoxLayout({vertical: true, x_expand: true});
+        metric.add_child(new St.Label({text: label, style_class: 'shadow-metric-label'}));
+        metric.add_child(new St.Label({text: value, style_class: 'shadow-metric-value'}));
+        return metric;
     }
 
     _formatUv(value) {
