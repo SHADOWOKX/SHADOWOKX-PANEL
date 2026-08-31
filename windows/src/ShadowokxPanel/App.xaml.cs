@@ -39,7 +39,7 @@ public partial class App : Application, IAsyncDisposable
                 .Any(value => value.Equals("--startup", StringComparison.OrdinalIgnoreCase));
             StartupDiagnostics.Write("tray initialization start");
             _window.InitializeTray();
-            StartupDiagnostics.Write("tray initialization end");
+            StartupDiagnostics.Write("tray initialization successful");
 
             if (!startedWithWindows || _showWhenReady)
                 _window.ShowPanel();

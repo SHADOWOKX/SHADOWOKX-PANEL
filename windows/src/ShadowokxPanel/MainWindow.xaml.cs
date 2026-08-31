@@ -51,7 +51,7 @@ public sealed partial class MainWindow : Window, IDisposable
         StartupDiagnostics.Write("TokenGraphControl construction start");
         _tokenGraph = new TokenGraphControl();
         TokenGraphHost.Children.Add(_tokenGraph);
-        StartupDiagnostics.Write("TokenGraphControl construction successful");
+        StartupDiagnostics.Write("graph construction successful");
         _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
         var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_hwnd);
         _appWindow = AppWindow.GetFromWindowId(windowId);

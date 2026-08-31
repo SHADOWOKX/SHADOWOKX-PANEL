@@ -23,4 +23,45 @@
   <ItemGroup>
     <Content Include="Assets\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <!--
+    WinUI adds generated XBF files to the normal build output, but its unpackaged
+    .NET integration does not add them to ResolvedFileToPublish. The MRT target
+    used by this project also does not publish the application PRI. Publish the
+    resources produced for this exact configuration/runtime instead of globbing
+    TargetDir, where stale outputs from removed XAML pages could remain.
+  -->
+  <Target Name="AddWinUIApplicationResourcesToPublish"
+          AfterTargets="ComputeResolvedFilesToPublishList"
+          DependsOnTargets="_GenerateProjectPriFile;ComputeProcessXamlFiles"
+          Condition="'$(UseWinUI)' == 'true' and '$(WindowsPackageType)' == 'None'">
+    <ItemGroup>
+      <_WinUIApplicationXbf Include="@(ProcessedXamlFiles)"
+                            Condition="'%(Extension)' == '.xbf'" />
+    </ItemGroup>
+
+    <Error Condition="!Exists('$(ProjectPriFullPath)')"
+           Text="WinUI application PRI was not generated at '$(ProjectPriFullPath)'." />
+    <Error Condition="'@(_WinUIApplicationXbf)' == ''"
+           Text="WinUI did not report any generated application XBF resources for publishing." />
+
+    <AssignTargetPath Files="@(_WinUIApplicationXbf)" RootFolder="$(TargetDir)">
+      <Output TaskParameter="AssignedFiles"
+              ItemName="_WinUIApplicationXbfWithTargetPath" />
+    </AssignTargetPath>
+
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="$(ProjectPriFullPath)" />
+      <ResolvedFileToPublish Include="$(ProjectPriFullPath)">
+        <RelativePath>$(ProjectPriFileName)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+
+      <ResolvedFileToPublish Remove="@(_WinUIApplicationXbfWithTargetPath)" />
+      <ResolvedFileToPublish Include="@(_WinUIApplicationXbfWithTargetPath)">
+        <RelativePath>%(_WinUIApplicationXbfWithTargetPath.TargetPath)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 </Project>
