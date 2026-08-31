@@ -84,7 +84,9 @@ export default class UiSmokeExtension extends Extension {
             const indicator = Main.panel.statusArea['shadow-panel@shadowokx'];
             const services = indicator?._extension?.getRuntimeServices?.();
             const codexReady = Boolean(services?.codexProvider?.getState()?.lastSuccessfulRefresh);
-            const weatherReady = Boolean(services?.weatherProvider?.getState()?.lastSuccessfulRefresh);
+            const weatherNeeded = Boolean(services?.weatherProvider);
+            const weatherReady = !weatherNeeded ||
+                Boolean(services.weatherProvider.getState()?.lastSuccessfulRefresh);
             if (!indicator || (!codexReady || !weatherReady) && this._attempts < 40)
                 return GLib.SOURCE_CONTINUE;
             this._source = 0;
@@ -101,9 +103,22 @@ export default class UiSmokeExtension extends Extension {
             tabSwitches: [],
             refreshStateExercised: false,
             openCloseCycles: 0,
+            moduleIds: [...indicator._pages.keys()],
+            tabWidths: [],
+            weatherTopBarVisible: indicator._weatherSummary.item.visible,
+            usageStateSetting: indicator._settings.get_boolean('show-codex-usage-state'),
+            usageStateKey: indicator._lastUsageState,
+            usageStateVisible: indicator._codexPaceIcon.visible,
+            expectedTimerCount: services?.weatherProvider ? 2 : 1,
         };
         indicator.menu.open();
-        for (const id of ['codex', 'weather', 'codex', 'weather']) {
+        await settle();
+        report.tabWidths = [...(indicator._tabs?._buttons?.values?.() ?? [])]
+            .map(({button}) => button.width);
+        const sequence = report.moduleIds.includes('weather')
+            ? ['codex', 'weather', 'codex', 'weather']
+            : ['codex', 'codex', 'codex', 'codex'];
+        for (const id of sequence) {
             indicator._select(id);
             await settle();
             const page = indicator._pages.get(id);
@@ -138,7 +153,7 @@ export default class UiSmokeExtension extends Extension {
         if (codexAdjustment?.upper > codexAdjustment?.page_size) {
             codexAdjustment.set_value(Math.min(80,
                 codexAdjustment.upper - codexAdjustment.page_size));
-            indicator._select('weather');
+            indicator._select(report.moduleIds.includes('weather') ? 'weather' : 'codex');
             await settle();
             indicator._select('codex');
             await settle();
@@ -159,6 +174,14 @@ export default class UiSmokeExtension extends Extension {
             actions?.destroy();
         }
         report.refreshStateExercised = true;
+        const originalUsageSetting = indicator._settings.get_boolean('show-codex-usage-state');
+        indicator._settings.set_boolean('show-codex-usage-state', false);
+        await settle();
+        report.usageSettingUpdatedLive =
+            Main.panel.statusArea['shadow-panel@shadowokx'] === indicator &&
+            !indicator._codexPaceIcon.visible;
+        indicator._settings.set_boolean('show-codex-usage-state', originalUsageSetting);
+        await settle();
         indicator.menu.close();
         for (let cycle = 0; cycle < 20; cycle++) {
             indicator.menu.open();
@@ -166,6 +189,15 @@ export default class UiSmokeExtension extends Extension {
                 report.openCloseCycles++;
             indicator.menu.close();
         }
+        const hiddenChildren = new Map([...indicator._pages]
+            .map(([id, page]) => [id, page.actor.get_first_child()]));
+        services.codexProvider._setState({...services.codexProvider.getState()});
+        if (services.weatherProvider)
+            services.weatherProvider._setState({...services.weatherProvider.getState()});
+        await settle();
+        report.hiddenPageTreesPreserved = [...indicator._pages]
+            .every(([id, page]) => page.actor.get_first_child() === hiddenChildren.get(id) &&
+                page._stateDirty);
         indicator.menu.open();
         const capturePage = GLib.getenv('SHADOW_UI_PAGE');
         if (capturePage === 'codex' || capturePage === 'weather') {
@@ -184,7 +216,7 @@ export default class UiSmokeExtension extends Extension {
                 const candidate = Main.panel.statusArea['shadow-panel@shadowokx'];
                 const timerCount = candidate?._extension
                     ?.getRuntimeServices?.().scheduler?._sources?.size;
-                if (candidate && timerCount === 2)
+                if (candidate && timerCount === report.expectedTimerCount)
                     break;
                 await settle(100);
             }

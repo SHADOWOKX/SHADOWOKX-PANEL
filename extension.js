@@ -12,15 +12,8 @@ import {ShadowIndicator} from './ui/panel.js';
 
 const REBUILD_KEYS = Object.freeze([
     'panel-placement',
-    'show-codex-icon',
-    'show-codex-remaining',
-    'show-codex-reset-countdown',
-    'show-weather-icon',
-    'show-weather-temperature',
-    'show-weather-condition',
-    'remember-last-tab',
-    'default-tab',
-    'animations',
+    'show-weather-panel',
+    'show-weather-top-bar',
     'density',
     'panel-width',
     'theme',
@@ -43,14 +36,29 @@ const REBUILD_KEYS = Object.freeze([
     'show-weather-insights',
 ]);
 
+const LIVE_INDICATOR_KEYS = Object.freeze([
+    'show-codex-icon',
+    'show-codex-remaining',
+    'show-codex-reset-countdown',
+    'show-codex-usage-state',
+    'show-weather-icon',
+    'show-weather-temperature',
+    'show-weather-condition',
+]);
+
 export default class ShadowPanelExtension extends Extension {
     enable() {
         this._settings = this.getSettings();
         this._logger = new Logger(this._settings);
         this._scheduler = new Scheduler(this._logger);
         this._services = {};
-        this._settingsIds = REBUILD_KEYS.map(key =>
-            this._settings.connect(`changed::${key}`, () => this._queueRebuild()));
+        this._settingsIds = [
+            ...REBUILD_KEYS.map(key =>
+                this._settings.connect(`changed::${key}`, () => this._queueRebuild())),
+            ...LIVE_INDICATOR_KEYS.map(key =>
+                this._settings.connect(`changed::${key}`, () =>
+                    this._indicator?.syncIndicatorSettings())),
+        ];
         this._interfaceSettings = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
         this._interfaceSettingsId = this._interfaceSettings.connect(
             'changed::text-scaling-factor',
@@ -103,11 +111,16 @@ export default class ShadowPanelExtension extends Extension {
             provider.start().catch(error =>
                 this._logger.warn('Could not start Codex provider', error));
         }
-        if (!this._services.weatherProvider) {
+        const needsWeather = this._settings.get_boolean('show-weather-panel') ||
+            this._settings.get_boolean('show-weather-top-bar');
+        if (needsWeather && !this._services.weatherProvider) {
             const provider = new WeatherProvider(this._settings, this._scheduler, this._logger);
             this._services.weatherProvider = provider;
             provider.start().catch(error =>
                 this._logger.warn('Could not start weather provider', error));
+        } else if (!needsWeather && this._services.weatherProvider) {
+            this._services.weatherProvider.destroy();
+            delete this._services.weatherProvider;
         }
     }
 
@@ -125,6 +138,7 @@ export default class ShadowPanelExtension extends Extension {
         this._indicator = replacement;
         const placement = this._settings.get_string('panel-placement');
         Main.panel.addToStatusArea(this.uuid, this._indicator, 0, placement);
+        replacement.completeMount();
     }
 
     _destroyIndicator() {

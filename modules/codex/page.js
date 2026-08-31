@@ -35,7 +35,13 @@ export class CodexPage extends BasePage {
         this._destroyed = false;
         this._popupOpen = false;
         this._lastWeeklyPercent = null;
-        this.track(this._provider.subscribe(() => this._render()));
+        this._hasRendered = false;
+        this._stateDirty = true;
+        this.track(this._provider.subscribe(() => {
+            this._stateDirty = true;
+            if (!this._hasRendered || this._popupOpen)
+                this._render();
+        }));
     }
 
     onPopupOpened() {
@@ -54,11 +60,15 @@ export class CodexPage extends BasePage {
     }
 
     activate() {
+        if (this._destroyed || this._pageDestroyed)
+            return;
         this.fit();
         resetScrollPosition(this._scroll);
     }
 
     fit() {
+        if (this._destroyed || this._pageDestroyed)
+            return;
         fitScrollToContent(this._scroll, this._scrollContent, this.context, this.actor);
     }
 
@@ -66,7 +76,9 @@ export class CodexPage extends BasePage {
         if (this._destroyed || this._pageDestroyed || !this.actor)
             return;
         const state = this._provider.getState();
-        this.replaceContent(page => {
+        let nextScroll = null;
+        let nextScrollContent = null;
+        const rendered = this.replaceContent(page => {
             page.add_child(pageTitle(
                 'Codex Usage',
                 this._actions(state),
@@ -123,10 +135,16 @@ export class CodexPage extends BasePage {
             const facts = this._facts(state);
             if (facts)
                 content.add_child(facts);
-            this._scrollContent = content;
-            this._scroll = scrollContainer(content, 'shadow-codex-scroll');
-            page.add_child(this._scroll);
+            nextScrollContent = content;
+            nextScroll = scrollContainer(content, 'shadow-codex-scroll');
+            page.add_child(nextScroll);
         });
+        if (rendered) {
+            this._scrollContent = nextScrollContent;
+            this._scroll = nextScroll;
+            this._hasRendered = true;
+            this._stateDirty = false;
+        }
         this.fit();
     }
 
@@ -503,7 +521,8 @@ export class CodexPage extends BasePage {
             );
         } finally {
             this._sharing = false;
-            if (!this._destroyed)
+            this._stateDirty = true;
+            if (!this._destroyed && this._popupOpen)
                 this._render();
         }
     }
@@ -513,5 +532,7 @@ export class CodexPage extends BasePage {
         this._stopRefreshAnimation();
         this.context.scheduler.cancel('codex-countdown');
         super.destroy();
+        this._scroll = null;
+        this._scrollContent = null;
     }
 }

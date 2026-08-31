@@ -31,6 +31,8 @@ unzip -Z1 "$shadow_test_dir/package/shadow-panel@shadowokx.shell-extension.zip" 
   grep -qx 'modules/codex/shareWorker.js'
 unzip -Z1 "$shadow_test_dir/package/shadow-panel@shadowokx.shell-extension.zip" | \
   grep -qx 'icons/chatgpt.png'
+unzip -Z1 "$shadow_test_dir/package/shadow-panel@shadowokx.shell-extension.zip" | \
+  grep -qx 'icons/usage-high-symbolic.svg'
 if unzip -Z1 "$shadow_test_dir/package/shadow-panel@shadowokx.shell-extension.zip" | \
   rg -i '(^|/)(notes|obsidian|tasks|todo|tools)(/|\.|$)'; then
   printf '%s\n' 'Removed productivity-module code was found in the release archive.' >&2

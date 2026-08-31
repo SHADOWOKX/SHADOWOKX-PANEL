@@ -26,6 +26,18 @@
       <default>false</default>
       <summary>Show the weekly reset countdown in the top bar</summary>
     </key>
+    <key name="show-codex-usage-state" type="b">
+      <default>false</default>
+      <summary>Show a real-history Codex usage-state icon in the top bar</summary>
+    </key>
+    <key name="show-weather-panel" type="b">
+      <default>true</default>
+      <summary>Show the Weather page in the popup</summary>
+    </key>
+    <key name="show-weather-top-bar" type="b">
+      <default>true</default>
+      <summary>Show the Weather summary in the top bar</summary>
+    </key>
     <key name="show-weather-icon" type="b">
       <default>true</default>
       <summary>Show the current weather icon in the top bar</summary>

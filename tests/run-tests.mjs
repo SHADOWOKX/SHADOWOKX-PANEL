@@ -11,7 +11,12 @@ import {
 } from '../lib/format.js';
 import {chooseInitialModule} from '../lib/moduleConfig.js';
 import {normalizeSparklineBuckets, sparklineCoordinates} from '../lib/sparkline.js';
-import {codexRemainingSummary, codexUsageStatus, weatherSummaryTemperature} from '../lib/summary.js';
+import {
+    codexRemainingSummary,
+    codexUsagePace,
+    codexUsageStatus,
+    weatherSummaryTemperature,
+} from '../lib/summary.js';
 import {
     normalizeCachedRateLimits,
     normalizeAccountTokenUsage,
@@ -274,6 +279,29 @@ function testTopBarSummaries() {
     equal(codexUsageStatus(4).emoji, '🔴', 'low usage status');
     equal(weatherSummaryTemperature({current: {temperature: 33.6}}),
         34, 'weather summary rounds temperature');
+
+    const paceState = tokens => ({
+        tokenUsage: {
+            dailyBuckets: tokens.map((value, index) => ({
+                date: `2026-08-${String(27 + index).padStart(2, '0')}`,
+                tokens: value,
+            })),
+        },
+    });
+    const nowMs = new Date(2026, 8, 1, 12).getTime();
+    equal(codexUsagePace(paceState([100, 100, 100, 200]), nowMs).key,
+        'high', 'usage state flags a completed day at least 1.5× its real baseline');
+    equal(codexUsagePace(paceState([100, 100, 100, 120]), nowMs).key,
+        'normal', 'usage state keeps ordinary completed-day activity neutral');
+    equal(codexUsagePace(paceState([100, 100, 100, 40]), nowMs).key,
+        'low', 'usage state flags a completed day at most half its real baseline');
+    equal(codexUsagePace(paceState([100, 100, 100]), nowMs), null,
+        'usage state stays hidden without four completed daily buckets');
+    equal(codexUsagePace(paceState([0, 0, 0, 100]), nowMs), null,
+        'usage state does not guess from a zero baseline');
+    equal(codexUsagePace(paceState([100, 100, 100, 10]),
+        new Date(2026, 7, 30, 12).getTime()), null,
+        'today\'s incomplete bucket is excluded instead of being labeled quiet');
 }
 
 function testWeatherNormalization() {

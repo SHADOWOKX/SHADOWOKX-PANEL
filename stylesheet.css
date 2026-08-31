@@ -123,6 +123,15 @@
   font-feature-settings: "tnum";
 }
 
+.shadow-panel-usage-state {
+  icon-shadow: none;
+  transition-duration: 140ms;
+}
+
+.shadow-usage-state-high { color: #fb7185; }
+.shadow-usage-state-normal { opacity: 220; }
+.shadow-usage-state-low { opacity: 190; }
+
 /* Product header */
 .shadow-header {
   min-height: 32px;

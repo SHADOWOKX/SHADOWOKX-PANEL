@@ -25,12 +25,19 @@ export class WeatherPage extends BasePage {
         super(context, 'weather');
         this._provider = context.weatherProvider;
         this._popupOpen = false;
-        this.track(this._provider.subscribe(() => this._render()));
+        this._hasRendered = false;
+        this._stateDirty = true;
+        this.track(this._provider.subscribe(() => {
+            this._stateDirty = true;
+            if (!this._hasRendered || this._popupOpen)
+                this._render();
+        }));
     }
 
     onPopupOpened() {
         this._popupOpen = true;
-        this._render();
+        if (this._stateDirty)
+            this._render();
         if (this.context.settings.get_boolean('refresh-on-open') && this._provider.isStale())
             this._provider.refresh(false);
     }
@@ -41,11 +48,15 @@ export class WeatherPage extends BasePage {
     }
 
     activate() {
+        if (this._pageDestroyed)
+            return;
         this.fit();
         resetScrollPosition(this._scroll);
     }
 
     fit() {
+        if (this._pageDestroyed)
+            return;
         fitScrollToContent(this._scroll, this._scrollContent, this.context, this.actor);
     }
 
@@ -53,7 +64,9 @@ export class WeatherPage extends BasePage {
         if (this._pageDestroyed || !this.actor)
             return;
         const state = this._provider.getState();
-        this.replaceContent(page => {
+        let nextScroll = null;
+        let nextScrollContent = null;
+        const rendered = this.replaceContent(page => {
             page.add_child(pageTitle('Weather', this._actions(state)));
 
             if (state.status === 'loading' && !state.lastSuccessfulRefresh) {
@@ -107,10 +120,18 @@ export class WeatherPage extends BasePage {
             if (insight)
                 content.add_child(insight);
 
-            this._scrollContent = content;
-            this._scroll = scrollContainer(content, 'shadow-weather-scroll');
-            page.add_child(this._scroll);
+            nextScrollContent = content;
+            nextScroll = scrollContainer(content, 'shadow-weather-scroll');
+            page.add_child(nextScroll);
         });
+        if (rendered) {
+            this._scrollContent = nextScrollContent;
+            this._scroll = nextScroll;
+            if (!nextScroll)
+                this._hourlyScroll = null;
+            this._hasRendered = true;
+            this._stateDirty = false;
+        }
         this.fit();
     }
 
@@ -397,6 +418,9 @@ export class WeatherPage extends BasePage {
     destroy() {
         this._stopRefreshAnimation();
         super.destroy();
+        this._scroll = null;
+        this._scrollContent = null;
+        this._hourlyScroll = null;
     }
 
     _formatHour(timestamp, timezone) {

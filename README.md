@@ -2,7 +2,7 @@
 
 Shadowokx Panel is a small GNOME top-bar utility that does two things well: it shows Codex usage limits and useful local weather. It targets Ubuntu 26.04.1 LTS, GNOME Shell 50, Wayland, and modern GJS ES modules.
 
-Release `2.2.0` deliberately contains only two pages:
+Release `2.3.0` deliberately contains only two pages:
 
 1. ChatGPT Codex
 2. Weather
@@ -21,8 +21,8 @@ The Codex percentage always means **remaining capacity**, never consumed capacit
 
 ## Features
 
-- Compact configurable top-bar fields for the ChatGPT icon, remaining percentage, weekly reset countdown, weather icon, temperature, and condition.
-- Two equal-width segmented tabs with icon and text labels, a restrained accent state, keyboard navigation, and no separator artifact.
+- Compact configurable top-bar fields for the ChatGPT icon, remaining percentage, weekly reset countdown, optional real-history usage state, weather icon, temperature, and condition. Weather can be hidden from the top bar independently from the popup.
+- A genuinely homogeneous 50/50 Codex/Weather segmented control with centered icon-and-label content, identical geometry, restrained accent and hover states, and keyboard navigation. When Weather is disabled in the popup, the single unnecessary segment is removed entirely.
 - A weekly-first Codex hero with dominant remaining capacity, remaining-progress meter, compact status pill, reset countdown/date, compact five-hour state, reset credits, refresh, icon-only Open Codex, and PNG Share actions.
 - Verified Codex token activity with compact lifetime and peak totals, full peak date, and a native Cairo line-and-area sparkline only when the signed-in app-server reports at least two real daily buckets. Exact lifetime totals remain available in a tooltip.
 - Content-driven current-weather hero with condition, shortened and ellipsized location, high/low, up to five optional details including real UV, up to 12 horizontally scrollable forecast hours, optional hourly rain, sunrise/sunset, Celsius or Fahrenheit, and location-aware times.
@@ -89,6 +89,8 @@ remaining = 100 - usedPercent
 
 The top bar prefers weekly remaining capacity because the weekly limit is the primary product signal, with five-hour remaining as a fallback when weekly is not reported.
 
+The optional usage-state icon uses completed daily buckets from the same structured token-activity response. It needs at least four completed days, compares the latest completed day with the mean of the preceding completed days, and deliberately excludes the still-changing current day. At 150% or more of that baseline it shows a small flame; at 50% or less it shows a quiet moon; otherwise it shows a neutral balanced state. The icon is omitted when history is missing, insufficient, or has no non-zero baseline. No pace is guessed from the remaining-limit percentage.
+
 `account/usage/read` supplies optional account token-activity summaries and `dailyUsageBuckets`. Every chart point is the validated `tokens` value for the bucket's reported `startDate`; it is not a lifetime snapshot or an inferred delta. Buckets are deduplicated by date, ordered oldest to newest, restricted to the current seven-day calendar window, and never padded with invented zeroes. The panel never estimates a peak hour from daily data or parses private session transcripts as a substitute.
 
 The 54-pixel mini graph is drawn by a native `St.DrawingArea` with Cairo: a two-pixel rounded accent line, a restrained gradient area fill, and one endpoint dot. Its X positions preserve real calendar gaps and its Y scale keeps a truthful zero baseline. It has no redraw timer or animation loop. With fewer than two real daily buckets the card says “Not enough history yet.” All-zero, duplicate, corrupt, missing-day, single-point, and large-spike inputs are covered by pure tests.
@@ -129,6 +131,8 @@ The bundled ChatGPT icon is used only to identify the Codex integration. See [NO
 The configured location is sent to Open-Meteo geocoding. The resolved coordinates are then sent to the Open-Meteo forecast endpoint. No API key is required.
 
 Requests are asynchronous, time-limited, response-size bounded, cached, and made only when stale, manually refreshed, or after a relevant setting changes. A failed refresh never discards the last successful forecast. Full Weather unavailable state is shown only when no valid result has ever been loaded.
+
+The Weather page and top-bar summary have separate switches. If both are disabled, the Weather provider and its timer are not created at all; Codex-only mode therefore has no hidden Weather polling or placeholder UI.
 
 The hourly forecast keeps up to 12 validated hours in one bounded horizontal `St.ScrollView`. It uses exact four-column pages, so no partial fifth item or scrollbar artifact leaks through the rounded card. Additional pages remain available to touchpad or horizontal-wheel scrolling; the hourly view never creates vertical overflow.
 
@@ -181,6 +185,8 @@ tests/                       pure logic, provider, share, and import tests
 
 Provider code never imports page code. Codex failure cannot break Weather, and Weather failure cannot break Codex. All timers, cancellables, subscriptions, subprocesses, and actors are released when the extension is disabled.
 
+Provider updates mark closed pages dirty without rebuilding their hidden actor trees. The selected page renders the pending state when opened, refresh animation runs only while its page is visible, and top-bar-only setting changes update the existing indicator actors without a full panel reconstruction.
+
 ## Development
 
 The complete checks use the standard Ubuntu GNOME runtime plus:
@@ -209,6 +215,7 @@ SHADOW_UI_DENSITY=compact SHADOW_UI_WIDTH=narrow ./scripts/ui-smoke.sh
 SHADOW_UI_HEIGHT=420 SHADOW_EXPECT_SCROLL=true ./scripts/ui-smoke.sh
 SHADOW_TEXT_SCALE=1.5 SHADOW_EXPECT_SCROLL=true ./scripts/ui-smoke.sh
 SHADOW_UI_THEME=light SHADOW_UI_BACKGROUND=nord SHADOW_UI_ACCENT=blue ./scripts/ui-smoke.sh
+SHADOW_SHOW_WEATHER_PANEL=false SHADOW_SHOW_WEATHER_TOP_BAR=false SHADOW_SHOW_USAGE_STATE=true SHADOW_UI_LIFECYCLE=true ./scripts/ui-smoke.sh
 ```
 
 Exercise the live providers with isolated caches:
@@ -236,8 +243,9 @@ Normal operation is quiet. Debug logging is disabled by default and never includ
 
 - Some Codex accounts or sessions report only weekly capacity. The five-hour section remains compactly unavailable and no value is invented.
 - Token activity can be unavailable for unsupported authentication modes or older Codex versions. The graph needs two actual buckets, does not interpolate missing dates, and may therefore show fewer than seven points. Peak hour is not displayed because the provider exposes daily buckets, not hourly timestamps.
+- The optional usage-state icon needs at least four completed daily buckets. It stays hidden instead of estimating a state when that history is not available.
 - GNOME Shell 50 does not expose one dependable extension-facing system-accent API across the targeted Ubuntu environment, so Follow System covers light/dark mode while accent selection remains explicit.
-- Burn rate and limit runway are not displayed because the app-server returns a current rate-limit snapshot, not enough historical snapshots to calculate them honestly.
+- Intraday burn rate and limit runway are not displayed because the app-server returns daily history and a current rate-limit snapshot, not enough timestamped history to calculate them honestly.
 - The local Codex app-server schema can evolve with future Codex releases; its provider is isolated so it can be updated without changing the page.
 - Share saves PNG files and opens their folder; it does not claim binary clipboard support.
 - Weather location entry uses safe manual text validation rather than automatic geolocation or a network-backed search chooser.

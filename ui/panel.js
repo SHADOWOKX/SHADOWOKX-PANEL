@@ -1,5 +1,7 @@
 import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
 import GObject from 'gi://GObject';
+import GLib from 'gi://GLib';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -10,7 +12,11 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import {formatCountdown, formatResetDate} from '../lib/format.js';
 import {ACCENTS, MODULE_IDS, MODULE_META} from '../lib/constants.js';
 import {chooseInitialModule} from '../lib/moduleConfig.js';
-import {codexRemainingSummary, weatherSummaryTemperature} from '../lib/summary.js';
+import {
+    codexRemainingSummary,
+    codexUsagePace,
+    weatherSummaryTemperature,
+} from '../lib/summary.js';
 import {PAGE_FACTORIES} from '../modules/index.js';
 import {
     animationsEnabled,
@@ -54,6 +60,11 @@ class ShadowIndicator extends PanelMenu.Button {
         this._codexState = null;
         this._weatherState = null;
         this._notificationSource = null;
+        this._lastUsageState = null;
+        this._mounted = false;
+        this._mountSignalId = 0;
+        this._moduleIds = MODULE_IDS.filter(id =>
+            id !== 'weather' || settings.get_boolean('show-weather-panel'));
 
         this._buildIndicator();
         this._buildDashboard();
@@ -86,6 +97,18 @@ class ShadowIndicator extends PanelMenu.Button {
         );
         this._indicatorBox.add_child(this._fallbackIcon);
         this._codexSummary = this._summaryItem('codex', 'Codex usage');
+        this._codexPaceIcon = new St.Icon({
+            icon_size: 12,
+            style_class: 'shadow-panel-usage-state',
+            y_align: Clutter.ActorAlign.CENTER,
+            visible: false,
+        });
+        this._usageHighIcon = Gio.icon_new_for_string(GLib.build_filenamev([
+            this._extension.path,
+            'icons',
+            'usage-high-symbolic.svg',
+        ]));
+        this._codexSummary.item.add_child(this._codexPaceIcon);
         this._weatherSummary = this._summaryItem('weather', 'Weather');
         this._indicatorBox.add_child(this._codexSummary.item);
         this._indicatorBox.add_child(this._weatherSummary.item);
@@ -144,13 +167,17 @@ class ShadowIndicator extends PanelMenu.Button {
         }, 'shadow-icon-button shadow-settings-button'));
         this._root.add_child(header);
 
-        this._tabs = new TabStrip(
-            this._extension,
-            this._settings,
-            MODULE_IDS,
-            id => this._select(id)
-        );
-        this._root.add_child(this._tabs.actor);
+        if (this._moduleIds.length > 1) {
+            this._tabs = new TabStrip(
+                this._extension,
+                this._settings,
+                this._moduleIds,
+                id => this._select(id)
+            );
+            this._root.add_child(this._tabs.actor);
+        } else {
+            this._tabs = null;
+        }
 
         this._pageStack = new St.Widget({
             style_class: 'shadow-page-stack',
@@ -190,14 +217,16 @@ class ShadowIndicator extends PanelMenu.Button {
             this._codexState = state;
             this._syncIndicator();
         }));
-        this._subscriptions.push(services.weatherProvider.subscribe(state => {
-            if (this._destroyed)
-                return;
-            this._weatherState = state;
-            this._syncIndicator();
-        }));
+        if (services.weatherProvider) {
+            this._subscriptions.push(services.weatherProvider.subscribe(state => {
+                if (this._destroyed)
+                    return;
+                this._weatherState = state;
+                this._syncIndicator();
+            }));
+        }
 
-        for (const id of MODULE_IDS) {
+        for (const id of this._moduleIds) {
             try {
                 const page = PAGE_FACTORIES[id](context);
                 page.actor.width = this._pageStack.width;
@@ -233,6 +262,8 @@ class ShadowIndicator extends PanelMenu.Button {
     }
 
     _fitPageScroll(scroll, pageActor) {
+        if (this._destroyed)
+            return;
         const natural = scroll?._shadowNaturalHeight;
         if (!scroll || !Number.isFinite(natural))
             return;
@@ -270,7 +301,7 @@ class ShadowIndicator extends PanelMenu.Button {
         actor.add_child(stateMessage(
             'dialog-warning-symbolic',
             `${MODULE_META[id].name} unavailable`,
-            'This page could not be initialized. The other page remains available.',
+            'This page could not be initialized. Shadowokx Panel remains available.',
             textButton('Retry', () => {
                 this.menu.close();
                 this._extension._queueRebuild();
@@ -287,7 +318,7 @@ class ShadowIndicator extends PanelMenu.Button {
     }
 
     _select(id) {
-        if (!this._pages.has(id))
+        if (this._destroyed || !this._pages.has(id))
             return;
         const previousId = this._activeId;
         const animate = Boolean(previousId && previousId !== id &&
@@ -295,12 +326,13 @@ class ShadowIndicator extends PanelMenu.Button {
         this._activeId = id;
         if (this._popupOpen && previousId && previousId !== id)
             this._pages.get(previousId)?.onPopupClosed();
+        let selectedPage = null;
         for (const [pageId, page] of this._pages) {
             page.actor.remove_all_transitions();
             if (pageId === id) {
                 page.actor.show();
                 page.actor.opacity = animate ? 0 : 255;
-                page.activate();
+                selectedPage = page;
                 if (animate) {
                     page.actor.ease({
                         opacity: 255,
@@ -313,15 +345,17 @@ class ShadowIndicator extends PanelMenu.Button {
                 page.actor.opacity = 255;
             }
         }
-        this._tabs.setActive(id);
+        this._tabs?.setActive(id);
         if (this._popupOpen && previousId !== id)
-            this._pages.get(id)?.onPopupOpened();
+            selectedPage?.onPopupOpened();
+        selectedPage?.activate();
         if (this._settings.get_boolean('remember-last-tab'))
             this._settings.set_string('last-selected-tab', id);
     }
 
     _syncIndicator() {
-        if (this._destroyed || !this._codexSummary || !this._weatherSummary)
+        if (this._destroyed || !this._mounted ||
+            !this._codexSummary || !this._weatherSummary)
             return;
         const monitorWidth = Main.layoutManager.primaryMonitor?.width ?? global.stage.width;
         const constrained = monitorWidth < 900;
@@ -345,6 +379,7 @@ class ShadowIndicator extends PanelMenu.Button {
         this._codexSummary.item.accessible_name = codexPercent === null
             ? 'Codex remaining capacity unavailable'
             : `Codex ${codexPercent}% remaining`;
+        this._syncUsageState();
 
         const temperature = weatherSummaryTemperature(this._weatherState);
         const weatherParts = [];
@@ -360,7 +395,8 @@ class ShadowIndicator extends PanelMenu.Button {
             this._weatherSummary.icon.icon_name = this._weatherState.current.condition.icon;
         this._weatherSummary.label.text = weatherParts.join('  ');
         this._weatherSummary.label.visible = weatherParts.length > 0;
-        const weatherConfigured = weatherIcon || weatherParts.length > 0;
+        const weatherConfigured = this._settings.get_boolean('show-weather-top-bar') &&
+            (weatherIcon || weatherParts.length > 0);
         this._weatherSummary.item.visible = weatherConfigured &&
             !(singleItem && this._codexSummary.item.visible);
         this._weatherSummary.item.accessible_name = temperature === null
@@ -375,17 +411,80 @@ class ShadowIndicator extends PanelMenu.Button {
         this.accessible_name = descriptions.join(', ') || 'Shadowokx Panel';
     }
 
+    _syncUsageState() {
+        const enabled = this._settings.get_boolean('show-codex-usage-state') &&
+            this._settings.get_boolean('show-codex-remaining') &&
+            codexRemainingSummary(this._codexState) !== null;
+        const state = enabled ? codexUsagePace(this._codexState) : null;
+        this._codexPaceIcon.visible = Boolean(state);
+        if (!state) {
+            this._lastUsageState = null;
+            return;
+        }
+
+        this._codexPaceIcon.gicon = state.key === 'high'
+            ? this._usageHighIcon
+            : Gio.ThemedIcon.new(state.iconName);
+        for (const key of ['high', 'normal', 'low'])
+            this._codexPaceIcon.remove_style_class_name(`shadow-usage-state-${key}`);
+        this._codexPaceIcon.add_style_class_name(`shadow-usage-state-${state.key}`);
+        this._codexPaceIcon.accessible_name = state.label;
+        if (this._lastUsageState && this._lastUsageState !== state.key &&
+            this._codexPaceIcon.mapped && animationsEnabled(this._settings)) {
+            this._codexPaceIcon.remove_all_transitions();
+            this._codexPaceIcon.opacity = 150;
+            this._codexPaceIcon.ease({
+                opacity: 255,
+                duration: 140,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+        } else {
+            this._codexPaceIcon.opacity = 255;
+        }
+        this._lastUsageState = state.key;
+        this._codexSummary.item.accessible_name += `, ${state.label.toLowerCase()}`;
+    }
+
+    syncIndicatorSettings() {
+        this._syncIndicator();
+    }
+
+    completeMount() {
+        if (this._destroyed)
+            return;
+        if (this.mapped) {
+            this._mounted = true;
+            this._syncIndicator();
+            return;
+        }
+        if (this._mountSignalId)
+            return;
+        this._mountSignalId = this.connect('notify::mapped', () => {
+            if (!this.mapped || this._destroyed)
+                return;
+            this.disconnect(this._mountSignalId);
+            this._mountSignalId = 0;
+            this._mounted = true;
+            this._syncIndicator();
+        });
+    }
+
     _indicatorTooltipText() {
         const lines = [];
         const codexPercent = codexRemainingSummary(this._codexState);
+        const usageState = this._settings.get_boolean('show-codex-usage-state')
+            ? codexUsagePace(this._codexState)
+            : null;
         const codexWindow = this._codexState?.weekly ?? this._codexState?.fiveHour;
         if (codexPercent !== null) {
             lines.push(`Codex · ${codexPercent}% remaining`);
             if (Number.isFinite(codexWindow?.resetsAt))
                 lines.push(`Resets ${formatResetDate(codexWindow.resetsAt)}`);
+            if (usageState)
+                lines.push(usageState.label);
         }
         const temperature = weatherSummaryTemperature(this._weatherState);
-        if (temperature !== null) {
+        if (this._settings.get_boolean('show-weather-top-bar') && temperature !== null) {
             const condition = this._weatherState.current.condition?.label;
             lines.push(`${temperature}°${condition ? ` · ${condition}` : ''}`);
             if (Number.isFinite(this._weatherState.current.feelsLike))
@@ -395,6 +494,8 @@ class ShadowIndicator extends PanelMenu.Button {
     }
 
     _onPopupOpened() {
+        if (this._destroyed)
+            return;
         this._popupOpen = true;
         try {
             this._pages.get(this._activeId)?.onPopupOpened();
@@ -404,6 +505,8 @@ class ShadowIndicator extends PanelMenu.Button {
     }
 
     _onPopupClosed() {
+        if (this._destroyed)
+            return;
         this._popupOpen = false;
         try {
             this._pages.get(this._activeId)?.onPopupClosed();
@@ -441,6 +544,11 @@ class ShadowIndicator extends PanelMenu.Button {
         if (this._destroyed)
             return;
         this._destroyed = true;
+        this._mounted = false;
+        if (this._mountSignalId) {
+            this.disconnect(this._mountSignalId);
+            this._mountSignalId = 0;
+        }
         for (const unsubscribe of this._subscriptions.splice(0))
             unsubscribe();
         for (const page of this._pages.values())
@@ -450,6 +558,8 @@ class ShadowIndicator extends PanelMenu.Button {
         this._tabs = null;
         this._codexSummary = null;
         this._weatherSummary = null;
+        this._codexPaceIcon = null;
+        this._usageHighIcon = null;
         this._fallbackIcon = null;
         this._notificationSource?.destroy();
         this._notificationSource = null;

@@ -117,6 +117,12 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
         panel.add(switchRow(settings, 'remember-last-tab', 'Remember last page'));
         panel.add(switchRow(
             settings,
+            'show-weather-panel',
+            'Show Weather page',
+            'When disabled, the popup becomes a focused Codex-only panel.'
+        ));
+        panel.add(switchRow(
+            settings,
             'refresh-on-open',
             'Refresh stale data when opened',
             'Only refreshes a provider after its configured interval has elapsed.'
@@ -132,12 +138,34 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
             'Show reset countdown',
             'Uses the weekly reset window.'
         ));
+        codex.add(switchRow(
+            settings,
+            'show-codex-usage-state',
+            'Show recent usage state',
+            'Uses only completed daily Codex history; hidden when history is insufficient.'
+        ));
         page.add(codex);
 
         const weather = new Adw.PreferencesGroup({title: 'Top bar · Weather'});
-        weather.add(switchRow(settings, 'show-weather-icon', 'Show weather icon'));
-        weather.add(switchRow(settings, 'show-weather-temperature', 'Show temperature'));
-        weather.add(switchRow(settings, 'show-weather-condition', 'Show condition text'));
+        weather.add(switchRow(
+            settings,
+            'show-weather-top-bar',
+            'Show Weather summary',
+            'Independent from the Weather page inside the popup.'
+        ));
+        for (const row of [
+            switchRow(settings, 'show-weather-icon', 'Show weather icon'),
+            switchRow(settings, 'show-weather-temperature', 'Show temperature'),
+            switchRow(settings, 'show-weather-condition', 'Show condition text'),
+        ]) {
+            settings.bind(
+                'show-weather-top-bar',
+                row,
+                'sensitive',
+                Gio.SettingsBindFlags.GET
+            );
+            weather.add(row);
+        }
         page.add(weather);
         return page;
     }

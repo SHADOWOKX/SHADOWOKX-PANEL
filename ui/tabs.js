@@ -2,7 +2,7 @@ import Clutter from 'gi://Clutter';
 import St from 'gi://St';
 
 import {MODULE_META} from '../lib/constants.js';
-import {accentRgba, moduleIcon, resolveAccent} from './components.js';
+import {accentRgba, animationsEnabled, moduleIcon, resolveAccent} from './components.js';
 
 export class TabStrip {
     constructor(extension, settings, moduleIds, onSelected) {
@@ -14,6 +14,7 @@ export class TabStrip {
             style_class: 'shadow-tab-strip shadow-segmented-control',
             x_expand: true,
         });
+        this.actor.layout_manager.homogeneous = true;
 
         for (const id of moduleIds) {
             const meta = MODULE_META[id];
@@ -49,18 +50,18 @@ export class TabStrip {
             button.connect('key-press-event', (_button, event) =>
                 this._onKeyPress(id, event));
             this.actor.add_child(button);
-            this._buttons.set(id, {button, icon, label});
+            this._buttons.set(id, {button, content, icon, label});
         }
     }
 
     setActive(id) {
         if (!this._buttons.has(id))
             return;
-        this._activeId = id;
+        const previousId = this._activeId;
         const accent = resolveAccent(this._settings);
         const tint = accentRgba(this._settings, 0.16);
 
-        for (const [buttonId, {button, icon, label}] of this._buttons) {
+        for (const [buttonId, {button, content, icon, label}] of this._buttons) {
             const active = buttonId === id;
             button.checked = active;
             button.accessible_name = active
@@ -72,11 +73,23 @@ export class TabStrip {
                 button.add_style_class_name('shadow-tab-active');
                 button.style = `background-color: ${tint};`;
                 icon.style = `color: ${accent};`;
+                if (previousId && previousId !== id && animationsEnabled(this._settings)) {
+                    content.remove_all_transitions();
+                    content.opacity = 210;
+                    content.ease({
+                        opacity: 255,
+                        duration: 120,
+                        mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                    });
+                }
             } else {
+                content.remove_all_transitions();
+                content.opacity = 255;
                 icon.style = null;
             }
             label.style = active ? `color: ${accent};` : null;
         }
+        this._activeId = id;
     }
 
     _onKeyPress(id, event) {

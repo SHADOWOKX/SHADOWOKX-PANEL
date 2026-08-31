@@ -58,10 +58,16 @@ dbus-run-session -- sh -eu -c '
     gsettings set org.gnome.shell.extensions.shadow-panel theme light
     gsettings set org.gnome.shell.extensions.shadow-panel accent-color orange
     gsettings set org.gnome.shell.extensions.shadow-panel default-tab weather
+    gsettings set org.gnome.shell.extensions.shadow-panel show-codex-usage-state true
+    gsettings set org.gnome.shell.extensions.shadow-panel show-weather-top-bar false
+    gsettings set org.gnome.shell.extensions.shadow-panel show-weather-panel false
     gsettings get org.gnome.shell.extensions.shadow-panel default-tab | grep -q weather
     sleep 1
     shadow_info=$(gnome-extensions info shadow-panel@shadowokx 2>/dev/null || true)
     printf "%s\n" "$shadow_info" | grep -q "State: ACTIVE"
+    gsettings set org.gnome.shell.extensions.shadow-panel show-weather-panel true
+    gsettings set org.gnome.shell.extensions.shadow-panel show-weather-top-bar true
+    sleep 1
     gnome-extensions prefs shadow-panel@shadowokx
     sleep 1
     gnome-extensions disable shadow-panel@shadowokx
