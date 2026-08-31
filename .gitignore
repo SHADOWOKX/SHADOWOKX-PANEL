@@ -2,6 +2,19 @@
 .backups/
 *.log
 *.tmp
+*.dump
+*.trace
+
+# Per-user provider state if XDG paths are redirected into the checkout
+codex.json
+codex-history.json
+weather.json
+/.cache/
+/.local/
+/cache/
+/data/
+/config/
+/run/
 
 # Generated release outputs
 dist/

@@ -4,18 +4,19 @@ import GLib from 'gi://GLib';
 import {Observable} from '../../services/observable.js';
 import {JsonStore} from '../../services/jsonStore.js';
 import {APP_VERSION} from '../../lib/constants.js';
+import {findCodexExecutable} from './discovery.js';
+import {
+    applyCodexHistory,
+    mergeCodexHistory,
+    normalizeCodexHistory,
+    withoutCodexHistory,
+} from './history.js';
 import {normalizeCachedRateLimits, normalizeRateLimits} from './normalize.js';
 
 Gio._promisify(Gio.OutputStream.prototype, 'write_all_async', 'write_all_finish');
 Gio._promisify(Gio.InputStream.prototype, 'read_bytes_async', 'read_bytes_finish');
 
 const MAX_MESSAGE_BYTES = 1024 * 1024;
-
-const CODEX_CANDIDATES = Object.freeze([
-    '/usr/lib/chatgpt/resources/codex',
-    '/usr/local/bin/codex',
-    '/usr/bin/codex',
-]);
 
 export class CodexProvider extends Observable {
     constructor(settings, scheduler, logger) {
@@ -24,11 +25,7 @@ export class CodexProvider extends Observable {
             connection: 'unknown',
             stale: false,
             error: null,
-            accountName: null,
-            accountType: null,
-            planType: null,
-            planLabel: null,
-            clientVersion: null,
+            errorCode: null,
             fiveHour: null,
             weekly: null,
             resetCreditsAvailable: 0,
@@ -43,6 +40,12 @@ export class CodexProvider extends Observable {
             'codex.json',
             logger
         );
+        this._historyStore = new JsonStore(
+            GLib.build_filenamev([GLib.get_user_data_dir(), 'shadow-panel']),
+            'codex-history.json',
+            logger
+        );
+        this._history = normalizeCodexHistory(null);
         this._inFlight = null;
         this._cancellable = null;
         this._process = null;
@@ -51,14 +54,23 @@ export class CodexProvider extends Observable {
     }
 
     async start() {
-        const cached = await this._cache.read(null);
+        const [cached, history] = await Promise.all([
+            this._cache.read(null),
+            this._historyStore.read(null),
+        ]);
         if (this._destroyed)
             return this.getState();
+        this._history = normalizeCodexHistory(history);
         const cachedState = normalizeCachedRateLimits(cached);
         if (cachedState) {
             const stale = Date.now() - cachedState.lastSuccessfulRefresh >=
                 this._settings.get_int('codex-refresh-minutes') * 60 * 1000;
-            this._setState({...cachedState, status: stale ? 'stale' : 'cached', stale});
+            this._setState({
+                ...cachedState,
+                tokenUsage: applyCodexHistory(cachedState.tokenUsage, this._history),
+                status: stale ? 'stale' : 'cached',
+                stale,
+            });
         }
         this._reschedule();
         this._settingsId = this._settings.connect('changed::codex-refresh-minutes', () => {
@@ -108,18 +120,33 @@ export class CodexProvider extends Observable {
 
         try {
             const response = await this._readAppServer();
-            const state = normalizeRateLimits(response.rateLimitsResponse, Date.now(), {
-                accountResponse: response.accountResponse,
-                initializeResponse: response.initializeResponse,
-                usageResponse: response.usageResponse,
-            });
+            const nowMs = Date.now();
+            let liveState;
+            try {
+                liveState = normalizeRateLimits(response.rateLimitsResponse, nowMs, {
+                    usageResponse: response.usageResponse,
+                });
+            } catch {
+                throw new Error('codex-invalid-response');
+            }
+            this._history = mergeCodexHistory(this._history, liveState.tokenUsage, nowMs);
+            const state = {
+                ...liveState,
+                tokenUsage: applyCodexHistory(liveState.tokenUsage, this._history, nowMs),
+            };
             if (this._destroyed)
                 return this.getState();
             this._setState(state);
             try {
-                await this._cache.write(state);
+                await Promise.all([
+                    this._cache.write({
+                        ...state,
+                        tokenUsage: withoutCodexHistory(state.tokenUsage),
+                    }),
+                    this._historyStore.write(this._history),
+                ]);
             } catch {
-                this._logger?.debug('codex.cache.write.failed');
+                this._logger?.debug('codex.storage.write.failed');
             }
             this._logger?.debug('codex.refresh.success', {
                 hasFiveHour: Boolean(state.fiveHour),
@@ -132,12 +159,14 @@ export class CodexProvider extends Observable {
                 return this.getState();
             }
             const hasCache = Boolean(previous?.lastSuccessfulRefresh);
+            const details = this._friendlyError(error);
             const state = {
                 ...previous,
                 status: hasCache ? 'stale' : 'error',
                 connection: 'unavailable',
                 stale: hasCache,
-                error: this._friendlyError(error),
+                errorCode: details.code,
+                error: details.message,
             };
             this._setState(state);
             this._logger?.debug('codex.refresh.failed', {message: error.message});
@@ -189,7 +218,6 @@ export class CodexProvider extends Observable {
         let initializeResponse = null;
         let usageResponse = null;
         let usageSettled = false;
-        let accountResponse = null;
         let rateLimitsResponse = null;
 
         try {
@@ -274,10 +302,8 @@ export class CodexProvider extends Observable {
                 {
                     jsonrpc: '2.0',
                     id: 3,
-                    method: 'account/read',
-                    params: {refreshToken: false},
+                    method: 'account/rateLimits/read',
                 },
-                {jsonrpc: '2.0', id: 4, method: 'account/rateLimits/read'},
             ]);
 
             for (let count = 0; count < 512; count++) {
@@ -288,10 +314,6 @@ export class CodexProvider extends Observable {
                         usageResponse = message.result ?? null;
                 }
                 if (message.id === 3) {
-                    if (!message.error)
-                        accountResponse = message.result ?? null;
-                }
-                if (message.id === 4) {
                     if (message.error)
                         throw new Error('codex-request-failed');
                     if (!message.result)
@@ -304,7 +326,6 @@ export class CodexProvider extends Observable {
                 if (rateLimitsResponse && usageSettled) {
                     return {
                         initializeResponse,
-                        accountResponse,
                         rateLimitsResponse,
                         usageResponse,
                     };
@@ -317,7 +338,6 @@ export class CodexProvider extends Observable {
             if (timedOut && rateLimitsResponse) {
                 return {
                     initializeResponse,
-                    accountResponse,
                     rateLimitsResponse,
                     usageResponse: null,
                 };
@@ -339,22 +359,33 @@ export class CodexProvider extends Observable {
     }
 
     _findCodex() {
-        const fromPath = GLib.find_program_in_path('codex');
-        if (fromPath)
-            return fromPath;
-        return CODEX_CANDIDATES.find(path => GLib.file_test(path, GLib.FileTest.IS_EXECUTABLE)) ?? null;
+        return findCodexExecutable();
     }
 
     _friendlyError(error) {
         switch (error.message) {
         case 'codex-not-installed':
-            return 'Codex is not installed or is not available to GNOME Shell.';
+            return {
+                code: 'not-installed',
+                message: 'Install Codex for this user, then sign in and retry.',
+            };
         case 'codex-timeout':
-            return 'Codex did not respond in time.';
+            return {code: 'timeout', message: 'Codex did not respond in time.'};
         case 'codex-request-failed':
-            return 'Codex could not retrieve usage for the signed-in account.';
+            return {
+                code: 'usage-unavailable',
+                message: 'Open Codex and confirm you are signed in, then retry.',
+            };
+        case 'codex-invalid-response':
+            return {
+                code: 'unsupported-response',
+                message: 'This Codex version did not return supported usage data.',
+            };
         default:
-            return 'Codex usage is temporarily unavailable.';
+            return {
+                code: 'unavailable',
+                message: 'Codex usage is temporarily unavailable.',
+            };
         }
     }
 

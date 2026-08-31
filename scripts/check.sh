@@ -17,6 +17,17 @@ XDG_DATA_HOME="$shadow_test_dir/data" \
 XDG_CACHE_HOME="$shadow_test_dir/cache" \
 gjs -m tests/run-tests.mjs
 
+for shadow_scenario in authenticated unauthenticated missing existing-history; do
+  shadow_case_dir="$shadow_test_dir/first-run-$shadow_scenario"
+  mkdir -p "$shadow_case_dir/home" "$shadow_case_dir/data" "$shadow_case_dir/cache"
+  HOME="$shadow_case_dir/home" \
+  PATH="/usr/bin:/bin" \
+  XDG_DATA_HOME="$shadow_case_dir/data" \
+  XDG_CACHE_HOME="$shadow_case_dir/cache" \
+  SHADOW_PANEL_TEST_ISOLATED=1 \
+  gjs -m tests/first-run-codex.mjs "$shadow_scenario"
+done
+
 shadow_clutter_typelib=$(find /usr/lib -path '*/mutter-18/Clutter-18.typelib' -print -quit)
 test -n "$shadow_clutter_typelib"
 shadow_mutter_typelib_dir=$(dirname -- "$shadow_clutter_typelib")
@@ -36,6 +47,16 @@ unzip -Z1 "$shadow_test_dir/package/shadow-panel@shadowokx.shell-extension.zip" 
 if unzip -Z1 "$shadow_test_dir/package/shadow-panel@shadowokx.shell-extension.zip" | \
   rg -i '(^|/)(notes|obsidian|tasks|todo|tools)(/|\.|$)'; then
   printf '%s\n' 'Removed productivity-module code was found in the release archive.' >&2
+  exit 1
+fi
+if unzip -Z1 "$shadow_test_dir/package/shadow-panel@shadowokx.shell-extension.zip" | \
+  rg -i '(^|/)(codex(-history)?|weather)\.json$|\.(log|dump|trace)$'; then
+  printf '%s\n' 'Per-user runtime data was found in the release archive.' >&2
+  exit 1
+fi
+if rg -n '/home/[[:alnum:]_.-]+/' \
+  --glob '!scripts/check.sh' --glob '!dist/**' --glob '!schemas/gschemas.compiled' .; then
+  printf '%s\n' 'A machine-specific home path was found in the repository.' >&2
   exit 1
 fi
 

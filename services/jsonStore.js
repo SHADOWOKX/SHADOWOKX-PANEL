@@ -36,6 +36,7 @@ export class JsonStore {
         this._lastReadError = null;
         try {
             await (FILE_QUEUES.get(this.path) ?? Promise.resolve());
+            await this._validateDirectory(cancellable);
             const info = await this._file.query_info_async(
                 'standard::size,standard::type,standard::is-symlink',
                 Gio.FileQueryInfoFlags.NOFOLLOW_SYMLINKS,
@@ -87,6 +88,21 @@ export class JsonStore {
 
     async _ensureDirectory(cancellable) {
         await this._ensureDirectoryAt(this._directory, cancellable);
+        await this._validateDirectory(cancellable);
+        const path = this._directory.get_path();
+        if (!path || GLib.chmod(path, 0o700) !== 0)
+            throw new Error(`${this._directory.get_basename()} permissions could not be secured`);
+    }
+
+    async _validateDirectory(cancellable) {
+        const info = await this._directory.query_info_async(
+            'standard::type,standard::is-symlink',
+            Gio.FileQueryInfoFlags.NOFOLLOW_SYMLINKS,
+            GLib.PRIORITY_DEFAULT,
+            cancellable
+        );
+        if (info.get_is_symlink() || info.get_file_type() !== Gio.FileType.DIRECTORY)
+            throw new Error(`${this._directory.get_basename()} must be a real directory`);
     }
 
     async _ensureDirectoryAt(directory, cancellable) {

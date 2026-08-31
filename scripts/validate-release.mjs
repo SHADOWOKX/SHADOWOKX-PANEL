@@ -51,7 +51,13 @@ try {
     if (!readText('README.md').includes(`Release \`${APP_VERSION}\``))
         throw new Error('README release version is inconsistent');
     const ignore = readText('.gitignore');
-    for (const generated of ['dist/', 'schemas/gschemas.compiled']) {
+    for (const generated of [
+        'dist/',
+        'schemas/gschemas.compiled',
+        'codex.json',
+        'codex-history.json',
+        'weather.json',
+    ]) {
         if (!ignore.includes(generated))
             throw new Error(`generated release output is not ignored: ${generated}`);
     }

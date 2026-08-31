@@ -39,43 +39,6 @@ function isWeekly(window) {
         window.windowDurationMins <= 8 * 24 * 60;
 }
 
-export function accountNameFromEmail(email) {
-    const cleanEmail = cleanText(email, 254);
-    if (!cleanEmail)
-        return null;
-    const localPart = cleanEmail.split('@', 1)[0].trim();
-    return localPart ? [...localPart].slice(0, 80).join('') : null;
-}
-
-export function planLabel(planType) {
-    const labels = {
-        free: 'Codex Free',
-        go: 'Codex Go',
-        plus: 'Codex Plus',
-        pro: 'Codex Pro',
-        prolite: 'Codex Pro',
-        team: 'Codex Team',
-        self_serve_business_prolite: 'Codex Business',
-        self_serve_business_usage_based: 'Codex Business',
-        business: 'Codex Business',
-        ent26: 'Codex Enterprise',
-        enterprise_cbp_automation: 'Codex Enterprise',
-        enterprise_cbp_usage_based: 'Codex Enterprise',
-        enterprise: 'Codex Enterprise',
-        edu: 'Codex Edu',
-        edu_plus: 'Codex Edu Plus',
-        edu_pro: 'Codex Edu Pro',
-    };
-    return Object.hasOwn(labels, planType)
-        ? labels[planType]
-        : planType ? 'Codex account' : null;
-}
-
-function clientVersion(userAgent) {
-    const match = cleanText(userAgent, 200).match(/\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?/);
-    return match?.[0] ?? null;
-}
-
 function normalizeCredits(credits) {
     if (!credits || typeof credits !== 'object')
         return null;
@@ -112,7 +75,7 @@ function normalizeUsageDate(value) {
         : null;
 }
 
-function localDateKey(nowMs) {
+export function localUsageDateKey(nowMs) {
     const date = new Date(nowMs);
     if (!Number.isFinite(date.getTime()))
         return null;
@@ -122,8 +85,8 @@ function localDateKey(nowMs) {
     return `${year}-${month}-${day}`;
 }
 
-function recentUsageBuckets(buckets, nowMs) {
-    const today = localDateKey(nowMs);
+export function recentUsageBuckets(buckets, nowMs) {
+    const today = localUsageDateKey(nowMs);
     if (!today)
         return [];
     const todayMs = Date.parse(`${today}T00:00:00Z`);
@@ -160,7 +123,7 @@ export function normalizeAccountTokenUsage(response, nowMs = Date.now()) {
     const reportedPeak = normalizeTokenCount(response.summary?.peakDailyTokens);
     const peakDailyTokens = reportedPeak ?? peakBucket?.tokens ?? null;
     const peakDate = buckets.find(bucket => bucket.tokens === peakDailyTokens)?.date ?? null;
-    const todayTokens = buckets.find(bucket => bucket.date === localDateKey(nowMs))?.tokens ?? null;
+    const todayTokens = buckets.find(bucket => bucket.date === localUsageDateKey(nowMs))?.tokens ?? null;
     const lifetimeTokens = normalizeTokenCount(response.summary?.lifetimeTokens);
     if (lifetimeTokens === null && todayTokens === null && peakDailyTokens === null)
         return null;
@@ -219,8 +182,8 @@ export function normalizeRateLimits(response, nowMs = Date.now(), metadata = {})
         .filter(Boolean);
     const fiveHour = windows.find(isFiveHour) ?? null;
     const weekly = windows.find(isWeekly) ?? null;
-    const account = metadata.accountResponse?.account ?? metadata.account ?? null;
-    const resolvedPlanType = cleanText(account?.planType ?? snapshot.planType, 80) || null;
+    if (!fiveHour && !weekly)
+        throw new Error('Codex did not return a supported rate-limit window');
     const resetCreditDetails = Array.isArray(response.rateLimitResetCredits?.credits)
         ? response.rateLimitResetCredits.credits
             .filter(credit => credit?.status === 'available')
@@ -235,12 +198,8 @@ export function normalizeRateLimits(response, nowMs = Date.now(), metadata = {})
         connection: 'connected',
         stale: false,
         error: null,
+        errorCode: null,
         source: 'codex-app-server',
-        accountName: accountNameFromEmail(account?.email),
-        accountType: cleanText(account?.type, 40) || null,
-        planType: resolvedPlanType,
-        planLabel: planLabel(resolvedPlanType),
-        clientVersion: clientVersion(metadata.initializeResponse?.userAgent),
         limitReachedType: cleanText(snapshot.rateLimitReachedType, 80) || null,
         fiveHour,
         weekly,
@@ -264,18 +223,13 @@ export function normalizeCachedRateLimits(value) {
     const weekly = normalizeWindow(value.weekly);
     if (!fiveHour && !weekly)
         return null;
-    const cachedPlanType = cleanText(value.planType, 80) || null;
     return {
         status: 'cached',
         connection: 'connected',
         stale: false,
         error: null,
+        errorCode: null,
         source: 'codex-app-server',
-        accountName: cleanText(value.accountName, 80) || null,
-        accountType: cleanText(value.accountType, 40) || null,
-        planType: cachedPlanType,
-        planLabel: cleanText(value.planLabel, 80) || planLabel(cachedPlanType),
-        clientVersion: cleanText(value.clientVersion, 80) || null,
         fiveHour,
         weekly,
         resetCreditsAvailable: Number.isFinite(value.resetCreditsAvailable)

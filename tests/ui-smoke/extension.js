@@ -96,7 +96,37 @@ export default class UiSmokeExtension extends Extension {
     }
 
     async _exercise(indicator, services) {
+        // Auto-theme discovery can queue one startup rebuild after providers
+        // become ready. Exercise the stable status-area actor, never the
+        // instance Shell just retired during that initialization window.
+        await settle(220);
+        const stableIndicator = Main.panel.statusArea['shadow-panel@shadowokx'];
+        if (stableIndicator && stableIndicator !== indicator) {
+            indicator = stableIndicator;
+            services = indicator._extension.getRuntimeServices();
+        }
         const reportPath = GLib.getenv('SHADOW_UI_REPORT');
+        const codexState = services?.codexProvider?.getState();
+        if (codexState?.tokenUsage && codexState.tokenUsage.dailyBuckets.length < 2) {
+            const dailyBuckets = Array.from({length: 2}, (_value, index) => {
+                const date = new Date(Date.now() - (1 - index) * 86_400_000);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return {date: `${year}-${month}-${day}`, tokens: (index + 1) * 100};
+            });
+            services.codexProvider._setState({
+                ...codexState,
+                tokenUsage: {
+                    ...codexState.tokenUsage,
+                    dailyBuckets,
+                    todayTokens: dailyBuckets.at(-1).tokens,
+                    peakDailyTokens: dailyBuckets.at(-1).tokens,
+                    peakDate: dailyBuckets.at(-1).date,
+                    sevenDayTokens: dailyBuckets.reduce((sum, bucket) => sum + bucket.tokens, 0),
+                },
+            });
+        }
         const displayLocation = GLib.getenv('SHADOW_TEST_DISPLAY_LOCATION');
         if (displayLocation && services?.weatherProvider) {
             const weatherState = services.weatherProvider.getState();

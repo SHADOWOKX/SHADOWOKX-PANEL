@@ -8,6 +8,7 @@ import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/ex
 
 import {ACCENTS, APP_VERSION, MODULE_IDS, MODULE_META} from './lib/constants.js';
 import {isHexColor} from './lib/format.js';
+import {findCodexExecutable} from './modules/codex/discovery.js';
 import {normalizeWeatherQuery} from './modules/weather/normalize.js';
 
 function switchRow(settings, key, title, subtitle = '') {
@@ -258,10 +259,7 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
         ));
         page.add(activity);
 
-        const executable = GLib.find_program_in_path('codex') ||
-            (GLib.file_test('/usr/lib/chatgpt/resources/codex', GLib.FileTest.IS_EXECUTABLE)
-                ? '/usr/lib/chatgpt/resources/codex'
-                : null);
+        const executable = findCodexExecutable();
         const handler = Gio.AppInfo.get_default_for_uri_scheme('codex');
         const app = new Adw.PreferencesGroup({title: 'Codex application'});
         const status = new Adw.ActionRow({

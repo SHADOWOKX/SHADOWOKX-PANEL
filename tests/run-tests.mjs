@@ -25,8 +25,14 @@ import {
     normalizeCachedRateLimits,
     normalizeAccountTokenUsage,
     normalizeRateLimits,
-    planLabel,
 } from '../modules/codex/normalize.js';
+import {codexExecutableCandidates, findCodexExecutable} from '../modules/codex/discovery.js';
+import {
+    applyCodexHistory,
+    mergeCodexHistory,
+    normalizeCodexHistory,
+    withoutCodexHistory,
+} from '../modules/codex/history.js';
 import {CodexProvider} from '../modules/codex/provider.js';
 import {exportCodexSummaryImage, resolveSharePalette} from '../modules/codex/shareImage.js';
 import {
@@ -236,8 +242,6 @@ function testCodexNormalization() {
             credits: [{status: 'available', title: 'Reset now', expiresAt: 2_100_000_000}],
         },
     }, nowMs, {
-        accountResponse: {account: {email: 'shadow@example.test', planType: 'plus', type: 'chatgpt'}},
-        initializeResponse: {userAgent: 'codex-cli/0.150.0-alpha.12.2'},
         usageResponse: {
             summary: {lifetimeTokens: 885_281_875, peakDailyTokens: 284_458_873},
             dailyUsageBuckets: [
@@ -249,9 +253,6 @@ function testCodexNormalization() {
     equal(state.fiveHour.usedPercent, 68, 'five-hour usage');
     equal(state.fiveHour.remainingPercent, 32, 'five-hour remaining');
     equal(state.weekly.usedPercent, 43, 'weekly usage');
-    equal(state.accountName, 'shadow', 'only the non-secret account display name is retained');
-    equal(state.planLabel, 'Codex Plus', 'plan gets a friendly label');
-    equal(state.clientVersion, '0.150.0-alpha.12.2', 'client version is normalized');
     equal(state.resetCreditsAvailable, 1, 'reset-credit count is normalized');
     equal(state.tokenUsage.todayTokens, 5_822_658, 'today token usage is normalized');
     equal(state.tokenUsage.lifetimeTokens, 885_281_875, 'lifetime token usage is normalized');
@@ -262,7 +263,6 @@ function testCodexNormalization() {
     equal(state.tokenUsage.sevenDayTokens, 5_822_658,
         'seven-day activity is derived from real daily buckets');
     equal(state.lastSuccessfulRefresh, nowMs, 'Codex refresh timestamp');
-    equal(planLabel('__proto__'), 'Codex account', 'prototype names cannot become plan labels');
 
     const weeklyOnly = normalizeRateLimits({
         rateLimitsByLimitId: {
@@ -272,6 +272,11 @@ function testCodexNormalization() {
     });
     equal(weeklyOnly.fiveHour, null, 'missing five-hour remains unavailable');
     equal(weeklyOnly.weekly.usedPercent, 4, 'weekly-only response');
+    rejects(() => normalizeRateLimits({
+        rateLimits: {
+            primary: {usedPercent: 4, windowDurationMins: 60, resetsAt: 2_000_000_000},
+        },
+    }), 'unrecognized rate-limit windows fail closed instead of showing misleading data');
     equal(normalizeCachedRateLimits({lastSuccessfulRefresh: Date.now()}), null,
         'semantically empty Codex caches are rejected');
     equal(normalizeCachedRateLimits({
@@ -315,6 +320,78 @@ function testCodexNormalization() {
         'validated token activity survives a cached refresh');
     equal(cachedUsage.tokenUsage.dailyBuckets.length, 0,
         'older caches without history remain compatible');
+}
+
+function testCodexPortability() {
+    const home = '/srv/users/Name With Spaces';
+    const data = '/srv/xdg data';
+    const candidates = codexExecutableCandidates({
+        homeDirectory: home,
+        userDataDirectory: data,
+        environment: {
+            NVM_BIN: '/srv/node current/bin',
+            VOLTA_HOME: '/srv/volta',
+            BUN_INSTALL: null,
+            PNPM_HOME: '/srv/pnpm',
+            FNM_MULTISHELL_PATH: null,
+        },
+    });
+    ok(candidates.includes('/srv/users/Name With Spaces/.local/bin/codex'),
+        'Codex discovery uses the current home directory without assuming /home');
+    ok(candidates.includes('/srv/xdg data/pnpm/codex'),
+        'Codex discovery honors the current XDG data directory');
+    ok(candidates.includes('/srv/node current/bin/codex'),
+        'Codex discovery honors an exported current Node installation');
+    equal(findCodexExecutable({
+        homeDirectory: home,
+        userDataDirectory: data,
+        environment: {},
+        pathLookup: () => '/custom/current-user/bin/codex',
+        executableTest: path => path === '/custom/current-user/bin/codex',
+    }), '/custom/current-user/bin/codex', 'the current GNOME environment PATH takes precedence');
+    equal(findCodexExecutable({
+        homeDirectory: home,
+        userDataDirectory: data,
+        environment: {},
+        pathLookup: () => null,
+        executableTest: () => false,
+    }), null, 'a user without Codex is reported honestly');
+}
+
+function testCodexLocalHistory() {
+    const nowMs = new Date(2026, 7, 31, 12).getTime();
+    const liveUsage = normalizeAccountTokenUsage({
+        summary: {lifetimeTokens: 10_000},
+        dailyUsageBuckets: [
+            {startDate: '2026-08-29', tokens: 100},
+            {startDate: '2026-08-30', tokens: 200},
+            {startDate: '2026-08-31', tokens: 300},
+        ],
+    }, nowMs);
+    const firstRun = mergeCodexHistory(null, liveUsage, nowMs);
+    equal(firstRun.dailyBuckets.length, 1,
+        'a fresh installation starts with only its first real current-day sample');
+    equal(firstRun.dailyBuckets[0].date, '2026-08-31',
+        'fresh history never imports earlier account-side buckets');
+    const existing = {
+        version: 1,
+        startedAt: nowMs - 86_400_000,
+        dailyBuckets: [{date: '2026-08-30', tokens: 175}],
+    };
+    const merged = mergeCodexHistory(existing, liveUsage, nowMs);
+    equal(merged.dailyBuckets.length, 2, 'existing local history gains one current-day sample');
+    equal(mergeCodexHistory(merged, liveUsage, nowMs).dailyBuckets.length, 2,
+        'repeated refreshes never duplicate a same-day history entry');
+    const displayed = applyCodexHistory(liveUsage, merged, nowMs);
+    equal(displayed.peakDailyTokens, 300, 'local peak statistics derive from local history');
+    equal(displayed.sevenDayTokens, 475, 'local seven-day total derives from local history');
+    equal(withoutCodexHistory(displayed).dailyBuckets.length, 0,
+        'the current-limit cache never duplicates local graph history');
+    equal(normalizeCodexHistory({
+        version: 999,
+        startedAt: 1,
+        dailyBuckets: [{date: '2026-08-30', tokens: 999}],
+    }, nowMs).dailyBuckets.length, 0, 'unsupported history formats fail closed');
 }
 
 function testTopBarSummaries() {
@@ -595,6 +672,18 @@ async function testProviderFailureIsolation() {
     equal(codexState.status, 'success', 'Codex live data survives a cache-write failure');
     codex.destroy();
 
+    const unsupported = new CodexProvider(
+        new FakeSettings({'codex-refresh-minutes': 15}),
+        inertScheduler,
+        null
+    );
+    unsupported._readAppServer = async () => ({rateLimitsResponse: {unexpected: true}});
+    const unsupportedState = await unsupported.refresh(true);
+    equal(unsupportedState.status, 'error', 'unsupported Codex data fails gracefully');
+    equal(unsupportedState.errorCode, 'unsupported-response',
+        'unsupported Codex data is distinguished without guessing limits');
+    unsupported.destroy();
+
     const weatherSettings = new FakeSettings({
         'weather-refresh-minutes': 30,
         'weather-location': 'Cairo, Egypt',
@@ -655,6 +744,18 @@ async function testPersistenceAndRefreshCoalescing() {
     const fallback = {safe: true};
     equal((await store.read(fallback)).safe, true,
         'corrupt JSON caches fall back without crashing');
+    const firstRunDirectory = GLib.build_filenamev([
+        GLib.get_user_data_dir(),
+        `first-run-store-${GLib.uuid_string_random()}`,
+    ]);
+    const firstRunStore = new JsonStore(firstRunDirectory, 'state.json', null, 4096);
+    await firstRunStore.write({ready: true});
+    const directoryInfo = Gio.File.new_for_path(firstRunDirectory).query_info(
+        'unix::mode', Gio.FileQueryInfoFlags.NOFOLLOW_SYMLINKS, null);
+    equal(directoryInfo.get_attribute_uint32('unix::mode') & 0o077, 0,
+        'first-run storage directory is private');
+    equal((await firstRunStore.read(null)).ready, true,
+        'first-run storage creates and reads its file without manual setup');
 
     const dates = Array.from({length: 10}, (_value, index) => ({
         date: `2026-08-${String(index + 1).padStart(2, '0')}`,
@@ -709,13 +810,12 @@ esac
 printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"userAgent":"codex-cli/9.9.9"}}'
 IFS= read -r initialized
     IFS= read -r usage
-    IFS= read -r account
     IFS= read -r limits
-    case "$initialized:$usage:$account:$limits" in
-      *'"method":"initialized"'*':'*'"id":2'*':'*'"id":3'*':'*'"id":4'*) ;;
+    case "$initialized:$usage:$limits" in
+      *'"method":"initialized"'*':'*'"id":2'*':'*'"id":3'*) ;;
       *) exit 3 ;;
     esac
-    printf '%s\n' '{"jsonrpc":"2.0","id":4,"result":{"rateLimits":{"primary":{"usedPercent":10,"windowDurationMins":10080,"resetsAt":2000000000}}}}'
+    printf '%s\n' '{"jsonrpc":"2.0","id":3,"result":{"rateLimits":{"primary":{"usedPercent":10,"windowDurationMins":10080,"resetsAt":2000000000}}}}'
     printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"summary":{"lifetimeTokens":1234,"peakDailyTokens":900},"dailyUsageBuckets":[{"startDate":"2026-08-29","tokens":334}]}}'
 sleep 5
 `;
@@ -733,7 +833,6 @@ sleep 5
         equal(state.status, 'success', 'Codex protocol follows the initialized request order');
         equal(state.weekly.remainingPercent, 90,
             'Codex accepts valid limits without waiting for optional account metadata');
-        equal(state.clientVersion, '9.9.9', 'Codex initialize metadata is retained');
         equal(state.tokenUsage.lifetimeTokens, 1234,
             'Codex waits for out-of-order account token activity');
     } finally {
@@ -773,6 +872,8 @@ testModuleConfiguration();
 testSparklineData();
 testSchedulerLifecycle();
 testCodexNormalization();
+testCodexPortability();
+testCodexLocalHistory();
 testTopBarSummaries();
 testWeatherNormalization();
 testExtendedWeatherForecast();

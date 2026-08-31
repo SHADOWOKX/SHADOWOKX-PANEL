@@ -29,7 +29,6 @@ print(JSON.stringify({
     status: state.status,
     source: state.source ?? null,
     connection: state.connection,
-    plan: state.planLabel ?? null,
     fiveHourAvailable: Boolean(state.fiveHour),
     weeklyAvailable: Boolean(state.weekly),
     todayTokens: state.tokenUsage?.todayTokens ?? null,
@@ -39,7 +38,6 @@ print(JSON.stringify({
     dailyHistoryPoints: state.tokenUsage?.dailyBuckets?.length ?? 0,
     peakHourAvailable: Boolean(state.tokenUsage?.peakHour),
     resetCreditsAvailable: state.resetCreditsAvailable ?? 0,
-    clientVersion: state.clientVersion ?? null,
     error: state.error ?? null,
 }, null, 2));
 provider.destroy();

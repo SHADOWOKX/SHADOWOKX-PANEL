@@ -72,8 +72,14 @@ class ShadowIndicator extends PanelMenu.Button {
 
         if (settings.get_string('theme') === 'auto') {
             const shellSettings = St.Settings.get();
-            const colorSchemeId = shellSettings.connect('notify::color-scheme', () =>
-                this._extension._queueRebuild());
+            let currentTheme = effectiveTheme(settings);
+            const colorSchemeId = shellSettings.connect('notify::color-scheme', () => {
+                const nextTheme = effectiveTheme(settings);
+                if (nextTheme === currentTheme)
+                    return;
+                currentTheme = nextTheme;
+                this._extension._queueRebuild();
+            });
             this._subscriptions.push(() => shellSettings.disconnect(colorSchemeId));
         }
         this.menu.connect('open-state-changed', (_menu, open) => {

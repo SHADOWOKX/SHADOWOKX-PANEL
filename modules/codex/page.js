@@ -116,7 +116,9 @@ export class CodexPage extends BasePage {
             if (state.status === 'error' && !state.lastSuccessfulRefresh) {
                 page.add_child(stateMessage(
                     'dialog-warning-symbolic',
-                    'Codex usage unavailable',
+                    state.errorCode === 'not-installed'
+                        ? 'Codex not detected'
+                        : 'Codex usage unavailable',
                     state.error ?? 'No usage data has been reported yet.',
                     textButton('Retry', () => this._provider.refresh(true))
                 ));
