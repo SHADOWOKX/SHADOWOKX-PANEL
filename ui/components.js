@@ -189,19 +189,27 @@ export function sectionTitle(text, styleClass = 'shadow-section-title') {
     return label;
 }
 
-export function statusPill(settings, text, tone = 'neutral') {
+export function statusPill(settings, text, tone = 'neutral', iconName = null) {
     const pill = new St.BoxLayout({
         style_class: `shadow-status-pill shadow-status-${tone}`,
         y_align: Clutter.ActorAlign.CENTER,
     });
-    const dot = new St.Widget({
-        style_class: 'shadow-status-dot',
-        y_align: Clutter.ActorAlign.CENTER,
-        style: tone === 'accent' || tone === 'info'
-            ? `background-color: ${resolveAccent(settings)};`
-            : null,
-    });
-    pill.add_child(dot);
+    if (iconName) {
+        pill.add_child(new St.Icon({
+            icon_name: iconName,
+            icon_size: 11,
+            style_class: 'shadow-status-icon',
+            y_align: Clutter.ActorAlign.CENTER,
+        }));
+    } else {
+        pill.add_child(new St.Widget({
+            style_class: 'shadow-status-dot',
+            y_align: Clutter.ActorAlign.CENTER,
+            style: tone === 'accent' || tone === 'info'
+                ? `background-color: ${resolveAccent(settings)};`
+                : null,
+        }));
+    }
     pill.add_child(new St.Label({
         text,
         style_class: 'shadow-status-label',

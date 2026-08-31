@@ -312,6 +312,15 @@
   font-weight: 650;
 }
 
+.shadow-status-icon {
+  color: #a5a8a5;
+  icon-shadow: none;
+}
+
+.shadow-theme-light .shadow-status-icon {
+  color: #686d69;
+}
+
 .shadow-status-warning .shadow-status-dot { background-color: #f59e0b; }
 .shadow-status-danger .shadow-status-dot { background-color: #ef4444; }
 
@@ -421,10 +430,37 @@
   font-weight: 600;
 }
 
-.shadow-metadata-row {
+.shadow-codex-footer {
   min-height: 25px;
-  padding: 4px 3px;
+  padding: 3px 3px 3px;
   spacing: 12px;
+}
+
+.shadow-footer-credits {
+  spacing: 5px;
+}
+
+.shadow-footer-icon,
+.shadow-footer-label,
+.shadow-footer-updated {
+  color: #a6a9a6;
+}
+
+.shadow-theme-light .shadow-footer-icon,
+.shadow-theme-light .shadow-footer-label,
+.shadow-theme-light .shadow-footer-updated {
+  color: #686d69;
+}
+
+.shadow-footer-label,
+.shadow-footer-updated {
+  font-size: 10px;
+}
+
+.shadow-footer-value {
+  font-size: 11px;
+  font-weight: 680;
+  font-feature-settings: "tnum";
 }
 
 .shadow-token-activity {
@@ -481,7 +517,7 @@
 .shadow-token-sparkline {
   height: 54px;
   border-radius: 9px;
-  background-color: rgba(128, 128, 128, 0.045);
+  background-color: rgba(128, 128, 128, 0.035);
 }
 
 .shadow-spark-label {
@@ -579,6 +615,12 @@
 .shadow-weather-metric {
   min-width: 132px;
   padding: 6px 8px;
+}
+
+.shadow-weather-metric-wide {
+  min-height: 31px;
+  margin: 1px 3px 0;
+  padding: 5px 5px;
 }
 
 .shadow-hourly-section {
@@ -680,4 +722,9 @@
 .shadow-compact .shadow-weather-metric {
   min-width: 118px;
   padding: 4px 6px;
+}
+
+.shadow-compact .shadow-weather-metric-wide {
+  min-height: 27px;
+  padding: 3px;
 }

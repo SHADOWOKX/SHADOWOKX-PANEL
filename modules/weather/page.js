@@ -238,13 +238,33 @@ export class WeatherPage extends BasePage {
             vertical: true,
             style_class: 'shadow-secondary-surface shadow-weather-metrics',
         });
-        for (let index = 0; index < metrics.length; index += 2) {
+        const uv = metrics.find(([label]) => label === 'UV Index');
+        const regular = metrics.filter(([label]) => label !== 'UV Index');
+        for (let index = 0; index < regular.length; index += 2) {
             const row = new St.BoxLayout({style_class: 'shadow-weather-metric-row', x_expand: true});
-            row.add_child(this._metric(...metrics[index]));
-            if (metrics[index + 1])
-                row.add_child(this._metric(...metrics[index + 1]));
+            row.add_child(this._metric(...regular[index]));
+            if (regular[index + 1])
+                row.add_child(this._metric(...regular[index + 1]));
             else
                 row.add_child(new St.Widget({x_expand: true}));
+            grid.add_child(row);
+        }
+        if (uv) {
+            const row = new St.BoxLayout({
+                style_class: 'shadow-weather-metric-wide',
+                x_expand: true,
+            });
+            row.add_child(new St.Label({
+                text: uv[0],
+                style_class: 'shadow-metric-label',
+                x_expand: true,
+                y_align: Clutter.ActorAlign.CENTER,
+            }));
+            row.add_child(new St.Label({
+                text: uv[1],
+                style_class: 'shadow-metric-value',
+                y_align: Clutter.ActorAlign.CENTER,
+            }));
             grid.add_child(row);
         }
         return grid;

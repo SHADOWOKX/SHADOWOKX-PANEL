@@ -136,6 +136,8 @@ export default class UiSmokeExtension extends Extension {
             });
             if (id === 'codex') {
                 report.graph = allocation(findStyle(page.actor, 'shadow-token-sparkline'));
+                report.codexFooter = allocation(findStyle(page.actor, 'shadow-codex-footer'));
+                report.historyBadgeIcon = allocation(findStyle(page.actor, 'shadow-status-icon'));
             } else {
                 const hourlyAdjustment = page?._hourlyScroll?.hadjustment ??
                     page?._hourlyScroll?.hscroll?.adjustment;
@@ -145,6 +147,7 @@ export default class UiSmokeExtension extends Extension {
                     pageWidth: hourlyAdjustment?.page_size ?? 0,
                     verticalPolicy: page?._hourlyScroll?.vscrollbar_policy ?? null,
                 };
+                report.uvRow = allocation(findStyle(page.actor, 'shadow-weather-metric-wide'));
             }
         }
         const codexPage = indicator._pages.get('codex');

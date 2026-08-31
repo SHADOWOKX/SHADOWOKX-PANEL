@@ -163,6 +163,14 @@ function testSparklineData() {
     equal(Math.round(missingDay[1].x), 96, 'missing days remain an honest chronological gap');
     ok(missingDay.every(point => Number.isFinite(point.x) && Number.isFinite(point.y)),
         'sparkline coordinates remain finite');
+    const padded = sparklineCoordinates([
+        {date: '2026-08-28', tokens: 10},
+        {date: '2026-08-29', tokens: 20},
+    ], 100, 50, 7);
+    equal(padded[0].x, 7, 'sparkline honors refined left drawing padding');
+    equal(padded.at(-1).x, 93, 'sparkline honors refined right drawing padding');
+    ok(padded.every(point => point.y >= 7 && point.y <= 43),
+        'sparkline points remain inside refined vertical clipping bounds');
 
     const allZero = sparklineCoordinates([
         {date: '2026-08-28', tokens: 0},

@@ -2,7 +2,7 @@ import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import St from 'gi://St';
 
-import {formatCountdown, formatResetDate} from '../../lib/format.js';
+import {formatCountdown, formatRelativeAge, formatResetDate} from '../../lib/format.js';
 import {codexUsageStatus} from '../../lib/summary.js';
 import {launchUri} from '../../services/launcher.js';
 import {
@@ -317,8 +317,14 @@ export class CodexPage extends BasePage {
         });
         const heading = new St.BoxLayout({style_class: 'shadow-token-heading', x_expand: true});
         heading.add_child(sectionTitle('Token activity'));
-        if (usage?.dailyBuckets?.length >= 2)
-            heading.add_child(statusPill(this.context.settings, '7-day history', 'info'));
+        if (usage?.dailyBuckets?.length >= 2) {
+            heading.add_child(statusPill(
+                this.context.settings,
+                '7-day history',
+                'neutral',
+                'document-open-recent-symbolic'
+            ));
+        }
         card.add_child(heading);
         if (!usage) {
             card.add_child(new St.Label({
@@ -460,15 +466,35 @@ export class CodexPage extends BasePage {
     }
 
     _facts(state) {
-        if (!(state.resetCreditsAvailable > 0))
+        const hasCredits = state.resetCreditsAvailable > 0;
+        const hasUpdate = Number.isFinite(state.lastSuccessfulRefresh);
+        if (!hasCredits && !hasUpdate)
             return null;
-        const row = new St.BoxLayout({style_class: 'shadow-metadata-row', x_expand: true});
-        row.add_child(new St.Label({
-            text: `${state.resetCreditsAvailable} reset credit` +
-                (state.resetCreditsAvailable === 1 ? '' : 's'),
-            style_class: 'shadow-metadata-value',
-            x_expand: true,
-        }));
+        const row = new St.BoxLayout({style_class: 'shadow-codex-footer', x_expand: true});
+        const credits = new St.BoxLayout({style_class: 'shadow-footer-credits', x_expand: true});
+        if (hasCredits) {
+            credits.add_child(new St.Icon({
+                icon_name: 'view-refresh-symbolic',
+                icon_size: 12,
+                style_class: 'shadow-footer-icon',
+            }));
+            credits.add_child(new St.Label({
+                text: 'Reset credits',
+                style_class: 'shadow-footer-label',
+            }));
+            credits.add_child(new St.Label({
+                text: String(state.resetCreditsAvailable),
+                style_class: 'shadow-footer-value',
+            }));
+        }
+        row.add_child(credits);
+        if (hasUpdate) {
+            row.add_child(new St.Label({
+                text: `Updated ${formatRelativeAge(state.lastSuccessfulRefresh)}`,
+                style_class: 'shadow-footer-updated',
+                x_align: Clutter.ActorAlign.END,
+            }));
+        }
         return row;
     }
 

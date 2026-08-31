@@ -2,7 +2,7 @@
 
 Shadowokx Panel is a small GNOME top-bar utility that does two things well: it shows Codex usage limits and useful local weather. It targets Ubuntu 26.04.1 LTS, GNOME Shell 50, Wayland, and modern GJS ES modules.
 
-Release `2.3.0` deliberately contains only two pages:
+Release `2.3.1` deliberately contains only two pages:
 
 1. ChatGPT Codex
 2. Weather
@@ -93,7 +93,7 @@ The optional usage-state icon uses completed daily buckets from the same structu
 
 `account/usage/read` supplies optional account token-activity summaries and `dailyUsageBuckets`. Every chart point is the validated `tokens` value for the bucket's reported `startDate`; it is not a lifetime snapshot or an inferred delta. Buckets are deduplicated by date, ordered oldest to newest, restricted to the current seven-day calendar window, and never padded with invented zeroes. The panel never estimates a peak hour from daily data or parses private session transcripts as a substitute.
 
-The 54-pixel mini graph is drawn by a native `St.DrawingArea` with Cairo: a two-pixel rounded accent line, a restrained gradient area fill, and one endpoint dot. Its X positions preserve real calendar gaps and its Y scale keeps a truthful zero baseline. It has no redraw timer or animation loop. With fewer than two real daily buckets the card says “Not enough history yet.” All-zero, duplicate, corrupt, missing-day, single-point, and large-spike inputs are covered by pure tests.
+The 54-pixel mini graph is drawn by a native `St.DrawingArea` with Cairo: a subtle rounded accent curve, bounded control points, a restrained gradient area fill, and one highlighted endpoint. Its X positions preserve real calendar gaps and its Y scale keeps a truthful zero baseline. It has no redraw timer or animation loop. With fewer than two real daily buckets the card says “Not enough history yet.” All-zero, duplicate, corrupt, missing-day, single-point, clipping-bound, and large-spike inputs are covered by pure tests.
 
 Security properties:
 

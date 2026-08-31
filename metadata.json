@@ -5,5 +5,5 @@
   "shell-version": ["50"],
   "settings-schema": "org.gnome.shell.extensions.shadow-panel",
   "url": "https://github.com/shadowokx/shadow-panel",
-  "version": 13
+  "version": 14
 }
