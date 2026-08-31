@@ -1,8 +1,7 @@
 <Window
     x:Class="ShadowokxPanel.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="using:ShadowokxPanel.Controls">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Border
         x:Name="Root"
         Background="{ThemeResource AppBackgroundBrush}"
@@ -172,7 +171,7 @@
                                     </Grid>
                                     <TextBlock x:Name="LifetimeTokens" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="24" FontWeight="SemiBold" />
                                     <TextBlock Text="Lifetime tokens" Style="{StaticResource MetricLabelStyle}" Margin="0,-8,0,0" />
-                                    <controls:TokenGraphControl x:Name="TokenGraph" />
+                                    <Grid x:Name="TokenGraphHost" Height="92" MinWidth="120" />
                                     <Grid ColumnSpacing="18">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />

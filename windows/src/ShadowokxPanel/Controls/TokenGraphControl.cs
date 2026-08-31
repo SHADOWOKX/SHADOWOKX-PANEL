@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
 using ShadowokxPanel.Core.History;
 using ShadowokxPanel.Core.Models;
+using ShadowokxPanel.Services;
 using Windows.Foundation;
 using XamlPath = Microsoft.UI.Xaml.Shapes.Path;
 
@@ -16,9 +17,11 @@ public sealed class TokenGraphControl : Canvas
 
     public TokenGraphControl()
     {
+        StartupDiagnostics.Write("TokenGraphControl constructor entered");
         Height = 92;
         MinWidth = 120;
         SizeChanged += (_, _) => Render();
+        StartupDiagnostics.Write("TokenGraphControl constructor completed");
     }
 
     public void SetData(IReadOnlyList<UsageBucket>? buckets)

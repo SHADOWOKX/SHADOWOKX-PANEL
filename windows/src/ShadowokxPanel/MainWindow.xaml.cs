@@ -4,6 +4,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using ShadowokxPanel.Controls;
 using ShadowokxPanel.Core.History;
 using ShadowokxPanel.Core.Models;
 using ShadowokxPanel.Platform;
@@ -21,6 +22,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private readonly AppWindow _appWindow;
     private readonly nint _hwnd;
     private readonly DispatcherTimer _clockTimer;
+    private readonly TokenGraphControl _tokenGraph;
     private readonly UISettings _uiSettings = new();
     private IReadOnlyList<ForecastHour> _renderedForecast = [];
     private string? _renderedForecastTimeZone;
@@ -34,7 +36,22 @@ public sealed partial class MainWindow : Window, IDisposable
     public MainWindow(AppHost host)
     {
         _host = host;
-        InitializeComponent();
+        StartupDiagnostics.Write("MainWindow InitializeComponent start");
+        try
+        {
+            InitializeComponent();
+        }
+        catch (Exception error)
+        {
+            StartupDiagnostics.WriteException("MainWindow InitializeComponent failed", error);
+            throw;
+        }
+        StartupDiagnostics.Write("MainWindow InitializeComponent successful");
+
+        StartupDiagnostics.Write("TokenGraphControl construction start");
+        _tokenGraph = new TokenGraphControl();
+        TokenGraphHost.Children.Add(_tokenGraph);
+        StartupDiagnostics.Write("TokenGraphControl construction successful");
         _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
         var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_hwnd);
         _appWindow = AppWindow.GetFromWindowId(windowId);
@@ -210,8 +227,8 @@ public sealed partial class MainWindow : Window, IDisposable
         var usage = state.TokenUsage;
         LifetimeTokens.Visibility = settings.ShowLifetimeTokens ? Visibility.Visible : Visibility.Collapsed;
         LifetimeTokens.Text = FormatTokens(usage?.LifetimeTokens);
-        TokenGraph.Visibility = settings.ShowTokenHistory ? Visibility.Visible : Visibility.Collapsed;
-        TokenGraph.SetData(usage?.DailyBuckets);
+        _tokenGraph.Visibility = settings.ShowTokenHistory ? Visibility.Visible : Visibility.Collapsed;
+        _tokenGraph.SetData(usage?.DailyBuckets);
         PeakTokens.Text = FormatTokens(usage?.PeakDailyTokens);
         PeakDate.Text = usage?.PeakDate?.ToString(
             "MMM d, yyyy", CultureInfo.CurrentCulture) ?? "Not reported";

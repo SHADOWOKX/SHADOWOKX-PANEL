@@ -30,9 +30,16 @@ if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE."
 }
 
-$executable = Join-Path $output 'ShadowokxPanel.exe'
-if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
-    throw "dotnet publish completed without producing $executable."
+$requiredPublishFiles = @(
+    (Join-Path $output 'ShadowokxPanel.exe'),
+    (Join-Path $output 'ShadowokxPanel.dll'),
+    (Join-Path $output 'resources.pri'),
+    (Join-Path $output 'Assets/chatgpt.png')
+)
+foreach ($requiredFile in $requiredPublishFiles) {
+    if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
+        throw "dotnet publish completed without required runtime resource $requiredFile."
+    }
 }
 
 Write-Host "Published Shadowokx Panel to $output"
