@@ -69,7 +69,7 @@ public sealed partial class MainWindow : Window, IDisposable
             () => _ = _viewModel.RefreshAllAsync(),
             OpenSettings,
             ToggleStartup,
-            () => _ = ((App)Application.Current).ExitAsync(),
+            () => _ = ((App)Application.Current).ExitAsync("tray menu"),
             () => _ = _host.ResumeAsync(),
             ThemeService.AccentColor(_host.Settings.Current));
         UpdateTray();

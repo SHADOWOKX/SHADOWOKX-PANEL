@@ -1,6 +1,5 @@
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
-using Microsoft.Windows.AppLifecycle;
 using ShadowokxPanel.Services;
 
 namespace ShadowokxPanel;
@@ -9,64 +8,124 @@ public partial class App : Application, IAsyncDisposable
 {
     private readonly AppHost _host = new();
     private readonly object _lifecycleSync = new();
+    private readonly DispatcherQueue _dispatcher;
     private MainWindow? _window;
-    private AppInstance? _instance;
-    private DispatcherQueue? _dispatcher;
     private Task? _disposeTask;
     private Task? _exitTask;
-    private bool _instanceSubscribed;
+    private bool _showWhenReady;
 
     public App()
     {
+        StartupDiagnostics.Write("App constructor entered");
         InitializeComponent();
+        _dispatcher = DispatcherQueue.GetForCurrentThread();
+        StartupDiagnostics.Write("App constructed");
     }
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
+        StartupDiagnostics.Write("OnLaunched entered");
         try
         {
-            _instance = AppInstance.FindOrRegisterForKey("ShadowokxPanel.CurrentUser");
-            if (!_instance.IsCurrent)
-            {
-                await _instance.RedirectActivationToAsync(
-                    AppInstance.GetCurrent().GetActivatedEventArgs());
-                await ExitAsync();
-                return;
-            }
-
-            _dispatcher = DispatcherQueue.GetForCurrentThread();
-            _instance.Activated += Instance_Activated;
-            _instanceSubscribed = true;
+            StartupDiagnostics.Write("host initialization start");
             await _host.StartAsync();
+            StartupDiagnostics.Write("host initialization end");
+
+            StartupDiagnostics.Write("MainWindow construction start");
             _window = new MainWindow(_host);
+            StartupDiagnostics.Write("MainWindow construction end");
+
             var startedWithWindows = Environment.GetCommandLineArgs()
                 .Any(value => value.Equals("--startup", StringComparison.OrdinalIgnoreCase));
+            StartupDiagnostics.Write("tray initialization start");
             _window.InitializeTray();
-            if (!startedWithWindows)
+            StartupDiagnostics.Write("tray initialization end");
+
+            if (!startedWithWindows || _showWhenReady)
                 _window.ShowPanel();
+            _showWhenReady = false;
+            StartupDiagnostics.Write("app entering steady-state");
         }
-        catch (Exception)
+        catch (Exception error)
         {
-            await ExitAsync();
+            Environment.ExitCode = 1;
+            StartupDiagnostics.WriteException("startup exception", error);
+            try
+            {
+                await ExitAsync("startup failure");
+            }
+            catch (Exception shutdownError)
+            {
+                StartupDiagnostics.WriteException("startup cleanup failed", shutdownError);
+            }
         }
     }
 
-    private void Instance_Activated(object? sender, AppActivationArguments eventArgs) =>
-        _dispatcher?.TryEnqueue(() => _window?.ShowPanel());
+    internal void HandleRedirectedActivation()
+    {
+        StartupDiagnostics.Write("redirected activation dispatch requested");
+        if (!_dispatcher.TryEnqueue(() =>
+            {
+                if (_window is null)
+                    _showWhenReady = true;
+                else
+                    _window.ShowPanel();
+            }))
+        {
+            StartupDiagnostics.Write("redirected activation dispatch rejected");
+        }
+    }
 
-    public Task ExitAsync()
+    internal bool IsShutdownRequested
+    {
+        get
+        {
+            lock (_lifecycleSync)
+                return _exitTask is not null;
+        }
+    }
+
+    public Task ExitAsync(string reason = "requested")
     {
         lock (_lifecycleSync)
-            return _exitTask ??= ExitCoreAsync();
+        {
+            if (_exitTask is null)
+            {
+                StartupDiagnostics.Write($"shutdown requested: {reason}");
+                _exitTask = ExitCoreAsync();
+            }
+            return _exitTask;
+        }
     }
 
     public async ValueTask DisposeAsync()
     {
         Task disposeTask;
+        bool startedDisposal;
         lock (_lifecycleSync)
+        {
+            startedDisposal = _disposeTask is null;
+            if (startedDisposal)
+                StartupDiagnostics.Write("DisposeAsync start");
             disposeTask = _disposeTask ??= DisposeCoreAsync();
-        await disposeTask;
-        GC.SuppressFinalize(this);
+        }
+
+        try
+        {
+            await disposeTask;
+        }
+        catch (Exception error)
+        {
+            if (startedDisposal)
+                StartupDiagnostics.WriteException("DisposeAsync failed", error);
+            throw;
+        }
+        finally
+        {
+            GC.SuppressFinalize(this);
+            if (startedDisposal)
+                StartupDiagnostics.Write("DisposeAsync end");
+        }
     }
 
     private async Task ExitCoreAsync()
@@ -77,18 +136,13 @@ public partial class App : Application, IAsyncDisposable
         }
         finally
         {
+            StartupDiagnostics.Write("Application.Exit invoked");
             Exit();
         }
     }
 
     private async Task DisposeCoreAsync()
     {
-        if (_instance is not null && _instanceSubscribed)
-        {
-            _instance.Activated -= Instance_Activated;
-            _instanceSubscribed = false;
-        }
-        _dispatcher = null;
         var window = _window;
         _window = null;
         try
