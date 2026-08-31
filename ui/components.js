@@ -91,7 +91,6 @@ export function animateRefreshButton(button, settings, active) {
     icon.ease({
         rotation_angle_z: 360,
         duration: 800,
-        repeatCount: -1,
         mode: Clutter.AnimationMode.LINEAR,
     });
     return icon;

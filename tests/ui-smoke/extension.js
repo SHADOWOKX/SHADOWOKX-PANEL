@@ -102,6 +102,7 @@ export default class UiSmokeExtension extends Extension {
             weatherProviderStatus: services?.weatherProvider?.getState()?.status ?? null,
             tabSwitches: [],
             refreshStateExercised: false,
+            refreshTreesPreserved: true,
             openCloseCycles: 0,
             moduleIds: [...indicator._pages.keys()],
             tabWidths: [],
@@ -136,6 +137,11 @@ export default class UiSmokeExtension extends Extension {
             });
             if (id === 'codex') {
                 report.graph = allocation(findStyle(page.actor, 'shadow-token-sparkline'));
+                const dayLabels = findStyle(page.actor, 'shadow-spark-days');
+                report.graphDayLabels = {
+                    ...allocation(dayLabels),
+                    count: dayLabels?.get_children?.().length ?? 0,
+                };
                 report.codexFooter = allocation(findStyle(page.actor, 'shadow-codex-footer'));
                 report.historyBadgeIcon = allocation(findStyle(page.actor, 'shadow-status-icon'));
             } else {
@@ -172,9 +178,19 @@ export default class UiSmokeExtension extends Extension {
             ['weather', services?.weatherProvider],
         ]) {
             const page = indicator._pages.get(id);
-            const actions = page?._actions?.({...provider?.getState(), status: 'refreshing'});
+            if (!page || !provider)
+                continue;
+            indicator._select(id);
+            await settle();
+            const originalState = provider.getState();
+            const originalTree = page.actor.get_first_child();
+            provider._setState({...originalState, status: 'refreshing'});
+            await settle();
+            report.refreshTreesPreserved &&=
+                page.actor.get_first_child() === originalTree;
             page?._stopRefreshAnimation?.();
-            actions?.destroy();
+            provider._setState(originalState);
+            await settle();
         }
         report.refreshStateExercised = true;
         const originalUsageSetting = indicator._settings.get_boolean('show-codex-usage-state');
@@ -186,6 +202,15 @@ export default class UiSmokeExtension extends Extension {
         indicator._settings.set_boolean('show-codex-usage-state', originalUsageSetting);
         await settle();
         indicator.menu.close();
+        // Auto-theme initialization can legitimately queue one deferred
+        // dashboard rebuild. Let it finish before the lifecycle assertions so
+        // the smoke helper never keeps inspecting an actor that Shell disposed.
+        await settle(180);
+        const currentIndicator = Main.panel.statusArea['shadow-panel@shadowokx'];
+        if (currentIndicator && currentIndicator !== indicator) {
+            indicator = currentIndicator;
+            services = indicator._extension.getRuntimeServices();
+        }
         for (let cycle = 0; cycle < 20; cycle++) {
             indicator.menu.open();
             if (indicator.menu.isOpen)
@@ -211,6 +236,9 @@ export default class UiSmokeExtension extends Extension {
         await captureScreenshot(GLib.getenv('SHADOW_UI_SCREENSHOT'));
         indicator.menu.close();
         if (GLib.getenv('SHADOW_UI_LIFECYCLE') === 'true') {
+            // Allow the intentionally short page/tab exit transitions to
+            // settle before simulating an extension-manager teardown.
+            await settle(220);
             Main.extensionManager.disableExtension('shadow-panel@shadowokx');
             await settle(250);
             report.disabledRemoved = !Main.panel.statusArea['shadow-panel@shadowokx'];

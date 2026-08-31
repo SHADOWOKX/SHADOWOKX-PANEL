@@ -2,7 +2,7 @@
 
 Shadowokx Panel is a small GNOME top-bar utility that does two things well: it shows Codex usage limits and useful local weather. It targets Ubuntu 26.04.1 LTS, GNOME Shell 50, Wayland, and modern GJS ES modules.
 
-Release `2.3.1` deliberately contains only two pages:
+Release `2.3.2` deliberately contains only two pages:
 
 1. ChatGPT Codex
 2. Weather
@@ -24,7 +24,7 @@ The Codex percentage always means **remaining capacity**, never consumed capacit
 - Compact configurable top-bar fields for the ChatGPT icon, remaining percentage, weekly reset countdown, optional real-history usage state, weather icon, temperature, and condition. Weather can be hidden from the top bar independently from the popup.
 - A genuinely homogeneous 50/50 Codex/Weather segmented control with centered icon-and-label content, identical geometry, restrained accent and hover states, and keyboard navigation. When Weather is disabled in the popup, the single unnecessary segment is removed entirely.
 - A weekly-first Codex hero with dominant remaining capacity, remaining-progress meter, compact status pill, reset countdown/date, compact five-hour state, reset credits, refresh, icon-only Open Codex, and PNG Share actions.
-- Verified Codex token activity with compact lifetime and peak totals, full peak date, and a native Cairo line-and-area sparkline only when the signed-in app-server reports at least two real daily buckets. Exact lifetime totals remain available in a tooltip.
+- Verified Codex token activity with compact lifetime and peak totals, full peak date, and a 48-pixel native Cairo line-and-area sparkline only when the signed-in app-server reports at least two real daily buckets. The bounded curve cannot overshoot real points, every reported point is marked, the newest point is emphasized, and locale-aware day labels preserve missing-day spacing. Exact lifetime totals remain available in a tooltip.
 - Content-driven current-weather hero with condition, shortened and ellipsized location, high/low, up to five optional details including real UV, up to 12 horizontally scrollable forecast hours, optional hourly rain, sunrise/sunset, Celsius or Fahrenheit, and location-aware times.
 - Natural-height pages: each page expands only to its own content height and gains vertical scrolling only when the monitor or text scale cannot fit that content safely.
 - Cached Codex and Weather data remain visible during temporary failures.
@@ -152,7 +152,7 @@ The stylesheet uses a small set of logical surface and text classes rather than 
 
 Accent is limited to selected tabs, progress, important usage values, weather emphasis, and active controls. It does not tint the whole popup.
 
-The custom accent uses GTK 4's native color dialog and stores one validated `#RRGGBB` value in GSettings. Invalid values fall back to Rose. Appearance changes are applied by a coordinated indicator rebuild as soon as the popup is closed, avoiding actor replacement while the user is interacting with it.
+The custom accent uses GTK 4's native color dialog and stores one validated `#RRGGBB` value in GSettings. Invalid values fall back to Rose. Appearance changes are applied by a debounced indicator rebuild as soon as the popup is closed, avoiding actor replacement while the user is interacting with it. Rebuilds wait for GNOME to release the previous status-area role before mounting a replacement.
 
 ## Architecture
 
@@ -185,7 +185,7 @@ tests/                       pure logic, provider, share, and import tests
 
 Provider code never imports page code. Codex failure cannot break Weather, and Weather failure cannot break Codex. All timers, cancellables, subscriptions, subprocesses, and actors are released when the extension is disabled.
 
-Provider updates mark closed pages dirty without rebuilding their hidden actor trees. The selected page renders the pending state when opened, refresh animation runs only while its page is visible, and top-bar-only setting changes update the existing indicator actors without a full panel reconstruction.
+Provider updates mark closed pages dirty without rebuilding their hidden actor trees. The selected page renders the pending state when opened, refresh-start updates only the current button, countdown/relative-time ticks update only their labels, refresh animation runs only while its page is visible, and top-bar-only setting changes update the existing indicator actors without a full panel reconstruction.
 
 ## Development
 

@@ -3,6 +3,7 @@ import Gio from 'gi://Gio';
 import St from 'gi://St';
 
 import {formatCountdown, formatRelativeAge, formatResetDate} from '../../lib/format.js';
+import {normalizeSparklineBuckets} from '../../lib/sparkline.js';
 import {codexUsageStatus} from '../../lib/summary.js';
 import {launchUri} from '../../services/launcher.js';
 import {
@@ -37,18 +38,31 @@ export class CodexPage extends BasePage {
         this._lastWeeklyPercent = null;
         this._hasRendered = false;
         this._stateDirty = true;
-        this.track(this._provider.subscribe(() => {
+        this._timedLabels = [];
+        this._graphHasAppeared = false;
+        this._refreshButton = null;
+        this.track(this._provider.subscribe(state => {
             this._stateDirty = true;
-            if (!this._hasRendered || this._popupOpen)
+            if (this._hasRendered && this._popupOpen &&
+                state.status === 'refreshing' && state.lastSuccessfulRefresh) {
+                this._setRefreshState(true);
+            } else if (!this._hasRendered || this._popupOpen) {
                 this._render();
+            }
         }));
     }
 
     onPopupOpened() {
         this._popupOpen = true;
-        this._lastWeeklyPercent = null;
-        this._render();
-        this.context.scheduler.every('codex-countdown', 60, () => this._render());
+        if (this._stateDirty) {
+            this._lastWeeklyPercent = null;
+            this._render();
+        } else {
+            this._refreshTimedLabels();
+            this.fit();
+        }
+        this.context.scheduler.every('codex-countdown', 60, () =>
+            this._refreshTimedLabels());
         if (this.context.settings.get_boolean('refresh-on-open') && this._provider.isStale())
             this._provider.refresh(false);
     }
@@ -78,10 +92,15 @@ export class CodexPage extends BasePage {
         const state = this._provider.getState();
         let nextScroll = null;
         let nextScrollContent = null;
+        let nextRefreshButton = null;
+        const nextTimedLabels = [];
+        this._buildingTimedLabels = nextTimedLabels;
         const rendered = this.replaceContent(page => {
+            const actions = this._actions(state);
+            nextRefreshButton = actions._shadowRefreshButton;
             page.add_child(pageTitle(
                 'Codex Usage',
-                this._actions(state),
+                actions,
                 moduleIcon(this.context.extension, 'codex', 19, 'shadow-page-brand-icon')
             ));
 
@@ -139,11 +158,14 @@ export class CodexPage extends BasePage {
             nextScroll = scrollContainer(content, 'shadow-codex-scroll');
             page.add_child(nextScroll);
         });
+        this._buildingTimedLabels = null;
         if (rendered) {
             this._scrollContent = nextScrollContent;
             this._scroll = nextScroll;
             this._hasRendered = true;
             this._stateDirty = false;
+            this._refreshButton = nextRefreshButton;
+            this._timedLabels = nextTimedLabels;
         }
         this.fit();
     }
@@ -171,6 +193,7 @@ export class CodexPage extends BasePage {
             this.context.settings,
             refreshing && this._popupOpen
         );
+        actions._shadowRefreshButton = refresh;
         actions.add_child(refresh);
         const share = iconButton(
             this._sharing ? 'process-working-symbolic' : 'document-send-symbolic',
@@ -216,7 +239,10 @@ export class CodexPage extends BasePage {
             return card;
         }
 
-        const value = new St.BoxLayout({style_class: 'shadow-weekly-value-row'});
+        const value = new St.BoxLayout({
+            style_class: 'shadow-weekly-value-row',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
         value.add_child(new St.Label({
             text: `${window.remainingPercent}%`,
             style_class: 'shadow-weekly-value',
@@ -242,7 +268,11 @@ export class CodexPage extends BasePage {
             animate
         ).actor);
 
-        const legend = new St.BoxLayout({style_class: 'shadow-progress-legend', x_expand: true});
+        const legend = new St.BoxLayout({
+            style_class: 'shadow-progress-legend',
+            x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
         legend.add_child(new St.Label({
             text: `${100 - window.remainingPercent}% used`,
             style_class: 'shadow-muted',
@@ -256,11 +286,13 @@ export class CodexPage extends BasePage {
 
         if (this.context.settings.get_boolean('show-codex-reset-time')) {
             const reset = new St.BoxLayout({style_class: 'shadow-weekly-reset', x_expand: true});
-            reset.add_child(new St.Label({
-                text: formatCountdown(window.resetsAt),
+            reset.add_child(this._timedLabel(
+                () => formatCountdown(window.resetsAt),
+                {
                 style_class: 'shadow-reset-countdown',
                 x_expand: true,
-            }));
+                }
+            ));
             reset.add_child(new St.Label({
                 text: formatResetDate(window.resetsAt),
                 style_class: 'shadow-muted',
@@ -293,11 +325,13 @@ export class CodexPage extends BasePage {
         }
 
         if (this.context.settings.get_boolean('show-codex-reset-time')) {
-            copy.add_child(new St.Label({
-                text: formatCountdown(window.resetsAt),
+            copy.add_child(this._timedLabel(
+                () => formatCountdown(window.resetsAt),
+                {
                 style_class: 'shadow-muted',
                 x_align: Clutter.ActorAlign.START,
-            }));
+                }
+            ));
         }
         section.add_child(copy);
         section.add_child(new St.Label({
@@ -370,20 +404,71 @@ export class CodexPage extends BasePage {
     }
 
     _tokenSparkline(buckets) {
-        if (!Array.isArray(buckets) || buckets.length < 2)
+        const normalized = normalizeSparklineBuckets(buckets);
+        if (normalized.length < 2)
             return null;
         const sparkline = new St.BoxLayout({
             vertical: true,
             style_class: 'shadow-token-sparkline-wrap',
             x_expand: true,
         });
-        const chart = tokenSparkline(buckets, resolveAccent(this.context.settings));
-        chart.accessible_name = buckets.map(bucket =>
+        const shouldAnimate = this._popupOpen && !this._graphHasAppeared &&
+            animationsEnabled(this.context.settings);
+        const chart = tokenSparkline(
+            normalized,
+            resolveAccent(this.context.settings),
+            shouldAnimate
+        );
+        if (this._popupOpen)
+            this._graphHasAppeared = true;
+        chart.accessible_name = normalized.map(bucket =>
             `${this._formatUsageDate(bucket.date)}, ${this._formatTokens(bucket.tokens)} tokens`
         ).join('; ');
         sparkline.add_child(chart);
-        sparkline.add_child(new St.Label({text: 'Last 7 days', style_class: 'shadow-spark-label'}));
+        const dayLabels = this._sparklineDayLabels(normalized);
+        if (dayLabels.length) {
+            const timeline = new St.Widget({
+                style_class: 'shadow-spark-days',
+                x_expand: true,
+                height: 12,
+                layout_manager: new Clutter.FixedLayout(),
+            });
+            const labels = [];
+            for (const label of dayLabels) {
+                const actor = new St.Label({
+                    text: label,
+                    style_class: 'shadow-spark-day',
+                });
+                labels.push(actor);
+                timeline.add_child(actor);
+            }
+            timeline.connect('notify::allocation', () => {
+                const width = timeline.width;
+                if (width <= 16)
+                    return;
+                labels.forEach((label, index) => {
+                    const [, labelWidth] = label.get_preferred_width(-1);
+                    const center = 8 + index / (labels.length - 1) * (width - 16);
+                    label.set_position(Math.round(center - labelWidth / 2), 0);
+                });
+            });
+            sparkline.add_child(timeline);
+        }
         return sparkline;
+    }
+
+    _sparklineDayLabels(buckets) {
+        const first = Date.parse(`${buckets[0].date}T00:00:00Z`);
+        const last = Date.parse(`${buckets.at(-1).date}T00:00:00Z`);
+        const dayMs = 86_400_000;
+        const span = Math.round((last - first) / dayMs);
+        if (!Number.isFinite(span) || span < 1 || span > 6)
+            return [];
+        return Array.from({length: span + 1}, (_unused, index) =>
+            new Date(first + index * dayMs).toLocaleDateString(undefined, {
+                weekday: 'narrow',
+                timeZone: 'UTC',
+            }));
     }
 
     _tokenInsight(usage) {
@@ -473,11 +558,6 @@ export class CodexPage extends BasePage {
         const row = new St.BoxLayout({style_class: 'shadow-codex-footer', x_expand: true});
         const credits = new St.BoxLayout({style_class: 'shadow-footer-credits', x_expand: true});
         if (hasCredits) {
-            credits.add_child(new St.Icon({
-                icon_name: 'view-refresh-symbolic',
-                icon_size: 12,
-                style_class: 'shadow-footer-icon',
-            }));
             credits.add_child(new St.Label({
                 text: 'Reset credits',
                 style_class: 'shadow-footer-label',
@@ -489,13 +569,48 @@ export class CodexPage extends BasePage {
         }
         row.add_child(credits);
         if (hasUpdate) {
-            row.add_child(new St.Label({
-                text: `Updated ${formatRelativeAge(state.lastSuccessfulRefresh)}`,
+            row.add_child(this._timedLabel(
+                () => `Updated ${formatRelativeAge(state.lastSuccessfulRefresh)}`,
+                {
                 style_class: 'shadow-footer-updated',
                 x_align: Clutter.ActorAlign.END,
-            }));
+                }
+            ));
         }
         return row;
+    }
+
+    _timedLabel(textProvider, properties) {
+        const actor = new St.Label({text: textProvider(), ...properties});
+        this._buildingTimedLabels?.push({actor, textProvider});
+        return actor;
+    }
+
+    _refreshTimedLabels() {
+        if (this._destroyed || this._pageDestroyed || !this._popupOpen)
+            return;
+        for (const {actor, textProvider} of this._timedLabels) {
+            if (actor && !actor.is_finalized?.())
+                actor.text = textProvider();
+        }
+    }
+
+    _setRefreshState(refreshing) {
+        const button = this._refreshButton;
+        if (!button)
+            return;
+        this._stopRefreshAnimation();
+        button.reactive = !refreshing;
+        button.can_focus = !refreshing;
+        button.accessible_name = refreshing ? 'Refreshing Codex usage' : 'Refresh Codex usage';
+        button.child.icon_name = refreshing
+            ? 'process-working-symbolic'
+            : 'view-refresh-symbolic';
+        this._refreshIcon = animateRefreshButton(
+            button,
+            this.context.settings,
+            refreshing && this._popupOpen
+        );
     }
 
     _progressWidth() {
@@ -560,5 +675,7 @@ export class CodexPage extends BasePage {
         super.destroy();
         this._scroll = null;
         this._scrollContent = null;
+        this._refreshButton = null;
+        this._timedLabels = [];
     }
 }

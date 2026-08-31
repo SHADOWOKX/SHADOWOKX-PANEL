@@ -1,4 +1,5 @@
 import Cairo from 'cairo';
+import Clutter from 'gi://Clutter';
 import St from 'gi://St';
 
 import {sparklineCoordinates} from '../../lib/sparkline.js';
@@ -42,23 +43,36 @@ function traceSeries(context, points, move = true) {
     }
 }
 
-export function tokenSparkline(buckets, accent) {
+export function tokenSparkline(buckets, accent, animate = false) {
     const area = new St.DrawingArea({
         style_class: 'shadow-token-sparkline',
         x_expand: true,
-        height: 54,
+        height: 48,
+        opacity: animate ? 0 : 255,
     });
+    if (animate) {
+        const mappedId = area.connect('notify::mapped', () => {
+            if (!area.mapped)
+                return;
+            area.disconnect(mappedId);
+            area.ease({
+                opacity: 255,
+                duration: 160,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+        });
+    }
     area.connect('repaint', drawingArea => {
         const [width, height] = drawingArea.get_surface_size();
-        const padding = 7;
+        const padding = {x: 8, y: 6};
         const points = sparklineCoordinates(buckets, width, height, padding);
         if (points.length < 2)
             return;
         const [red, green, blue] = accentRgb(accent);
         const context = drawingArea.get_context();
         try {
-            const bottom = height - padding;
-            const fill = new Cairo.LinearGradient(0, padding, 0, bottom);
+            const bottom = height - padding.y;
+            const fill = new Cairo.LinearGradient(0, padding.y, 0, bottom);
             fill.addColorStopRGBA(0, red, green, blue, 0.17);
             fill.addColorStopRGBA(0.55, red, green, blue, 0.065);
             fill.addColorStopRGBA(1, red, green, blue, 0);
@@ -72,16 +86,22 @@ export function tokenSparkline(buckets, accent) {
 
             traceSeries(context, points);
             context.setSourceRGBA(red, green, blue, 0.94);
-            context.setLineWidth(1.8);
+            context.setLineWidth(1.45);
             context.setLineJoin(Cairo.LineJoin.ROUND);
             context.setLineCap(Cairo.LineCap.ROUND);
             context.stroke();
 
+            for (const point of points.slice(0, -1)) {
+                context.arc(point.x, point.y, 1.6, 0, Math.PI * 2);
+                context.setSourceRGBA(red, green, blue, 0.82);
+                context.fill();
+            }
+
             const last = points.at(-1);
-            context.arc(last.x, last.y, 4, 0, Math.PI * 2);
+            context.arc(last.x, last.y, 3.7, 0, Math.PI * 2);
             context.setSourceRGBA(red, green, blue, 0.18);
             context.fill();
-            context.arc(last.x, last.y, 2.2, 0, Math.PI * 2);
+            context.arc(last.x, last.y, 2, 0, Math.PI * 2);
             context.setSourceRGBA(red, green, blue, 1);
             context.fill();
         } finally {

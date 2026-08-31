@@ -1,4 +1,4 @@
-/* Shadowokx Panel 2.2 — focused Codex and Weather utility */
+/* Shadowokx Panel 2.3 — focused Codex and Weather utility */
 
 .shadow-menu-item {
   padding: 0;
@@ -44,25 +44,25 @@
 
 /* Surface tokens */
 .shadow-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background-color: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.085);
+  background-color: rgba(255, 255, 255, 0.05);
   border-radius: 12px;
 }
 
 .shadow-secondary-surface {
-  border: 1px solid rgba(255, 255, 255, 0.065);
-  background-color: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background-color: rgba(255, 255, 255, 0.03);
   border-radius: 12px;
 }
 
 .shadow-theme-light .shadow-card {
-  border-color: rgba(0, 0, 0, 0.09);
-  background-color: rgba(0, 0, 0, 0.025);
+  border-color: rgba(0, 0, 0, 0.095);
+  background-color: rgba(0, 0, 0, 0.03);
 }
 
 .shadow-theme-light .shadow-secondary-surface {
-  border-color: rgba(0, 0, 0, 0.075);
-  background-color: rgba(0, 0, 0, 0.018);
+  border-color: rgba(0, 0, 0, 0.08);
+  background-color: rgba(0, 0, 0, 0.022);
 }
 
 /* Text tokens */
@@ -177,7 +177,7 @@
   min-width: 27px;
   min-height: 27px;
   padding: 5px;
-  background-color: rgba(128, 128, 128, 0.08);
+  background-color: rgba(128, 128, 128, 0.09);
 }
 
 .shadow-icon-button:hover,
@@ -307,6 +307,12 @@
   background-color: #919591;
 }
 
+.shadow-status-accent .shadow-status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 3px;
+}
+
 .shadow-status-label {
   font-size: 10px;
   font-weight: 650;
@@ -362,7 +368,7 @@
 }
 
 .shadow-weekly-value-row {
-  spacing: 7px;
+  spacing: 4px;
 }
 
 .shadow-weekly-value {
@@ -372,7 +378,7 @@
 }
 
 .shadow-weekly-unit {
-  padding-bottom: 7px;
+  padding-bottom: 5px;
   font-size: 12px;
   font-weight: 560;
 }
@@ -398,6 +404,7 @@
 .shadow-progress-legend {
   min-height: 15px;
   font-size: 10px;
+  font-feature-settings: "tnum";
 }
 
 .shadow-progress-available {
@@ -432,6 +439,7 @@
 
 .shadow-codex-footer {
   min-height: 25px;
+  margin-top: 2px;
   padding: 3px 3px 3px;
   spacing: 12px;
 }
@@ -440,13 +448,11 @@
   spacing: 5px;
 }
 
-.shadow-footer-icon,
 .shadow-footer-label,
 .shadow-footer-updated {
   color: #a6a9a6;
 }
 
-.shadow-theme-light .shadow-footer-icon,
 .shadow-theme-light .shadow-footer-label,
 .shadow-theme-light .shadow-footer-updated {
   color: #686d69;
@@ -511,16 +517,20 @@
 }
 
 .shadow-token-sparkline-wrap {
-  spacing: 3px;
+  spacing: 1px;
 }
 
 .shadow-token-sparkline {
-  height: 54px;
+  height: 48px;
   border-radius: 9px;
   background-color: rgba(128, 128, 128, 0.035);
 }
 
-.shadow-spark-label {
+.shadow-spark-days {
+  min-height: 12px;
+}
+
+.shadow-spark-day {
   color: #9ea19e;
   font-size: 9px;
 }
@@ -534,7 +544,7 @@
   text-align: center;
 }
 
-.shadow-theme-light .shadow-spark-label {
+.shadow-theme-light .shadow-spark-day {
   color: #707570;
 }
 
@@ -599,6 +609,16 @@
   font-size: 11px;
 }
 
+.shadow-theme-dark .shadow-weather-location,
+.shadow-theme-dark .shadow-metric-label {
+  color: #babdba;
+}
+
+.shadow-theme-light .shadow-weather-location,
+.shadow-theme-light .shadow-metric-label {
+  color: #626762;
+}
+
 .shadow-weather-today {
   font-weight: 620;
 }
@@ -619,8 +639,9 @@
 
 .shadow-weather-metric-wide {
   min-height: 31px;
-  margin: 1px 3px 0;
-  padding: 5px 5px;
+  margin: 2px 3px 0;
+  padding: 7px 5px 4px;
+  border-top: 1px solid rgba(128, 128, 128, 0.09);
 }
 
 .shadow-hourly-section {
@@ -726,5 +747,5 @@
 
 .shadow-compact .shadow-weather-metric-wide {
   min-height: 27px;
-  padding: 3px;
+  padding: 5px 3px 2px;
 }

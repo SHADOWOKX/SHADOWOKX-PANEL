@@ -171,6 +171,16 @@ function testSparklineData() {
     equal(padded.at(-1).x, 93, 'sparkline honors refined right drawing padding');
     ok(padded.every(point => point.y >= 7 && point.y <= 43),
         'sparkline points remain inside refined vertical clipping bounds');
+    const asymmetricPadding = sparklineCoordinates([
+        {date: '2026-08-28', tokens: 10},
+        {date: '2026-08-29', tokens: 20},
+    ], 100, 48, {x: 8, y: 6});
+    equal(asymmetricPadding[0].x, 8,
+        'sparkline supports independent horizontal padding');
+    equal(asymmetricPadding.at(-1).x, 92,
+        'sparkline preserves the refined right inset');
+    ok(asymmetricPadding.every(point => point.y >= 6 && point.y <= 42),
+        'sparkline supports independent vertical clipping bounds');
 
     const allZero = sparklineCoordinates([
         {date: '2026-08-28', tokens: 0},
@@ -261,6 +271,23 @@ function testCodexNormalization() {
     }), null, 'unsafe or undated token activity is rejected');
     equal(normalizeAccountTokenUsage({summary: {lifetimeTokens: 123}}).sevenDayTokens, null,
         'a missing daily history never becomes a fabricated zero-token week');
+    const directDailyUsage = normalizeAccountTokenUsage({
+        summary: {lifetimeTokens: 10_000},
+        dailyUsageBuckets: [
+            {startDate: '2026-08-27', tokens: 100},
+            {startDate: '2026-08-28', tokens: -4},
+            {startDate: '2026-08-27', tokens: 125},
+            {startDate: '2026-08-29', tokens: 200},
+        ],
+    }, nowMs);
+    equal(directDailyUsage.dailyBuckets.length, 2,
+        'daily activity rejects negative counters and deduplicates dates');
+    equal(directDailyUsage.dailyBuckets[0].tokens, 125,
+        'the newest valid value for a duplicate day is retained');
+    equal(directDailyUsage.dailyBuckets[1].tokens, 200,
+        'reported daily buckets remain direct values rather than lifetime deltas');
+    equal(directDailyUsage.sevenDayTokens, 325,
+        'seven-day activity sums only validated real daily buckets');
     const cachedUsage = normalizeCachedRateLimits({
         lastSuccessfulRefresh: Date.now(),
         weekly: {usedPercent: 10, resetsAt: 2_000_000_000},
@@ -345,6 +372,12 @@ function testWeatherNormalization() {
     equal(state.today.uv, 7.2, 'daily UV index');
     equal(state.current.rainProbability, 12, 'current rain chance uses the next forecast hour');
     equal(state.forecast[1].precipitationChance, 27, 'hourly rain chance is normalized');
+    const withoutUv = normalizeWeather({
+        ...payload,
+        daily: {...payload.daily, uv_index_max: []},
+    }, 'Cairo, Egypt', 'celsius', 1000);
+    equal(withoutUv.today.uv, null,
+        'missing UV data remains absent instead of becoming a fabricated zero');
     equal(weatherCondition(999).label, 'Unknown conditions', 'unknown weather code');
     equal(weatherCondition('__proto__').label, 'Unknown conditions',
         'prototype names cannot become weather conditions');

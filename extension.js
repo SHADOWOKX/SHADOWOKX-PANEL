@@ -46,6 +46,14 @@ const LIVE_INDICATOR_KEYS = Object.freeze([
     'show-weather-condition',
 ]);
 
+// Preference windows can update several related keys in one interaction.
+// A short debounce keeps those bursts to one actor-tree rebuild and lets
+// GNOME finish the current style pass before the old indicator is destroyed.
+const REBUILD_DEBOUNCE_MS = 100;
+const REBUILD_MOUNT_MAX_POLLS = 40;
+const STATUS_AREA_RELEASE_POLL_MS = 25;
+const STATUS_AREA_RELEASE_MAX_POLLS = 40;
+
 export default class ShadowPanelExtension extends Extension {
     enable() {
         this._settings = this.getSettings();
@@ -75,28 +83,69 @@ export default class ShadowPanelExtension extends Extension {
             return;
         if (this._rebuildId)
             return;
-        this._rebuildId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
-            this._rebuildId = 0;
-            if (this._indicator?.menu?.isOpen)
-                return GLib.SOURCE_REMOVE;
-            this._rebuildPending = false;
-            this._destroyIndicator();
-            // Panel roles are released from GNOME Shell's status-area map on
-            // actor destruction. Recreate on the next idle so a replacement
-            // is never rejected and disposed as a duplicate role.
-            this._rebuildId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
-                this._rebuildId = 0;
-                if (!this._settings)
+        let mountPolls = 0;
+        this._rebuildId = GLib.timeout_add(
+            GLib.PRIORITY_DEFAULT,
+            REBUILD_DEBOUNCE_MS,
+            () => {
+                if (!this._settings) {
+                    this._rebuildId = 0;
                     return GLib.SOURCE_REMOVE;
-                try {
-                    this._createIndicator();
-                } catch (error) {
-                    this._logger?.warn('Could not rebuild Shadowokx Panel', error);
                 }
+                if (this._indicator?.menu?.isOpen) {
+                    this._rebuildId = 0;
+                    return GLib.SOURCE_REMOVE;
+                }
+                // A headless or freshly-started Shell can report the extension
+                // active just before its panel actor reaches the stage. Never
+                // destroy that actor while GNOME is still performing its first
+                // style pass.
+                if (this._indicator && !this._indicator.mapped &&
+                    mountPolls++ < REBUILD_MOUNT_MAX_POLLS)
+                    return GLib.SOURCE_CONTINUE;
+                if (this._indicator && !this._indicator.mapped) {
+                    this._rebuildId = 0;
+                    this._logger?.warn('Shadowokx panel actor did not reach the stage');
+                    return GLib.SOURCE_REMOVE;
+                }
+                this._rebuildId = 0;
+                this._rebuildPending = false;
+                this._destroyIndicator();
+                // GNOME releases panel roles asynchronously. Wait until the
+                // status-area map confirms the old role is gone so a replacement
+                // can never be accepted and then immediately disposed as a
+                // duplicate during a burst of preference changes.
+                let releasePolls = 0;
+                this._rebuildId = GLib.timeout_add(
+                    GLib.PRIORITY_DEFAULT,
+                    STATUS_AREA_RELEASE_POLL_MS,
+                    () => {
+                        if (!this._settings) {
+                            this._rebuildId = 0;
+                            return GLib.SOURCE_REMOVE;
+                        }
+                        if (Main.panel.statusArea[this.uuid] &&
+                            releasePolls++ < STATUS_AREA_RELEASE_MAX_POLLS)
+                            return GLib.SOURCE_CONTINUE;
+                        if (Main.panel.statusArea[this.uuid]) {
+                            this._rebuildId = 0;
+                            this._rebuildPending = true;
+                            this._logger?.warn('GNOME did not release the Shadowokx panel role');
+                            return GLib.SOURCE_REMOVE;
+                        }
+                        this._rebuildId = 0;
+                        this._rebuildPending = false;
+                        try {
+                            this._createIndicator();
+                        } catch (error) {
+                            this._logger?.warn('Could not rebuild Shadowokx Panel', error);
+                        }
+                        return GLib.SOURCE_REMOVE;
+                    }
+                );
                 return GLib.SOURCE_REMOVE;
-            });
-            return GLib.SOURCE_REMOVE;
-        });
+            }
+        );
     }
 
     _flushPendingRebuild() {

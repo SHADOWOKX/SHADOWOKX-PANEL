@@ -27,10 +27,15 @@ export class WeatherPage extends BasePage {
         this._popupOpen = false;
         this._hasRendered = false;
         this._stateDirty = true;
-        this.track(this._provider.subscribe(() => {
+        this._refreshButton = null;
+        this.track(this._provider.subscribe(state => {
             this._stateDirty = true;
-            if (!this._hasRendered || this._popupOpen)
+            if (this._hasRendered && this._popupOpen &&
+                state.status === 'refreshing' && state.lastSuccessfulRefresh) {
+                this._setRefreshState(true);
+            } else if (!this._hasRendered || this._popupOpen) {
                 this._render();
+            }
         }));
     }
 
@@ -66,8 +71,11 @@ export class WeatherPage extends BasePage {
         const state = this._provider.getState();
         let nextScroll = null;
         let nextScrollContent = null;
+        let nextRefreshButton = null;
         const rendered = this.replaceContent(page => {
-            page.add_child(pageTitle('Weather', this._actions(state)));
+            const actions = this._actions(state);
+            nextRefreshButton = actions._shadowRefreshButton;
+            page.add_child(pageTitle('Weather', actions));
 
             if (state.status === 'loading' && !state.lastSuccessfulRefresh) {
                 page.add_child(stateMessage(
@@ -131,6 +139,7 @@ export class WeatherPage extends BasePage {
                 this._hourlyScroll = null;
             this._hasRendered = true;
             this._stateDirty = false;
+            this._refreshButton = nextRefreshButton;
         }
         this.fit();
     }
@@ -153,6 +162,7 @@ export class WeatherPage extends BasePage {
             this.context.settings,
             refreshing && this._popupOpen
         );
+        actions._shadowRefreshButton = refresh;
         actions.add_child(refresh);
         return actions;
     }
@@ -203,11 +213,13 @@ export class WeatherPage extends BasePage {
         location.clutter_text.set_single_line_mode(true);
         location.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
         location.accessible_name = state.location;
+        location.y_align = Clutter.ActorAlign.CENTER;
         attachTooltip(location, state.location);
         locationRow.add_child(location);
         locationRow.add_child(new St.Label({
             text: `H ${Math.round(state.today.high)}°  ·  L ${Math.round(state.today.low)}°`,
             style_class: 'shadow-weather-today',
+            y_align: Clutter.ActorAlign.CENTER,
         }));
         hero.add_child(locationRow);
         return hero;
@@ -435,12 +447,31 @@ export class WeatherPage extends BasePage {
         this._refreshIcon = null;
     }
 
+    _setRefreshState(refreshing) {
+        const button = this._refreshButton;
+        if (!button)
+            return;
+        this._stopRefreshAnimation();
+        button.reactive = !refreshing;
+        button.can_focus = !refreshing;
+        button.accessible_name = refreshing ? 'Refreshing weather' : 'Refresh weather';
+        button.child.icon_name = refreshing
+            ? 'process-working-symbolic'
+            : 'view-refresh-symbolic';
+        this._refreshIcon = animateRefreshButton(
+            button,
+            this.context.settings,
+            refreshing && this._popupOpen
+        );
+    }
+
     destroy() {
         this._stopRefreshAnimation();
         super.destroy();
         this._scroll = null;
         this._scrollContent = null;
         this._hourlyScroll = null;
+        this._refreshButton = null;
     }
 
     _formatHour(timestamp, timezone) {
