@@ -14,6 +14,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     private WeatherState _weather;
     private AppSettings _settings;
     private string _selectedPage;
+    private bool _disposed;
 
     public DashboardViewModel(AppHost host, DispatcherQueue dispatcher)
     {
@@ -82,6 +83,9 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        if (_disposed)
+            return;
+        _disposed = true;
         _host.Codex.StateChanged -= OnCodexChanged;
         _host.Weather.StateChanged -= OnWeatherChanged;
         _host.Settings.Changed -= OnSettingsChanged;

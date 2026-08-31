@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -103,12 +104,13 @@ public sealed class TokenGraphControl : Canvas
             SetLeft(marker, point.X - marker.Width / 2);
             SetTop(marker, point.Y - marker.Height / 2);
             ToolTipService.SetToolTip(marker,
-                $"{point.Date:MMM d}\n{FormatTokens(point.Tokens)} tokens");
+                $"{point.Date.ToString("MMM d", CultureInfo.CurrentCulture)}\n{FormatTokens(point.Tokens)} tokens");
             Children.Add(marker);
 
             var label = new TextBlock
             {
-                Text = point.Date.ToString("ddd")[..1],
+                Text = FirstTextElement(
+                    point.Date.ToString("ddd", CultureInfo.CurrentCulture)),
                 Foreground = ResourceBrush("SecondaryTextBrush"),
                 FontSize = 10,
                 HorizontalTextAlignment = TextAlignment.Center,
@@ -139,11 +141,14 @@ public sealed class TokenGraphControl : Canvas
     private static Brush ResourceBrush(string name) =>
         (Brush)Application.Current.Resources[name];
 
+    private static string FirstTextElement(string value) =>
+        string.IsNullOrEmpty(value) ? value : StringInfo.GetNextTextElement(value);
+
     private static string FormatTokens(long tokens) => tokens switch
     {
-        >= 1_000_000_000 => $"{tokens / 1_000_000_000d:0.#}B",
-        >= 1_000_000 => $"{tokens / 1_000_000d:0.#}M",
-        >= 1_000 => $"{tokens / 1_000d:0.#}K",
-        _ => tokens.ToString("N0"),
+        >= 1_000_000_000 => tokens.ToString("0.#,,,'B'", CultureInfo.CurrentCulture),
+        >= 1_000_000 => tokens.ToString("0.#,,'M'", CultureInfo.CurrentCulture),
+        >= 1_000 => tokens.ToString("0.#,'K'", CultureInfo.CurrentCulture),
+        _ => tokens.ToString("N0", CultureInfo.CurrentCulture),
     };
 }

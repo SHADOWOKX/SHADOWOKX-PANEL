@@ -211,11 +211,17 @@ public sealed class WeatherProvider : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _lifetime.Cancel();
+        _configuration.Cancel();
         if (_timerTask is not null)
         {
             try { await _timerTask.ConfigureAwait(false); }
             catch (OperationCanceledException) { }
         }
+        Task<WeatherState>? refresh;
+        lock (_sync)
+            refresh = _refreshTask;
+        if (refresh is not null)
+            await refresh.ConfigureAwait(false);
         _lifetime.Dispose();
         _configuration.Dispose();
         if (_client is IDisposable disposable)

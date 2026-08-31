@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -13,7 +14,7 @@ using Windows.UI.ViewManagement;
 
 namespace ShadowokxPanel;
 
-public sealed partial class MainWindow : Window
+public sealed partial class MainWindow : Window, IDisposable
 {
     private readonly AppHost _host;
     private readonly DashboardViewModel _viewModel;
@@ -28,6 +29,7 @@ public sealed partial class MainWindow : Window
     private SettingsWindow? _settingsWindow;
     private bool _visible;
     private bool _exiting;
+    private bool _disposed;
 
     public MainWindow(AppHost host)
     {
@@ -45,31 +47,22 @@ public sealed partial class MainWindow : Window
             presenter.IsMinimizable = false;
         }
         _appWindow.Title = "Shadowokx Panel";
-        _appWindow.Closing += (_, eventArgs) =>
-        {
-            if (!_exiting)
-            {
-                eventArgs.Cancel = true;
-                HidePanel();
-            }
-        };
-        Activated += (_, eventArgs) =>
-        {
-            if (_visible && eventArgs.WindowActivationState == WindowActivationState.Deactivated &&
-                _settingsWindow is null)
-                HidePanel();
-        };
+        _appWindow.Closing += AppWindow_Closing;
+        Activated += MainWindow_Activated;
 
         _viewModel = new DashboardViewModel(host, DispatcherQueue);
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
         _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
-        _clockTimer.Tick += (_, _) => Render();
+        _clockTimer.Tick += ClockTimer_Tick;
         ThemeService.Apply(Root, _host.Settings.Current);
         Render();
     }
 
     public void InitializeTray()
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_tray is not null)
+            return;
         _tray = new TrayIcon(
             _hwnd,
             TogglePanel,
@@ -84,6 +77,8 @@ public sealed partial class MainWindow : Window
 
     public void ShowPanel()
     {
+        if (_disposed)
+            return;
         PositionNearTray();
         _appWindow.Show();
         Activate();
@@ -110,6 +105,24 @@ public sealed partial class MainWindow : Window
         _clockTimer.Stop();
         _appWindow.Hide();
     }
+
+    private void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs eventArgs)
+    {
+        if (!_exiting)
+        {
+            eventArgs.Cancel = true;
+            HidePanel();
+        }
+    }
+
+    private void MainWindow_Activated(object sender, WindowActivatedEventArgs eventArgs)
+    {
+        if (_visible && eventArgs.WindowActivationState == WindowActivationState.Deactivated &&
+            _settingsWindow is null)
+            HidePanel();
+    }
+
+    private void ClockTimer_Tick(object? sender, object eventArgs) => Render();
 
     private void PositionNearTray()
     {
@@ -180,7 +193,8 @@ public sealed partial class MainWindow : Window
             WeeklyAvailable.Text = $"{Math.Round(weekly.RemainingPercent):0}% available";
             CapacityLabel.Text = UsageAnalytics.CapacityLabel(weekly.RemainingPercent);
             WeeklyCountdown.Text = FormatCountdown(weekly.ResetsAt);
-            WeeklyResetDate.Text = weekly.ResetsAt?.LocalDateTime.ToString("ddd h:mm tt") ?? "Reset unavailable";
+            WeeklyResetDate.Text = weekly.ResetsAt?.LocalDateTime.ToString(
+                "ddd t", CultureInfo.CurrentCulture) ?? "Reset unavailable";
         }
 
         var fiveHour = state.FiveHour;
@@ -199,7 +213,8 @@ public sealed partial class MainWindow : Window
         TokenGraph.Visibility = settings.ShowTokenHistory ? Visibility.Visible : Visibility.Collapsed;
         TokenGraph.SetData(usage?.DailyBuckets);
         PeakTokens.Text = FormatTokens(usage?.PeakDailyTokens);
-        PeakDate.Text = usage?.PeakDate?.ToString("MMM d, yyyy") ?? "Not reported";
+        PeakDate.Text = usage?.PeakDate?.ToString(
+            "MMM d, yyyy", CultureInfo.CurrentCulture) ?? "Not reported";
         ResetCredits.Text = $"Reset credits: {state.ResetCreditsAvailable}";
         CodexUpdated.Text = FormatUpdated(state.LastSuccessfulRefresh, state.IsStale);
     }
@@ -250,7 +265,8 @@ public sealed partial class MainWindow : Window
                 };
                 item.Children.Add(new TextBlock
                 {
-                    Text = LocationTime(hour.Time, state.TimeZone).ToString("h tt"),
+                    Text = LocationTime(hour.Time, state.TimeZone).ToString(
+                        "t", CultureInfo.CurrentCulture),
                     FontSize = 11,
                     Foreground = ResourceBrush("SecondaryTextBrush"),
                     HorizontalAlignment = HorizontalAlignment.Center,
@@ -286,9 +302,11 @@ public sealed partial class MainWindow : Window
             _renderedForecastPrecipitation = settings.ShowHourlyPrecipitation;
         }
         Sunrise.Text = state.Today.Sunrise.HasValue
-            ? $"Sunrise {LocationTime(state.Today.Sunrise.Value, state.TimeZone):h:mm tt}" : "Sunrise unavailable";
+            ? $"Sunrise {LocationTime(state.Today.Sunrise.Value, state.TimeZone).ToString("t", CultureInfo.CurrentCulture)}"
+            : "Sunrise unavailable";
         Sunset.Text = state.Today.Sunset.HasValue
-            ? $"Sunset {LocationTime(state.Today.Sunset.Value, state.TimeZone):h:mm tt}" : "Sunset unavailable";
+            ? $"Sunset {LocationTime(state.Today.Sunset.Value, state.TimeZone).ToString("t", CultureInfo.CurrentCulture)}"
+            : "Sunset unavailable";
         WeatherUpdated.Text = FormatUpdated(state.LastSuccessfulRefresh, state.IsStale);
     }
 
@@ -373,16 +391,26 @@ public sealed partial class MainWindow : Window
 
     private void SettingsButton_Click(object sender, RoutedEventArgs e) => OpenSettings();
 
-    public void PrepareToExit()
+    public void Dispose()
     {
+        if (_disposed)
+            return;
+        _disposed = true;
         _exiting = true;
+        _visible = false;
         _clockTimer.Stop();
+        _clockTimer.Tick -= ClockTimer_Tick;
+        _appWindow.Closing -= AppWindow_Closing;
+        Activated -= MainWindow_Activated;
         _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
-        _viewModel.Dispose();
         _tray?.Dispose();
         _tray = null;
-        _settingsWindow?.Close();
+        _viewModel.Dispose();
+        var settingsWindow = _settingsWindow;
+        _settingsWindow = null;
+        settingsWindow?.Close();
         Close();
+        GC.SuppressFinalize(this);
     }
 
     private static SolidColorBrush Transparent() => new(Microsoft.UI.Colors.Transparent);
@@ -396,10 +424,10 @@ public sealed partial class MainWindow : Window
     private static string FormatTokens(long? value) => value switch
     {
         null => "Not reported",
-        >= 1_000_000_000 => $"{value.Value / 1_000_000_000d:0.#}B",
-        >= 1_000_000 => $"{value.Value / 1_000_000d:0.#}M",
-        >= 1_000 => $"{value.Value / 1_000d:0.#}K",
-        _ => value.Value.ToString("N0"),
+        >= 1_000_000_000 => value.Value.ToString("0.#,,,'B'", CultureInfo.CurrentCulture),
+        >= 1_000_000 => value.Value.ToString("0.#,,'M'", CultureInfo.CurrentCulture),
+        >= 1_000 => value.Value.ToString("0.#,'K'", CultureInfo.CurrentCulture),
+        _ => value.Value.ToString("N0", CultureInfo.CurrentCulture),
     };
 
     private static string FormatCountdown(DateTimeOffset? reset)
@@ -441,9 +469,15 @@ public sealed partial class MainWindow : Window
 
     private static string WeatherGlyph(string symbol) => symbol switch
     {
-        "sun" => "\uE706", "partly-cloudy" => "\uE9BD", "cloud" => "\uE753",
-        "fog" => "\uE9B8", "drizzle" => "\uE9C4", "rain" => "\uE9C4",
-        "snow" => "\uE9C7", "storm" => "\uE9C6", _ => "\uE7BA",
+        "sun" => "\uE706",
+        "partly-cloudy" => "\uE9BD",
+        "cloud" => "\uE753",
+        "fog" => "\uE9B8",
+        "drizzle" => "\uE9C4",
+        "rain" => "\uE9C4",
+        "snow" => "\uE9C7",
+        "storm" => "\uE9C6",
+        _ => "\uE7BA",
     };
 
     private static DateTime LocationTime(DateTimeOffset value, string? zone)

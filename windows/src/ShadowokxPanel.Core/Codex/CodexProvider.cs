@@ -216,6 +216,11 @@ public sealed class CodexProvider : IAsyncDisposable
             try { await _timerTask.ConfigureAwait(false); }
             catch (OperationCanceledException) { }
         }
+        Task<CodexState>? refresh;
+        lock (_sync)
+            refresh = _refreshTask;
+        if (refresh is not null)
+            await refresh.ConfigureAwait(false);
         _lifetime.Dispose();
     }
 

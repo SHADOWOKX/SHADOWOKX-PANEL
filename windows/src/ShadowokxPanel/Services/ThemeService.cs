@@ -25,10 +25,14 @@ public static class ThemeService
     private static readonly IReadOnlyDictionary<AccentPreset, string> Accents =
         new Dictionary<AccentPreset, string>
         {
-            [AccentPreset.Rose] = "#f43f5e", [AccentPreset.Orange] = "#f97316",
-            [AccentPreset.Emerald] = "#10b981", [AccentPreset.Cyan] = "#06b6d4",
-            [AccentPreset.Blue] = "#3b82f6", [AccentPreset.Violet] = "#8b5cf6",
-            [AccentPreset.Amber] = "#f59e0b", [AccentPreset.Monochrome] = "#94a3b8",
+            [AccentPreset.Rose] = "#f43f5e",
+            [AccentPreset.Orange] = "#f97316",
+            [AccentPreset.Emerald] = "#10b981",
+            [AccentPreset.Cyan] = "#06b6d4",
+            [AccentPreset.Blue] = "#3b82f6",
+            [AccentPreset.Violet] = "#8b5cf6",
+            [AccentPreset.Amber] = "#f59e0b",
+            [AccentPreset.Monochrome] = "#94a3b8",
         };
 
     public static void Apply(FrameworkElement root, AppSettings settings)
