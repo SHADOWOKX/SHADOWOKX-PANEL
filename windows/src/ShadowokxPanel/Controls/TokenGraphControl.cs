@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Shapes;
 using ShadowokxPanel.Core.History;
 using ShadowokxPanel.Core.Models;
 using Windows.Foundation;
+using XamlPath = Microsoft.UI.Xaml.Shapes.Path;
 
 namespace ShadowokxPanel.Controls;
 
@@ -59,7 +60,7 @@ public sealed class TokenGraphControl : Canvas
         areaGeometry.Figures.Add(areaFigure);
         var accent = (ResourceBrush("AccentBrush") as SolidColorBrush)?.Color ??
             Windows.UI.Color.FromArgb(255, 244, 63, 94);
-        Children.Add(new Path
+        Children.Add(new XamlPath
         {
             Data = areaGeometry,
             Fill = new LinearGradientBrush
@@ -78,7 +79,7 @@ public sealed class TokenGraphControl : Canvas
         AddCurve(lineFigure, points);
         var lineGeometry = new PathGeometry();
         lineGeometry.Figures.Add(lineFigure);
-        Children.Add(new Path
+        Children.Add(new XamlPath
         {
             Data = lineGeometry,
             Stroke = ResourceBrush("AccentBrush"),

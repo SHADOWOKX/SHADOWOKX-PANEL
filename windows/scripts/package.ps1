@@ -7,6 +7,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 & (Join-Path $PSScriptRoot 'build.ps1') -Configuration Release -Runtime $Runtime
+if ($LASTEXITCODE -ne 0) {
+    throw "The Windows build failed with exit code $LASTEXITCODE."
+}
 
 $artifactRoot = Join-Path $root 'artifacts'
 $publishRoot = Join-Path $artifactRoot $Runtime
@@ -19,6 +22,9 @@ if ($Runtime -eq 'win-x64') {
     $compiler = Get-Command ISCC.exe -ErrorAction SilentlyContinue
     if ($compiler) {
         & $compiler.Source "/DSourceDir=$publishRoot" (Join-Path $root 'packaging/ShadowokxPanel.iss')
+        if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup failed with exit code $LASTEXITCODE."
+        }
     } else {
         Write-Warning 'Inno Setup was not found; the portable archive was created, but the installer was skipped.'
     }
