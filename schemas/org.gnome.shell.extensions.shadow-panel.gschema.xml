@@ -187,7 +187,7 @@
       <summary>Show rain probability</summary>
     </key>
     <key name="show-weather-uv" type="b">
-      <default>false</default>
+      <default>true</default>
       <summary>Show the UV index</summary>
     </key>
     <key name="show-weather-sun-times" type="b">

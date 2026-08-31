@@ -28,6 +28,75 @@ export function animationsEnabled(settings) {
     return settings.get_boolean('animations') && St.Settings.get().enable_animations;
 }
 
+export function attachTooltip(actor, textOrProvider) {
+    let tooltip = null;
+    let timeoutId = 0;
+    const text = () => typeof textOrProvider === 'function'
+        ? textOrProvider()
+        : textOrProvider;
+    const hide = () => {
+        if (timeoutId)
+            GLib.Source.remove(timeoutId);
+        timeoutId = 0;
+        tooltip?.destroy();
+        tooltip = null;
+    };
+    const show = () => {
+        const value = text();
+        if (!value || !actor.mapped)
+            return;
+        tooltip = new St.Label({text: value, style_class: 'shadow-tooltip'});
+        global.stage.add_child(tooltip);
+        const [x, y] = actor.get_transformed_position();
+        const [width, height] = actor.get_transformed_size();
+        const [, tooltipWidth] = tooltip.get_preferred_width(-1);
+        const [, tooltipHeight] = tooltip.get_preferred_height(tooltipWidth);
+        const stageWidth = global.stage.width;
+        const stageHeight = global.stage.height;
+        const tooltipX = Math.max(8, Math.min(
+            Math.round(x + width / 2 - tooltipWidth / 2),
+            stageWidth - tooltipWidth - 8
+        ));
+        const below = y + height + 8;
+        const tooltipY = below + tooltipHeight <= stageHeight - 8
+            ? below
+            : Math.max(8, y - tooltipHeight - 8);
+        tooltip.set_position(tooltipX, tooltipY);
+    };
+    actor.reactive = true;
+    actor.track_hover = true;
+    actor.connect('notify::hover', () => {
+        hide();
+        if (!actor.hover)
+            return;
+        timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 450, () => {
+            timeoutId = 0;
+            show();
+            return GLib.SOURCE_REMOVE;
+        });
+    });
+    actor.connect('notify::mapped', () => {
+        if (!actor.mapped)
+            hide();
+    });
+    actor.connect('destroy', hide);
+    return actor;
+}
+
+export function animateRefreshButton(button, settings, active) {
+    const icon = button?.child;
+    if (!icon || !active || !animationsEnabled(settings))
+        return null;
+    icon.set_pivot_point(0.5, 0.5);
+    icon.ease({
+        rotation_angle_z: 360,
+        duration: 800,
+        repeatCount: -1,
+        mode: Clutter.AnimationMode.LINEAR,
+    });
+    return icon;
+}
+
 export function moduleIcon(extension, id, size = 16, styleClass = '') {
     const properties = {
         icon_size: size,
@@ -56,7 +125,7 @@ export function iconButton(iconName, accessibleName, callback, styleClass = 'sha
         child: new St.Icon({icon_name: iconName, icon_size: 16}),
     });
     button.connect('clicked', callback);
-    return button;
+    return attachTooltip(button, accessibleName);
 }
 
 export function moduleIconButton(
@@ -75,7 +144,7 @@ export function moduleIconButton(
         child: moduleIcon(extension, moduleId, 16, 'shadow-button-brand-icon'),
     });
     button.connect('clicked', callback);
-    return button;
+    return attachTooltip(button, accessibleName);
 }
 
 export function textButton(label, callback, styleClass = 'shadow-text-button') {
@@ -200,10 +269,21 @@ export function scrollContainer(child, styleClass = 'shadow-list-scroll') {
         // leaving scrollbar chrome out of this compact popup.
         vscrollbar_policy: St.PolicyType.EXTERNAL,
         x_expand: true,
-        y_expand: true,
     });
     scroll.set_child(child);
     return scroll;
+}
+
+export function fitScrollToContent(scroll, child, context) {
+    if (!scroll || !child)
+        return;
+    const width = Math.max(1, (context.pageWidth ?? 386) - 4);
+    if (!Number.isFinite(scroll._shadowNaturalHeight)) {
+        const [, naturalHeight] = child.get_preferred_height(width);
+        scroll._shadowNaturalHeight = Math.max(1, Math.ceil(naturalHeight));
+    }
+    const maximum = Math.max(220, context.getMaxScrollHeight?.() ?? 540);
+    scroll.height = Math.min(scroll._shadowNaturalHeight, maximum);
 }
 
 export function horizontalScrollContainer(child, styleClass = 'shadow-horizontal-scroll') {

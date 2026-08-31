@@ -4,6 +4,9 @@ import St from 'gi://St';
 
 import {
     horizontalScrollContainer,
+    animateRefreshButton,
+    attachTooltip,
+    fitScrollToContent,
     iconButton,
     pageTitle,
     resolveAccent,
@@ -14,20 +17,30 @@ import {
     textButton,
 } from '../../ui/components.js';
 import {BasePage} from '../basePage.js';
+import {weatherDisplayLocation} from './normalize.js';
 
 export class WeatherPage extends BasePage {
     constructor(context) {
         super(context, 'weather');
         this._provider = context.weatherProvider;
+        this._popupOpen = false;
         this.track(this._provider.subscribe(() => this._render()));
     }
 
     onPopupOpened() {
+        this._popupOpen = true;
+        this._render();
         if (this.context.settings.get_boolean('refresh-on-open') && this._provider.isStale())
             this._provider.refresh(false);
     }
 
+    onPopupClosed() {
+        this._popupOpen = false;
+        this._stopRefreshAnimation();
+    }
+
     activate() {
+        fitScrollToContent(this._scroll, this._scrollContent, this.context);
         const adjustment = this._scroll?.vadjustment ?? this._scroll?.vscroll?.adjustment;
         adjustment?.set_value(0);
     }
@@ -81,16 +94,18 @@ export class WeatherPage extends BasePage {
 
             content.add_child(this._hourlyForecast(state));
 
-            const insight = this._weatherInsight(state);
-            if (insight)
-                content.add_child(insight);
-
             if (this.context.settings.get_boolean('show-weather-sun-times') &&
                 (state.today.sunrise || state.today.sunset)) {
                 content.add_child(this._sunTimes(state));
             }
 
+            const insight = this._weatherInsight(state);
+            if (insight)
+                content.add_child(insight);
+
+            this._scrollContent = content;
             this._scroll = scrollContainer(content, 'shadow-weather-scroll');
+            fitScrollToContent(this._scroll, content, this.context);
             page.add_child(this._scroll);
         });
     }
@@ -108,6 +123,11 @@ export class WeatherPage extends BasePage {
         );
         refresh.reactive = !refreshing;
         refresh.can_focus = !refreshing;
+        this._refreshIcon = animateRefreshButton(
+            refresh,
+            this.context.settings,
+            refreshing && this._popupOpen
+        );
         actions.add_child(refresh);
         return actions;
     }
@@ -150,13 +170,15 @@ export class WeatherPage extends BasePage {
             x_expand: true,
         });
         const location = new St.Label({
-            text: state.location,
+            text: weatherDisplayLocation(state.location),
             style_class: 'shadow-weather-location',
             x_expand: true,
             x_align: Clutter.ActorAlign.START,
         });
         location.clutter_text.set_single_line_mode(true);
         location.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
+        location.accessible_name = state.location;
+        attachTooltip(location, state.location);
         locationRow.add_child(location);
         locationRow.add_child(new St.Label({
             text: `H ${Math.round(state.today.high)}°  ·  L ${Math.round(state.today.low)}°`,
@@ -176,7 +198,7 @@ export class WeatherPage extends BasePage {
             ['show-weather-rain', 'Rain', Number.isFinite(state.current.rainProbability)
                 ? `${Math.round(state.current.rainProbability)}%`
                 : null],
-            ['show-weather-uv', 'UV', Number.isFinite(state.today.uv)
+            ['show-weather-uv', 'UV Index', Number.isFinite(state.today.uv)
                 ? this._formatUv(state.today.uv)
                 : null],
         ];
@@ -274,28 +296,36 @@ export class WeatherPage extends BasePage {
     _weatherInsight(state) {
         if (!this.context.settings.get_boolean('show-weather-insights'))
             return null;
+        const uv = state.today.uv;
         const upcoming = state.forecast.slice(0, 6)
             .filter(hour => Number.isFinite(hour.precipitationChance));
-        if (upcoming.length < 3)
-            return null;
-        const wettest = upcoming.reduce((peak, hour) =>
-            hour.precipitationChance > peak.precipitationChance ? hour : peak);
-        const message = wettest.precipitationChance <= 20
-            ? 'Low rain chance over the next several hours.'
-            : `Rain chance peaks at ${Math.round(wettest.precipitationChance)}% around ` +
+        const wettest = upcoming.length
+            ? upcoming.reduce((peak, hour) =>
+                hour.precipitationChance > peak.precipitationChance ? hour : peak)
+            : null;
+        let message = null;
+        let iconName = 'weather-clear-symbolic';
+        if (Number.isFinite(uv) && uv >= 8) {
+            message = `UV is ${uv >= 11 ? 'extreme' : 'very high'} today.`;
+        } else if (state.current.feelsLike >= 35) {
+            message = `Hot conditions · Feels like ${Math.round(state.current.feelsLike)}°.`;
+        } else if (wettest?.precipitationChance >= 35) {
+            message = `Rain chance peaks at ${Math.round(wettest.precipitationChance)}% around ` +
                 `${this._formatHour(wettest.time, state.timezone)}.`;
+            iconName = 'weather-showers-scattered-symbolic';
+        }
+        if (!message)
+            return null;
         const row = new St.BoxLayout({
-            style_class: 'shadow-weather-insight shadow-secondary-surface',
+            style_class: 'shadow-page-insight shadow-secondary-surface',
             x_expand: true,
         });
         row.add_child(new St.Icon({
-            icon_name: wettest.precipitationChance <= 20
-                ? 'weather-clear-symbolic'
-                : 'weather-showers-scattered-symbolic',
+            icon_name: iconName,
             icon_size: 15,
             style: `color: ${resolveAccent(this.context.settings)};`,
         }));
-        row.add_child(new St.Label({text: message, style_class: 'shadow-weather-insight-text'}));
+        row.add_child(new St.Label({text: message, style_class: 'shadow-page-insight-text'}));
         return row;
     }
 
@@ -328,9 +358,21 @@ export class WeatherPage extends BasePage {
 
     _formatUv(value) {
         const rounded = Math.round(value);
-        const label = value >= 11 ? 'Extreme' : value >= 8 ? 'Very high' :
+        const label = value >= 11 ? 'Extreme' : value >= 8 ? 'Very High' :
             value >= 6 ? 'High' : value >= 3 ? 'Moderate' : 'Low';
-        return `${rounded} ${label}`;
+        return `${rounded} · ${label}`;
+    }
+
+    _stopRefreshAnimation() {
+        this._refreshIcon?.remove_all_transitions();
+        if (this._refreshIcon)
+            this._refreshIcon.rotation_angle_z = 0;
+        this._refreshIcon = null;
+    }
+
+    destroy() {
+        this._stopRefreshAnimation();
+        super.destroy();
     }
 
     _formatHour(timestamp, timezone) {

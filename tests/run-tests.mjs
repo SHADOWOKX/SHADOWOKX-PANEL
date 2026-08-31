@@ -2,7 +2,13 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
 import {MODULE_IDS} from '../lib/constants.js';
-import {clampPercent, formatCountdown, formatResetDate, isHexColor} from '../lib/format.js';
+import {
+    clampPercent,
+    formatCountdown,
+    formatRelativeAge,
+    formatResetDate,
+    isHexColor,
+} from '../lib/format.js';
 import {chooseInitialModule} from '../lib/moduleConfig.js';
 import {codexRemainingSummary, codexUsageStatus, weatherSummaryTemperature} from '../lib/summary.js';
 import {
@@ -16,6 +22,7 @@ import {exportCodexSummaryImage, resolveSharePalette} from '../modules/codex/sha
 import {
     normalizeWeather,
     normalizeWeatherQuery,
+    weatherDisplayLocation,
     weatherCacheMatchesSettings,
     weatherCondition,
     weatherSearchQueries,
@@ -112,6 +119,10 @@ function testFormatting() {
     equal(formatResetDate(Number.MAX_VALUE), 'Reset time unavailable', 'invalid reset dates are rejected');
     ok(isHexColor('#8b5cf6'), 'valid custom accent');
     ok(!isHexColor('purple'), 'invalid custom accent');
+    equal(formatRelativeAge(999_970_000, 1_000_000_000), 'just now',
+        'sub-minute refresh ages stay concise');
+    equal(formatRelativeAge(999_880_000, 1_000_000_000), '2m ago',
+        'minute refresh ages are formatted');
 }
 
 function testModuleConfiguration() {
@@ -258,6 +269,10 @@ function testWeatherNormalization() {
     equal(weatherSearchQueries('port-said , Egypt').join('|'),
         'port-said, Egypt|port said, Egypt',
         'hyphenated places get a safe relaxed fallback query');
+    equal(weatherDisplayLocation('Port Said, Port Said Governorate, Egypt'),
+        'Port Said, Egypt', 'Weather presentation omits redundant administrative detail');
+    equal(weatherDisplayLocation('Cairo, Egypt'), 'Cairo, Egypt',
+        'short Weather locations remain unchanged');
     const longQuery = normalizeWeatherQuery('😀'.repeat(121));
     equal([...longQuery].length, 120, 'weather query length is capped by Unicode code point');
     ok(Boolean(encodeURIComponent(longQuery)), 'weather query truncation preserves valid Unicode');

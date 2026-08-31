@@ -20,6 +20,18 @@ function allocation(actor) {
     };
 }
 
+function scrollState(page) {
+    const scroll = page?._scroll;
+    if (!scroll)
+        return null;
+    const naturalHeight = scroll._shadowNaturalHeight ?? null;
+    return {
+        viewportHeight: scroll.height,
+        measuredNaturalHeight: naturalHeight,
+        needsScroll: Number.isFinite(naturalHeight) && naturalHeight > scroll.height + 1,
+    };
+}
+
 export default class UiSmokeExtension extends Extension {
     enable() {
         this._attempts = 0;
@@ -43,6 +55,7 @@ export default class UiSmokeExtension extends Extension {
             codexProviderStatus: services?.codexProvider?.getState()?.status ?? null,
             weatherProviderStatus: services?.weatherProvider?.getState()?.status ?? null,
             tabSwitches: [],
+            refreshStateExercised: false,
         };
         indicator.menu.open();
         for (const id of ['codex', 'weather', 'codex', 'weather']) {
@@ -53,12 +66,24 @@ export default class UiSmokeExtension extends Extension {
                 id,
                 page: allocation(page.actor),
                 stack: allocation(indicator._pageStack),
+                scroll: scrollState(page),
                 childCount: page.actor.get_children().length,
                 hasExpectedContent: id === 'codex'
                     ? labels.includes('Weekly capacity')
-                    : labels.some(text => text === services?.weatherProvider?.getState()?.location),
+                    : labels.includes('Next hours') &&
+                        labels.includes(services?.weatherProvider?.getState()?.current?.condition?.label),
             });
         }
+        for (const [id, provider] of [
+            ['codex', services?.codexProvider],
+            ['weather', services?.weatherProvider],
+        ]) {
+            const page = indicator._pages.get(id);
+            const actions = page?._actions?.({...provider?.getState(), status: 'refreshing'});
+            page?._stopRefreshAnimation?.();
+            actions?.destroy();
+        }
+        report.refreshStateExercised = true;
         indicator.menu.close();
         indicator.menu.open();
         report.reopened = indicator.menu.isOpen;

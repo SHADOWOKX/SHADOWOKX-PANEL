@@ -1,3 +1,4 @@
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
@@ -50,6 +51,11 @@ export default class ShadowPanelExtension extends Extension {
         this._services = {};
         this._settingsIds = REBUILD_KEYS.map(key =>
             this._settings.connect(`changed::${key}`, () => this._queueRebuild()));
+        this._interfaceSettings = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
+        this._interfaceSettingsId = this._interfaceSettings.connect(
+            'changed::text-scaling-factor',
+            () => this._queueRebuild()
+        );
         this._rebuildId = 0;
         this._rebuildPending = false;
         this._createIndicator();
@@ -141,6 +147,10 @@ export default class ShadowPanelExtension extends Extension {
         for (const id of this._settingsIds ?? [])
             this._settings.disconnect(id);
         this._settingsIds = [];
+        if (this._interfaceSettingsId)
+            this._interfaceSettings.disconnect(this._interfaceSettingsId);
+        this._interfaceSettingsId = 0;
+        this._interfaceSettings = null;
         this._logger = null;
         this._settings = null;
     }

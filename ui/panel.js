@@ -7,13 +7,14 @@ import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
-import {formatCountdown} from '../lib/format.js';
+import {formatCountdown, formatResetDate} from '../lib/format.js';
 import {ACCENTS, MODULE_IDS, MODULE_META} from '../lib/constants.js';
 import {chooseInitialModule} from '../lib/moduleConfig.js';
 import {codexRemainingSummary, weatherSummaryTemperature} from '../lib/summary.js';
 import {PAGE_FACTORIES} from '../modules/index.js';
 import {
     animationsEnabled,
+    attachTooltip,
     iconButton,
     moduleIcon,
     pageTitle,
@@ -89,6 +90,7 @@ class ShadowIndicator extends PanelMenu.Button {
         this._indicatorBox.add_child(this._codexSummary.item);
         this._indicatorBox.add_child(this._weatherSummary.item);
         this.add_child(this._indicatorBox);
+        attachTooltip(this, () => this._indicatorTooltipText());
 
         const monitorsChangedId = Main.layoutManager.connect('monitors-changed', () =>
             this._syncIndicator());
@@ -174,6 +176,8 @@ class ShadowIndicator extends PanelMenu.Button {
             logger: this._logger,
             notify: (title, message, options = {}) =>
                 this._notify(title, message, options),
+            pageWidth: this._pageStack.width,
+            getMaxScrollHeight: () => this._maxScrollHeight(),
             codexProvider: services.codexProvider,
             weatherProvider: services.weatherProvider,
         };
@@ -216,6 +220,14 @@ class ShadowIndicator extends PanelMenu.Button {
         );
         if (initial)
             this._select(initial);
+    }
+
+    _maxScrollHeight() {
+        const monitor = Main.layoutManager.findMonitorForActor(this) ??
+            Main.layoutManager.primaryMonitor;
+        const height = monitor?.height ?? global.stage.height;
+        const reserve = this._settings.get_string('density') === 'compact' ? 168 : 184;
+        return Math.max(220, height - Main.panel.height - reserve);
     }
 
     _moduleErrorPage(id) {
@@ -333,6 +345,25 @@ class ShadowIndicator extends PanelMenu.Button {
             .filter(summary => summary.item.visible)
             .map(summary => summary.item.accessible_name);
         this.accessible_name = descriptions.join(', ') || 'Shadowokx Panel';
+    }
+
+    _indicatorTooltipText() {
+        const lines = [];
+        const codexPercent = codexRemainingSummary(this._codexState);
+        const codexWindow = this._codexState?.weekly ?? this._codexState?.fiveHour;
+        if (codexPercent !== null) {
+            lines.push(`Codex · ${codexPercent}% remaining`);
+            if (Number.isFinite(codexWindow?.resetsAt))
+                lines.push(`Resets ${formatResetDate(codexWindow.resetsAt)}`);
+        }
+        const temperature = weatherSummaryTemperature(this._weatherState);
+        if (temperature !== null) {
+            const condition = this._weatherState.current.condition?.label;
+            lines.push(`${temperature}°${condition ? ` · ${condition}` : ''}`);
+            if (Number.isFinite(this._weatherState.current.feelsLike))
+                lines.push(`Feels like ${Math.round(this._weatherState.current.feelsLike)}°`);
+        }
+        return lines.join('\n') || 'Shadowokx Panel';
     }
 
     _onPopupOpened() {

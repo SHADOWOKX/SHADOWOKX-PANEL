@@ -46,6 +46,15 @@ export function normalizeWeatherQuery(value) {
     return [...clean].slice(0, 120).join('') || 'Cairo, Egypt';
 }
 
+export function weatherDisplayLocation(value) {
+    if (typeof value !== 'string')
+        return '';
+    const parts = value.split(',').map(part => part.trim()).filter(Boolean);
+    if (parts.length <= 2)
+        return parts.join(', ');
+    return `${parts[0]}, ${parts.at(-1)}`;
+}
+
 export function weatherSearchQueries(value) {
     const query = normalizeWeatherQuery(value);
     const candidates = [query];

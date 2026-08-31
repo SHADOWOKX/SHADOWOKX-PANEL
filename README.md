@@ -2,7 +2,7 @@
 
 Shadowokx Panel is a small GNOME top-bar utility that does two things well: it shows Codex usage limits and useful local weather. It targets Ubuntu 26.04.1 LTS, GNOME Shell 50, Wayland, and modern GJS ES modules.
 
-Release `2.1.0` deliberately contains only two pages:
+Release `2.1.1` deliberately contains only two pages:
 
 1. ChatGPT Codex
 2. Weather
@@ -23,9 +23,10 @@ The Codex percentage always means **remaining capacity**, never consumed capacit
 
 - Compact configurable top-bar fields for the ChatGPT icon, remaining percentage, weekly reset countdown, weather icon, temperature, and condition.
 - Two equal-width segmented tabs with icon and text labels, a restrained accent state, keyboard navigation, and no separator artifact.
-- A weekly-first Codex hero with dominant remaining capacity, remaining-progress meter, compact status pill, reset countdown/date, compact five-hour state, reset credits, refresh, Open Codex, and PNG Share actions.
-- Verified Codex token activity with compact lifetime totals, today/7-day/peak statistics, and a seven-day bar sparkline only when the signed-in app-server reports real daily buckets.
-- Content-driven current-weather hero with condition, ellipsized location, high/low, up to five optional details, up to 12 horizontally scrollable forecast hours, optional hourly rain, sunrise/sunset, Celsius or Fahrenheit, and location-aware times.
+- A weekly-first Codex hero with dominant remaining capacity, remaining-progress meter, compact status pill, reset countdown/date, compact five-hour state, reset credits, relative freshness, refresh, Open Codex, and PNG Share actions.
+- Verified Codex token activity with compact lifetime and peak totals, full peak date, and a seven-day bar sparkline only when the signed-in app-server reports real daily buckets. Exact lifetime totals remain available in a tooltip.
+- Content-driven current-weather hero with condition, shortened and ellipsized location, high/low, up to five optional details including real UV, up to 12 horizontally scrollable forecast hours, optional hourly rain, sunrise/sunset, Celsius or Fahrenheit, and location-aware times.
+- Natural-height pages: each page expands only to its own content height and gains vertical scrolling only when the monitor or text scale cannot fit that content safely.
 - Cached Codex and Weather data remain visible during temporary failures.
 - Auto, Dark, and Light modes; Claude Gray, Graphite, GNOME, and Light Neutral backgrounds; Comfortable and Compact density; Narrow, Standard, and Wide panel widths; seven accent presets plus a custom accent.
 - Native Adwaita preferences containing only General, Appearance, Codex, Weather, and About.
@@ -90,6 +91,8 @@ The top bar prefers weekly remaining capacity because the weekly limit is the pr
 
 `account/usage/read` supplies optional account token-activity summaries and daily buckets. The panel validates and displays only reported integer counts and dates. It never estimates a peak hour from daily data or parses private session transcripts as a substitute.
 
+The mini graph is built once per rendered state from those validated daily buckets using lightweight `St.Widget` bars. It has no redraw timer or animation loop. If fewer than two real daily buckets exist, the graph is omitted. Usage pace and reset projection are also omitted because the rate-limit endpoint supplies only a current snapshot, not enough history for an honest rate calculation.
+
 Security properties:
 
 - No rendered Codex interface is scraped.
@@ -128,6 +131,8 @@ The configured location is sent to Open-Meteo geocoding. The resolved coordinate
 Requests are asynchronous, time-limited, response-size bounded, cached, and made only when stale, manually refreshed, or after a relevant setting changes. A failed refresh never discards the last successful forecast. Full Weather unavailable state is shown only when no valid result has ever been loaded.
 
 The hourly forecast keeps up to 12 validated hours in a bounded horizontal `St.ScrollView`; roughly four are visible at once and additional hours remain available to touchpad or horizontal-wheel scrolling. Both horizontal and vertical scrollbar chrome use `EXTERNAL` policies, so content remains scrollable without an intrusive track.
+
+The main page scroll view measures its content's preferred height and uses the smaller of that natural height or the active monitor's safe available height. Codex and Weather therefore resize independently when selected. A constrained monitor or large text scale keeps wheel/touchpad scrolling while hiding only the scrollbar chrome. Changes to GNOME's text-scaling factor rebuild the layout so the measurement cannot become stale.
 
 ## Appearance
 
