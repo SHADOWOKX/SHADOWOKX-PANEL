@@ -2,6 +2,13 @@
 
 Shadowokx Panel is a small GNOME top-bar utility that does two things well: it shows Codex usage limits and useful local weather. It targets Ubuntu 26.04.1 LTS, GNOME Shell 50, Wayland, and modern GJS ES modules.
 
+## Available platforms
+
+- **Linux:** the production GNOME Shell 50 extension documented below.
+- **Windows:** a separate native C#/.NET 8 and WinUI 3 tray-application implementation under [`windows/`](windows/README.md). Its source and tests are implemented, but a real Windows 11 build and manual QA pass are still required before publishing the first Windows binary.
+
+The two implementations have independent build, package, storage, and release workflows. Windows development does not modify or depend on the GNOME runtime.
+
 Release `2.3.3` deliberately contains only two pages:
 
 1. ChatGPT Codex

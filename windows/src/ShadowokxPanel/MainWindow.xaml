@@ -1,0 +1,300 @@
+<Window
+    x:Class="ShadowokxPanel.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:ShadowokxPanel.Controls">
+    <Border
+        x:Name="Root"
+        Background="{ThemeResource AppBackgroundBrush}"
+        BorderBrush="{ThemeResource CardBorderBrush}"
+        BorderThickness="1"
+        CornerRadius="18"
+        Padding="20">
+        <Grid RowSpacing="16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0">
+                <TextBlock
+                    Text="Shadowokx Panel"
+                    Foreground="{ThemeResource PrimaryTextBrush}"
+                    FontSize="18"
+                    FontWeight="SemiBold"
+                    VerticalAlignment="Center" />
+                <Button
+                    x:Name="SettingsButton"
+                    HorizontalAlignment="Right"
+                    Style="{StaticResource IconButtonStyle}"
+                    ToolTipService.ToolTip="Settings"
+                    AutomationProperties.Name="Open settings"
+                    Click="SettingsButton_Click">
+                    <FontIcon Glyph="&#xE713;" FontSize="16" />
+                </Button>
+            </Grid>
+
+            <Border
+                x:Name="SegmentedBorder"
+                Grid.Row="1"
+                Background="{ThemeResource CardBrush}"
+                BorderBrush="{ThemeResource CardBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="3">
+                <Grid x:Name="SegmentedGrid" ColumnSpacing="3">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition x:Name="WeatherColumn" Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Button
+                        x:Name="CodexTab"
+                        Grid.Column="0"
+                        Height="40"
+                        HorizontalContentAlignment="Center"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        CornerRadius="9"
+                        AutomationProperties.Name="ChatGPT Codex page"
+                        Click="CodexTab_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Image Source="Assets/chatgpt.png" Width="16" Height="16" Stretch="Uniform" />
+                            <TextBlock Text="ChatGPT Codex" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
+                    <Button
+                        x:Name="WeatherTab"
+                        Grid.Column="1"
+                        Height="40"
+                        HorizontalContentAlignment="Center"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        CornerRadius="9"
+                        AutomationProperties.Name="Weather page"
+                        Click="WeatherTab_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE706;" FontSize="15" />
+                            <TextBlock Text="Weather" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="2">
+                <ScrollViewer
+                    x:Name="CodexScroll"
+                    VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="12" Padding="0,0,4,4">
+                        <Grid Margin="0,2,0,2">
+                            <TextBlock
+                                Text="Codex Usage"
+                                Foreground="{ThemeResource PrimaryTextBrush}"
+                                FontSize="16"
+                                FontWeight="SemiBold"
+                                VerticalAlignment="Center" />
+                            <Button
+                                x:Name="CodexRefreshButton"
+                                HorizontalAlignment="Right"
+                                Style="{StaticResource IconButtonStyle}"
+                                ToolTipService.ToolTip="Refresh Codex usage"
+                                AutomationProperties.Name="Refresh Codex usage"
+                                Click="CodexRefreshButton_Click">
+                                <Grid>
+                                    <FontIcon x:Name="CodexRefreshIcon" Glyph="&#xE72C;" FontSize="15" />
+                                    <ProgressRing x:Name="CodexRefreshRing" Width="18" Height="18" IsActive="False" Visibility="Collapsed" />
+                                </Grid>
+                            </Button>
+                        </Grid>
+
+                        <Border x:Name="CodexErrorCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
+                            <StackPanel Spacing="8" HorizontalAlignment="Center" Padding="10">
+                                <FontIcon Glyph="&#xE783;" FontSize="25" Foreground="{ThemeResource SecondaryTextBrush}" />
+                                <TextBlock x:Name="CodexErrorTitle" FontWeight="SemiBold" FontSize="15" HorizontalAlignment="Center" />
+                                <TextBlock x:Name="CodexErrorMessage" Foreground="{ThemeResource SecondaryTextBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+                                <Button Content="Retry" HorizontalAlignment="Center" Click="CodexRefreshButton_Click" />
+                            </StackPanel>
+                        </Border>
+
+                        <StackPanel x:Name="CodexContent" Spacing="12">
+                            <Border x:Name="WeeklyCard" Style="{StaticResource CardStyle}">
+                                <StackPanel Spacing="12">
+                                    <Grid>
+                                        <TextBlock Text="WEEKLY CAPACITY" Style="{StaticResource SectionLabelStyle}" />
+                                        <Border x:Name="CapacityPill" HorizontalAlignment="Right" Background="{ThemeResource CardHoverBrush}" CornerRadius="9" Padding="9,4">
+                                            <TextBlock x:Name="CapacityLabel" FontSize="11" FontWeight="SemiBold" />
+                                        </Border>
+                                    </Grid>
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <TextBlock x:Name="WeeklyRemaining" Foreground="{ThemeResource AccentBrush}" FontSize="38" FontWeight="Bold" />
+                                        <TextBlock Text="remaining" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="13" VerticalAlignment="Bottom" Margin="0,0,0,7" />
+                                    </StackPanel>
+                                    <ProgressBar x:Name="WeeklyProgress" Height="7" Minimum="0" Maximum="100" Foreground="{ThemeResource AccentBrush}" Background="{ThemeResource TrackBrush}" CornerRadius="4" />
+                                    <Grid>
+                                        <TextBlock x:Name="WeeklyUsed" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
+                                        <TextBlock x:Name="WeeklyAvailable" HorizontalAlignment="Right" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
+                                    </Grid>
+                                    <Grid>
+                                        <TextBlock x:Name="WeeklyCountdown" Foreground="{ThemeResource PrimaryTextBrush}" FontWeight="SemiBold" FontSize="12" />
+                                        <TextBlock x:Name="WeeklyResetDate" HorizontalAlignment="Right" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border x:Name="FiveHourCard" Style="{StaticResource CardStyle}">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="5">
+                                        <TextBlock Text="5-HOUR WINDOW" Style="{StaticResource SectionLabelStyle}" />
+                                        <TextBlock x:Name="FiveHourText" Foreground="{ThemeResource PrimaryTextBrush}" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="FiveHourReset" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
+                                    </StackPanel>
+                                    <Border Grid.Column="1" Background="{ThemeResource CardHoverBrush}" CornerRadius="9" Padding="9,4" VerticalAlignment="Top">
+                                        <TextBlock x:Name="FiveHourPill" FontSize="11" FontWeight="SemiBold" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+
+                            <Border x:Name="TokenCard" Style="{StaticResource CardStyle}">
+                                <StackPanel Spacing="11">
+                                    <Grid>
+                                        <TextBlock Text="TOKEN ACTIVITY" Style="{StaticResource SectionLabelStyle}" />
+                                        <Border HorizontalAlignment="Right" Background="{ThemeResource CardHoverBrush}" CornerRadius="9" Padding="9,4">
+                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                <FontIcon Glyph="&#xE81C;" FontSize="11" />
+                                                <TextBlock Text="7-day history" FontSize="11" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                    <TextBlock x:Name="LifetimeTokens" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="24" FontWeight="SemiBold" />
+                                    <TextBlock Text="Lifetime tokens" Style="{StaticResource MetricLabelStyle}" Margin="0,-8,0,0" />
+                                    <controls:TokenGraphControl x:Name="TokenGraph" />
+                                    <Grid ColumnSpacing="18">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="Peak" Style="{StaticResource MetricLabelStyle}" />
+                                            <TextBlock x:Name="PeakTokens" Style="{StaticResource MetricValueStyle}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="Peak day" Style="{StaticResource MetricLabelStyle}" />
+                                            <TextBlock x:Name="PeakDate" Style="{StaticResource MetricValueStyle}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Grid Margin="2,2,2,0">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE777;" FontSize="12" Foreground="{ThemeResource SecondaryTextBrush}" />
+                                    <TextBlock x:Name="ResetCredits" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
+                                </StackPanel>
+                                <TextBlock x:Name="CodexUpdated" HorizontalAlignment="Right" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <ScrollViewer
+                    x:Name="WeatherScroll"
+                    Visibility="Collapsed"
+                    VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="12" Padding="0,0,4,4">
+                        <Grid Margin="0,2,0,2">
+                            <TextBlock Text="Weather" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <Button
+                                x:Name="WeatherRefreshButton"
+                                HorizontalAlignment="Right"
+                                Style="{StaticResource IconButtonStyle}"
+                                ToolTipService.ToolTip="Refresh Weather"
+                                AutomationProperties.Name="Refresh Weather"
+                                Click="WeatherRefreshButton_Click">
+                                <Grid>
+                                    <FontIcon x:Name="WeatherRefreshIcon" Glyph="&#xE72C;" FontSize="15" />
+                                    <ProgressRing x:Name="WeatherRefreshRing" Width="18" Height="18" IsActive="False" Visibility="Collapsed" />
+                                </Grid>
+                            </Button>
+                        </Grid>
+
+                        <Border x:Name="WeatherErrorCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
+                            <StackPanel Spacing="8" HorizontalAlignment="Center" Padding="10">
+                                <FontIcon Glyph="&#xE9CE;" FontSize="25" Foreground="{ThemeResource SecondaryTextBrush}" />
+                                <TextBlock Text="Weather unavailable" FontWeight="SemiBold" FontSize="15" HorizontalAlignment="Center" />
+                                <TextBlock x:Name="WeatherErrorMessage" Foreground="{ThemeResource SecondaryTextBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+                                <Button Content="Retry" HorizontalAlignment="Center" Click="WeatherRefreshButton_Click" />
+                            </StackPanel>
+                        </Border>
+
+                        <StackPanel x:Name="WeatherContent" Spacing="12">
+                            <Border Style="{StaticResource CardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock x:Name="WeatherTemperature" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="40" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="WeatherCondition" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="15" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="WeatherLocation" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" TextTrimming="CharacterEllipsis" MaxWidth="285" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="8">
+                                        <FontIcon x:Name="WeatherHeroIcon" Glyph="&#xE706;" FontSize="34" Foreground="{ThemeResource AccentBrush}" />
+                                        <TextBlock x:Name="WeatherHighLow" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <Border Style="{StaticResource CardStyle}">
+                                <Grid RowSpacing="12" ColumnSpacing="24">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel><TextBlock Text="Feels like" Style="{StaticResource MetricLabelStyle}" /><TextBlock x:Name="FeelsLike" Style="{StaticResource MetricValueStyle}" /></StackPanel>
+                                    <StackPanel Grid.Column="1"><TextBlock Text="Humidity" Style="{StaticResource MetricLabelStyle}" /><TextBlock x:Name="Humidity" Style="{StaticResource MetricValueStyle}" /></StackPanel>
+                                    <StackPanel Grid.Row="1"><TextBlock Text="Wind" Style="{StaticResource MetricLabelStyle}" /><TextBlock x:Name="Wind" Style="{StaticResource MetricValueStyle}" /></StackPanel>
+                                    <StackPanel Grid.Row="1" Grid.Column="1"><TextBlock Text="Rain" Style="{StaticResource MetricLabelStyle}" /><TextBlock x:Name="Rain" Style="{StaticResource MetricValueStyle}" /></StackPanel>
+                                    <Grid Grid.Row="2" Grid.ColumnSpan="2" Margin="0,2,0,0">
+                                        <TextBlock Text="UV Index" Style="{StaticResource MetricLabelStyle}" />
+                                        <TextBlock x:Name="UvIndex" HorizontalAlignment="Right" Style="{StaticResource MetricValueStyle}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+
+                            <TextBlock Text="NEXT HOURS" Style="{StaticResource SectionLabelStyle}" Margin="2,2,0,-3" />
+                            <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" HorizontalScrollMode="Enabled" VerticalScrollMode="Disabled">
+                                <Border Style="{StaticResource CardStyle}" Padding="10">
+                                    <StackPanel x:Name="ForecastRow" Orientation="Horizontal" Spacing="8" />
+                                </Border>
+                            </ScrollViewer>
+
+                            <Grid Margin="2,2,2,0">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="&#xE706;" FontSize="12" Foreground="{ThemeResource SecondaryTextBrush}" />
+                                    <TextBlock x:Name="Sunrise" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="7" HorizontalAlignment="Right">
+                                    <FontIcon Glyph="&#xE708;" FontSize="12" Foreground="{ThemeResource SecondaryTextBrush}" />
+                                    <TextBlock x:Name="Sunset" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock x:Name="WeatherUpdated" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" Margin="2,2,0,0" />
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

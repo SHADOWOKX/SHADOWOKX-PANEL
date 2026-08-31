@@ -1,0 +1,44 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShadowokxPanel.Core", "src\ShadowokxPanel.Core\ShadowokxPanel.Core.csproj", "{5D745067-894F-4E63-89AD-46C8798B5597}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShadowokxPanel", "src\ShadowokxPanel\ShadowokxPanel.csproj", "{41FD99DD-C994-4571-ACD5-E91BC2197463}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShadowokxPanel.Core.Tests", "tests\ShadowokxPanel.Core.Tests\ShadowokxPanel.Core.Tests.csproj", "{140757ED-8029-4219-AFE4-9262F9FE143C}"
+EndProject
+Global
+  GlobalSection(SolutionConfigurationPlatforms) = preSolution
+    Debug|Any CPU = Debug|Any CPU
+    Release|Any CPU = Release|Any CPU
+    Release|x64 = Release|x64
+    Release|arm64 = Release|arm64
+  EndGlobalSection
+  GlobalSection(ProjectConfigurationPlatforms) = postSolution
+    {5D745067-894F-4E63-89AD-46C8798B5597}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+    {5D745067-894F-4E63-89AD-46C8798B5597}.Debug|Any CPU.Build.0 = Debug|Any CPU
+    {5D745067-894F-4E63-89AD-46C8798B5597}.Release|Any CPU.ActiveCfg = Release|Any CPU
+    {5D745067-894F-4E63-89AD-46C8798B5597}.Release|Any CPU.Build.0 = Release|Any CPU
+    {5D745067-894F-4E63-89AD-46C8798B5597}.Release|x64.ActiveCfg = Release|Any CPU
+    {5D745067-894F-4E63-89AD-46C8798B5597}.Release|x64.Build.0 = Release|Any CPU
+    {5D745067-894F-4E63-89AD-46C8798B5597}.Release|arm64.ActiveCfg = Release|Any CPU
+    {5D745067-894F-4E63-89AD-46C8798B5597}.Release|arm64.Build.0 = Release|Any CPU
+    {41FD99DD-C994-4571-ACD5-E91BC2197463}.Debug|Any CPU.ActiveCfg = Debug|x64
+    {41FD99DD-C994-4571-ACD5-E91BC2197463}.Debug|Any CPU.Build.0 = Debug|x64
+    {41FD99DD-C994-4571-ACD5-E91BC2197463}.Release|Any CPU.ActiveCfg = Release|x64
+    {41FD99DD-C994-4571-ACD5-E91BC2197463}.Release|Any CPU.Build.0 = Release|x64
+    {41FD99DD-C994-4571-ACD5-E91BC2197463}.Release|x64.ActiveCfg = Release|x64
+    {41FD99DD-C994-4571-ACD5-E91BC2197463}.Release|x64.Build.0 = Release|x64
+    {41FD99DD-C994-4571-ACD5-E91BC2197463}.Release|arm64.ActiveCfg = Release|arm64
+    {41FD99DD-C994-4571-ACD5-E91BC2197463}.Release|arm64.Build.0 = Release|arm64
+    {140757ED-8029-4219-AFE4-9262F9FE143C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+    {140757ED-8029-4219-AFE4-9262F9FE143C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+    {140757ED-8029-4219-AFE4-9262F9FE143C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+    {140757ED-8029-4219-AFE4-9262F9FE143C}.Release|Any CPU.Build.0 = Release|Any CPU
+    {140757ED-8029-4219-AFE4-9262F9FE143C}.Release|x64.ActiveCfg = Release|Any CPU
+    {140757ED-8029-4219-AFE4-9262F9FE143C}.Release|x64.Build.0 = Release|Any CPU
+    {140757ED-8029-4219-AFE4-9262F9FE143C}.Release|arm64.ActiveCfg = Release|Any CPU
+    {140757ED-8029-4219-AFE4-9262F9FE143C}.Release|arm64.Build.0 = Release|Any CPU
+  EndGlobalSection
+EndGlobal

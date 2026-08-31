@@ -1,0 +1,78 @@
+<Window
+    x:Class="ShadowokxPanel.SettingsWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid x:Name="Root" Background="{ThemeResource AppBackgroundBrush}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="22" Padding="28">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Shadowokx Panel" FontSize="24" FontWeight="SemiBold" Foreground="{ThemeResource PrimaryTextBrush}" />
+                    <TextBlock Text="Windows settings" Foreground="{ThemeResource SecondaryTextBrush}" />
+                </StackPanel>
+
+                <StackPanel Spacing="10">
+                    <TextBlock Text="GENERAL" Style="{StaticResource SectionLabelStyle}" />
+                    <ToggleSwitch x:Name="StartWithWindowsToggle" Header="Start with Windows" Toggled="SettingChanged" />
+                    <ToggleSwitch x:Name="ShowWeatherToggle" Header="Show Weather" Toggled="SettingChanged" />
+                    <ToggleSwitch x:Name="CodexStateToggle" Header="Show Codex usage state" Toggled="SettingChanged" />
+                    <ToggleSwitch x:Name="WeatherTooltipToggle" Header="Weather in tray tooltip" Toggled="SettingChanged" />
+                    <ToggleSwitch x:Name="TrayStateToggle" Header="Adapt tray icon to usage state" Toggled="SettingChanged" />
+                    <ToggleSwitch x:Name="RefreshOnOpenToggle" Header="Refresh stale data when opened" Toggled="SettingChanged" />
+                </StackPanel>
+
+                <StackPanel Spacing="10">
+                    <TextBlock Text="APPEARANCE" Style="{StaticResource SectionLabelStyle}" />
+                    <ComboBox x:Name="ThemeCombo" Header="Theme" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged">
+                        <x:String>Follow Windows</x:String><x:String>Shadow</x:String><x:String>Midnight</x:String>
+                        <x:String>Graphite</x:String><x:String>Nord</x:String><x:String>AMOLED</x:String><x:String>Light</x:String>
+                    </ComboBox>
+                    <ComboBox x:Name="AccentCombo" Header="Accent" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged">
+                        <x:String>Rose</x:String><x:String>Orange</x:String><x:String>Emerald</x:String><x:String>Cyan</x:String>
+                        <x:String>Blue</x:String><x:String>Violet</x:String><x:String>Amber</x:String><x:String>Monochrome</x:String><x:String>Custom</x:String>
+                    </ComboBox>
+                    <TextBox x:Name="CustomAccentBox" Header="Custom accent" PlaceholderText="#f43f5e" MaxLength="7" LostFocus="SettingChanged" />
+                    <ComboBox x:Name="DensityCombo" Header="Layout density" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged">
+                        <x:String>Compact</x:String><x:String>Comfortable</x:String>
+                    </ComboBox>
+                    <ToggleSwitch x:Name="AnimationsToggle" Header="Subtle animations" Toggled="SettingChanged" />
+                </StackPanel>
+
+                <StackPanel Spacing="10">
+                    <TextBlock Text="CODEX" Style="{StaticResource SectionLabelStyle}" />
+                    <ToggleSwitch x:Name="LifetimeToggle" Header="Show lifetime tokens" Toggled="SettingChanged" />
+                    <ToggleSwitch x:Name="HistoryToggle" Header="Show token history" Toggled="SettingChanged" />
+                    <ToggleSwitch x:Name="UsageStateToggle" Header="Show usage state" Toggled="SettingChanged" />
+                </StackPanel>
+
+                <StackPanel Spacing="10">
+                    <TextBlock Text="WEATHER" Style="{StaticResource SectionLabelStyle}" />
+                    <TextBox x:Name="LocationBox" Header="Location" MaxLength="120" LostFocus="SettingChanged" />
+                    <ComboBox x:Name="TemperatureCombo" Header="Temperature unit" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged">
+                        <x:String>Celsius</x:String><x:String>Fahrenheit</x:String>
+                    </ComboBox>
+                    <ComboBox x:Name="WindCombo" Header="Wind unit" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged">
+                        <x:String>km/h</x:String><x:String>mph</x:String>
+                    </ComboBox>
+                    <ToggleSwitch x:Name="UvToggle" Header="UV Index" Toggled="SettingChanged" />
+                    <ToggleSwitch x:Name="PrecipitationToggle" Header="Hourly precipitation" Toggled="SettingChanged" />
+                </StackPanel>
+
+                <StackPanel Spacing="10">
+                    <TextBlock Text="REFRESH" Style="{StaticResource SectionLabelStyle}" />
+                    <NumberBox x:Name="CodexInterval" Header="Codex refresh interval (minutes)" Minimum="5" Maximum="120" SpinButtonPlacementMode="Inline" ValueChanged="NumberChanged" />
+                    <NumberBox x:Name="WeatherInterval" Header="Weather refresh interval (minutes)" Minimum="15" Maximum="180" SpinButtonPlacementMode="Inline" ValueChanged="NumberChanged" />
+                </StackPanel>
+
+                <StackPanel Spacing="10">
+                    <TextBlock Text="ADVANCED" Style="{StaticResource SectionLabelStyle}" />
+                    <ToggleSwitch x:Name="DebugToggle" Header="Redacted debug logging" Toggled="SettingChanged" />
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Content="Clear local history" Click="ClearHistory_Click" />
+                        <Button Content="Reset appearance" Click="ResetAppearance_Click" />
+                    </StackPanel>
+                    <TextBlock Text="Settings and history stay in your Windows user profile. Authentication credentials are never copied." TextWrapping="Wrap" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>
