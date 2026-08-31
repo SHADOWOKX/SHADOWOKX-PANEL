@@ -35,6 +35,8 @@ print(JSON.stringify({
     todayTokens: state.tokenUsage?.todayTokens ?? null,
     lifetimeTokens: state.tokenUsage?.lifetimeTokens ?? null,
     peakDay: state.tokenUsage?.peakDate ?? null,
+    sevenDayTokens: state.tokenUsage?.sevenDayTokens ?? null,
+    dailyHistoryPoints: state.tokenUsage?.dailyBuckets?.length ?? 0,
     peakHourAvailable: Boolean(state.tokenUsage?.peakHour),
     resetCreditsAvailable: state.resetCreditsAvailable ?? 0,
     clientVersion: state.clientVersion ?? null,

@@ -136,6 +136,11 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
             {value: 'comfortable', label: 'Comfortable'},
             {value: 'compact', label: 'Compact'},
         ]));
+        interfaceGroup.add(comboRow(settings, 'panel-width', 'Panel width', [
+            {value: 'narrow', label: 'Narrow'},
+            {value: 'standard', label: 'Standard'},
+            {value: 'wide', label: 'Wide'},
+        ], 'Use Wide for long place names and more forecast space.'));
         interfaceGroup.add(switchRow(
             settings,
             'animations',
@@ -181,6 +186,20 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
             'Minutes between local app-server requests.'
         ));
         page.add(content);
+
+        const activity = new Adw.PreferencesGroup({
+            title: 'Token activity',
+            description: 'Only locally reported Codex usage is displayed.',
+        });
+        activity.add(switchRow(settings, 'show-codex-token-lifetime', 'Lifetime total'));
+        activity.add(switchRow(settings, 'show-codex-token-stats', 'Daily statistics and chart'));
+        activity.add(switchRow(
+            settings,
+            'show-codex-insights',
+            'Data-backed insights',
+            'Insights are hidden automatically when daily history is insufficient.'
+        ));
+        page.add(activity);
 
         const executable = GLib.find_program_in_path('codex') ||
             (GLib.file_test('/usr/lib/chatgpt/resources/codex', GLib.FileTest.IS_EXECUTABLE)
@@ -237,6 +256,10 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
             {value: 'celsius', label: 'Celsius'},
             {value: 'fahrenheit', label: 'Fahrenheit'},
         ]));
+        provider.add(comboRow(settings, 'weather-wind-unit', 'Wind unit', [
+            {value: 'kmh', label: 'Kilometres per hour'},
+            {value: 'mph', label: 'Miles per hour'},
+        ]));
         provider.add(spinRow(
             settings,
             'weather-refresh-minutes',
@@ -250,7 +273,7 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
 
         const details = new Adw.PreferencesGroup({
             title: 'Details',
-            description: 'The page shows at most four secondary metrics to preserve its compact layout.',
+            description: 'Unavailable values are hidden automatically.',
         });
         details.add(switchRow(settings, 'show-weather-feels-like', 'Feels like'));
         details.add(switchRow(settings, 'show-weather-humidity', 'Humidity'));
@@ -258,6 +281,12 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
         details.add(switchRow(settings, 'show-weather-rain', 'Rain probability'));
         details.add(switchRow(settings, 'show-weather-uv', 'UV index'));
         details.add(switchRow(settings, 'show-weather-sun-times', 'Sunrise and sunset'));
+        details.add(switchRow(
+            settings,
+            'show-weather-insights',
+            'Forecast insight',
+            'Uses only the returned hourly precipitation forecast.'
+        ));
         page.add(details);
         return page;
     }

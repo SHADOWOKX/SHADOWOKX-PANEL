@@ -11,9 +11,8 @@ export class TabStrip {
         this._buttons = new Map();
         this._activeId = null;
         this.actor = new St.BoxLayout({
-            style_class: 'shadow-tab-strip',
+            style_class: 'shadow-tab-strip shadow-segmented-control',
             x_expand: true,
-            x_align: Clutter.ActorAlign.CENTER,
         });
 
         for (const id of moduleIds) {
@@ -28,17 +27,20 @@ export class TabStrip {
                 style_class: 'shadow-tab-label',
                 y_align: Clutter.ActorAlign.CENTER,
             });
-            label.hide();
             content.add_child(icon);
             content.add_child(label);
             const button = new St.Button({
-                child: content,
-                style_class: 'shadow-tab',
+                child: new St.Bin({
+                    child: content,
+                    x_align: Clutter.ActorAlign.CENTER,
+                }),
+                style_class: 'shadow-tab shadow-segment',
                 can_focus: true,
                 reactive: true,
                 track_hover: true,
                 toggle_mode: true,
                 accessible_name: meta.name,
+                x_expand: true,
             });
             button.connect('clicked', () => {
                 this._onSelected(id);
@@ -54,11 +56,9 @@ export class TabStrip {
     setActive(id) {
         if (!this._buttons.has(id))
             return;
-        const hadActive = this._activeId !== null;
         this._activeId = id;
-        const animate = hadActive && this._settings.get_boolean('animations');
         const accent = resolveAccent(this._settings);
-        const tint = accentRgba(this._settings, 0.14);
+        const tint = accentRgba(this._settings, 0.16);
 
         for (const [buttonId, {button, icon, label}] of this._buttons) {
             const active = buttonId === id;
@@ -68,45 +68,14 @@ export class TabStrip {
                 : MODULE_META[buttonId].name;
             button.remove_style_class_name('shadow-tab-active');
             button.style = null;
-            label.remove_all_transitions();
             if (active) {
                 button.add_style_class_name('shadow-tab-active');
                 button.style = `background-color: ${tint};`;
                 icon.style = `color: ${accent};`;
-                label.show();
-                if (animate) {
-                    const [, naturalWidth] = label.get_preferred_width(-1);
-                    label.opacity = 0;
-                    label.width = 0;
-                    label.ease({
-                        opacity: 255,
-                        width: naturalWidth,
-                        duration: 140,
-                        mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                        onComplete: () => { label.width = -1; },
-                    });
-                } else {
-                    label.opacity = 255;
-                    label.width = -1;
-                }
-            } else if (label.visible && animate) {
-                icon.style = null;
-                label.ease({
-                    opacity: 0,
-                    width: 0,
-                    duration: 110,
-                    mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                    onComplete: () => {
-                        label.hide();
-                        label.width = -1;
-                    },
-                });
             } else {
                 icon.style = null;
-                label.hide();
-                label.opacity = 255;
-                label.width = -1;
             }
+            label.style = active ? `color: ${accent};` : null;
         }
     }
 

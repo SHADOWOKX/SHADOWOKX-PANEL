@@ -12,7 +12,14 @@ import {ACCENTS, MODULE_IDS, MODULE_META} from '../lib/constants.js';
 import {chooseInitialModule} from '../lib/moduleConfig.js';
 import {codexRemainingSummary, weatherSummaryTemperature} from '../lib/summary.js';
 import {PAGE_FACTORIES} from '../modules/index.js';
-import {iconButton, moduleIcon, pageTitle, stateMessage, textButton} from './components.js';
+import {
+    animationsEnabled,
+    iconButton,
+    moduleIcon,
+    pageTitle,
+    stateMessage,
+    textButton,
+} from './components.js';
 import {TabStrip} from './tabs.js';
 
 function effectiveTheme(settings) {
@@ -108,13 +115,15 @@ class ShadowIndicator extends PanelMenu.Button {
     _buildDashboard() {
         const density = this._settings.get_string('density');
         const background = this._settings.get_string('background-theme');
+        const panelWidth = this._settings.get_string('panel-width');
         const accentName = this._settings.get_string('accent-color');
         const accentClass = Object.hasOwn(ACCENTS, accentName) ? accentName : 'custom';
         this._root = new St.BoxLayout({
             vertical: true,
             style_class: `shadow-dashboard shadow-${density} ` +
                 `shadow-theme-${effectiveTheme(this._settings)} ` +
-                `shadow-bg-${background} shadow-accent-${accentClass}`,
+                `shadow-bg-${background} shadow-accent-${accentClass} ` +
+                `shadow-width-${panelWidth}`,
         });
 
         const header = new St.BoxLayout({style_class: 'shadow-header', x_expand: true});
@@ -143,8 +152,7 @@ class ShadowIndicator extends PanelMenu.Button {
             style_class: 'shadow-page-stack',
             layout_manager: new Clutter.BinLayout(),
             x_expand: true,
-            y_expand: true,
-            height: density === 'compact' ? 372 : 430,
+            width: {narrow: 350, standard: 386, wide: 420}[panelWidth] ?? 386,
         });
         this._root.add_child(this._pageStack);
 
@@ -186,12 +194,14 @@ class ShadowIndicator extends PanelMenu.Button {
         for (const id of MODULE_IDS) {
             try {
                 const page = PAGE_FACTORIES[id](context);
+                page.actor.width = this._pageStack.width;
                 page.actor.hide();
                 this._pageStack.add_child(page.actor);
                 this._pages.set(id, page);
             } catch (error) {
                 this._logger.warn(`Could not create ${id} page`, error);
                 const page = this._moduleErrorPage(id);
+                page.actor.width = this._pageStack.width;
                 page.actor.hide();
                 this._pageStack.add_child(page.actor);
                 this._pages.set(id, page);
@@ -213,6 +223,7 @@ class ShadowIndicator extends PanelMenu.Button {
             vertical: true,
             style_class: `shadow-page shadow-page-${id}`,
             x_expand: true,
+            x_align: Clutter.ActorAlign.FILL,
             y_expand: true,
         });
         actor.add_child(pageTitle(MODULE_META[id].name));
@@ -240,7 +251,7 @@ class ShadowIndicator extends PanelMenu.Button {
             return;
         const previousId = this._activeId;
         const animate = Boolean(previousId && previousId !== id &&
-            this._settings.get_boolean('animations'));
+            animationsEnabled(this._settings));
         this._activeId = id;
         if (this._popupOpen && previousId && previousId !== id)
             this._pages.get(previousId)?.onPopupClosed();

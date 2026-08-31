@@ -11,9 +11,12 @@
 }
 
 .shadow-dashboard.shadow-compact {
-  width: 350px;
   padding: 12px 13px 13px;
 }
+
+.shadow-dashboard.shadow-width-narrow { width: 350px; }
+.shadow-dashboard.shadow-width-standard { width: 386px; }
+.shadow-dashboard.shadow-width-wide { width: 420px; }
 
 /* Background tokens */
 .shadow-theme-dark {
@@ -164,35 +167,43 @@
 
 .shadow-icon-button:hover,
 .shadow-text-button:hover,
-.shadow-tab:hover {
+.shadow-segment:hover {
   background-color: rgba(128, 128, 128, 0.14);
 }
 
 .shadow-icon-button:active,
 .shadow-text-button:active,
-.shadow-tab:active {
+.shadow-segment:active {
   background-color: rgba(128, 128, 128, 0.22);
 }
 
 .shadow-icon-button:focus,
 .shadow-text-button:focus,
-.shadow-tab:focus {
+.shadow-segment:focus {
   box-shadow: 0 0 0 2px rgba(125, 130, 140, 0.58);
 }
 
-/* Two-page tab bar — deliberately no ScrollView or separator. */
+/* Two-page segmented control — deliberately no ScrollView or separator. */
 .shadow-tab-strip {
-  min-height: 36px;
+  min-height: 38px;
   margin-bottom: 12px;
-  spacing: 11px;
+  padding: 3px;
+  spacing: 3px;
+  border-radius: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  background-color: rgba(128, 128, 128, 0.07);
+}
+
+.shadow-theme-light .shadow-tab-strip {
+  border-color: rgba(0, 0, 0, 0.065);
+  background-color: rgba(0, 0, 0, 0.045);
 }
 
 .shadow-tab {
-  min-width: 34px;
   min-height: 32px;
-  padding: 5px 9px;
-  border-radius: 10px;
-  transition-duration: 140ms;
+  padding: 5px 10px;
+  border-radius: 8px;
+  transition-duration: 160ms;
 }
 
 .shadow-tab-content {
@@ -200,7 +211,7 @@
 }
 
 .shadow-tab-icon {
-  opacity: 235;
+  opacity: 245;
 }
 
 .shadow-tab-label {
@@ -209,7 +220,7 @@
 }
 
 .shadow-tab-active {
-  box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.12);
 }
 
 /* Page hierarchy */
@@ -240,8 +251,7 @@
 
 .shadow-codex-scroll,
 .shadow-weather-scroll {
-  min-height: 255px;
-  max-height: 354px;
+  max-height: 390px;
   padding-right: 2px;
 }
 
@@ -261,6 +271,30 @@
   padding: 16px 12px;
   text-align: center;
 }
+
+/* Reusable compact status */
+.shadow-status-pill {
+  min-height: 19px;
+  padding: 2px 7px;
+  spacing: 5px;
+  border-radius: 999px;
+  background-color: rgba(128, 128, 128, 0.10);
+}
+
+.shadow-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background-color: #919591;
+}
+
+.shadow-status-label {
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.shadow-status-warning .shadow-status-dot { background-color: #f59e0b; }
+.shadow-status-danger .shadow-status-dot { background-color: #ef4444; }
 
 /* Loading and first-run errors */
 .shadow-state {
@@ -291,21 +325,12 @@
 
 /* Codex */
 .shadow-weekly-hero {
-  min-height: 174px;
   padding: 15px;
   spacing: 7px;
 }
 
 .shadow-usage-heading {
   min-height: 22px;
-}
-
-.shadow-usage-state {
-  padding: 3px 8px;
-  border-radius: 999px;
-  background-color: rgba(128, 128, 128, 0.10);
-  font-size: 10px;
-  font-weight: 650;
 }
 
 .shadow-weekly-value-row {
@@ -362,7 +387,6 @@
 }
 
 .shadow-five-hour-section {
-  min-height: 50px;
   padding: 9px 11px;
   spacing: 10px;
 }
@@ -389,14 +413,12 @@
   spacing: 9px;
 }
 
-.shadow-token-primary-row {
-  min-height: 48px;
-  spacing: 18px;
+.shadow-token-heading {
+  min-height: 20px;
 }
 
 .shadow-token-row {
-  padding-top: 2px;
-  spacing: 18px;
+  spacing: 12px;
 }
 
 .shadow-token-note {
@@ -405,7 +427,7 @@
 }
 
 .shadow-token-metric {
-  min-width: 120px;
+  min-width: 80px;
 }
 
 .shadow-token-label {
@@ -418,15 +440,56 @@
 }
 
 .shadow-token-primary-value {
-  font-size: 22px;
+  font-size: 28px;
   font-weight: 740;
   font-feature-settings: "tnum";
 }
 
 .shadow-token-value {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 650;
   font-feature-settings: "tnum";
+}
+
+.shadow-token-primary {
+  padding: 1px 0 2px;
+}
+
+.shadow-token-sparkline {
+  height: 55px;
+  padding: 5px 3px 0;
+  spacing: 5px;
+  border-radius: 9px;
+  background-color: rgba(128, 128, 128, 0.045);
+}
+
+.shadow-spark-column {
+  spacing: 3px;
+  text-align: center;
+}
+
+.shadow-spark-bar-slot {
+  height: 34px;
+}
+
+.shadow-spark-bar {
+  min-width: 8px;
+  border-radius: 4px 4px 2px 2px;
+  opacity: 215;
+}
+
+.shadow-spark-label {
+  color: #9ea19e;
+  font-size: 9px;
+}
+
+.shadow-theme-light .shadow-spark-label {
+  color: #707570;
+}
+
+.shadow-token-insight {
+  padding-top: 2px;
+  font-size: 10px;
 }
 
 .shadow-metadata-label,
@@ -443,9 +506,12 @@
 
 /* Weather */
 .shadow-weather-hero {
-  min-height: 132px;
   padding: 14px;
   spacing: 10px;
+}
+
+.shadow-weather-primary {
+  spacing: 12px;
 }
 
 .shadow-weather-temperature {
@@ -500,13 +566,11 @@
 }
 
 .shadow-hourly-row {
-  min-height: 74px;
   padding: 7px 6px;
-  spacing: 4px;
+  spacing: 3px;
 }
 
 .shadow-hourly-item {
-  min-width: 66px;
   padding: 4px 3px;
   spacing: 3px;
   border-radius: 8px;
@@ -525,6 +589,30 @@
   font-size: 12px;
   font-weight: 680;
   font-feature-settings: "tnum";
+}
+
+.shadow-hourly-precipitation {
+  color: #9aa7bb;
+  font-size: 9px;
+  font-weight: 620;
+}
+
+.shadow-hourly-frame {
+  padding: 0;
+}
+
+.shadow-hourly-scroll {
+  max-height: 101px;
+}
+
+.shadow-weather-insight {
+  padding: 8px 10px;
+  spacing: 8px;
+}
+
+.shadow-weather-insight-text {
+  font-size: 10px;
+  font-weight: 560;
 }
 
 .shadow-sun-row {
@@ -553,11 +641,10 @@
 
 .shadow-compact .shadow-codex-scroll,
 .shadow-compact .shadow-weather-scroll {
-  max-height: 316px;
+  max-height: 350px;
 }
 
 .shadow-compact .shadow-weekly-hero {
-  min-height: 145px;
   padding: 11px 12px;
 }
 
@@ -566,7 +653,6 @@
 }
 
 .shadow-compact .shadow-weather-hero {
-  min-height: 112px;
   padding: 10px 11px;
 }
 
@@ -577,8 +663,4 @@
 .shadow-compact .shadow-weather-metric {
   min-width: 118px;
   padding: 4px 6px;
-}
-
-.shadow-compact .shadow-hourly-item {
-  min-width: 58px;
 }

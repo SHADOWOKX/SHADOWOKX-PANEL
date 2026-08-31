@@ -70,6 +70,15 @@
       <default>'comfortable'</default>
       <summary>Popup density</summary>
     </key>
+    <key name="panel-width" type="s">
+      <choices>
+        <choice value="narrow"/>
+        <choice value="standard"/>
+        <choice value="wide"/>
+      </choices>
+      <default>'standard'</default>
+      <summary>Dashboard width</summary>
+    </key>
     <key name="theme" type="s">
       <choices>
         <choice value="auto"/>
@@ -100,11 +109,11 @@
         <choice value="graphite"/>
         <choice value="custom"/>
       </choices>
-      <default>'purple'</default>
+      <default>'rose'</default>
       <summary>Accent color preset</summary>
     </key>
     <key name="custom-accent" type="s">
-      <default>'#8b5cf6'</default>
+      <default>'#f43f5e'</default>
       <summary>Custom accent color</summary>
     </key>
     <key name="show-codex-weekly" type="b">
@@ -118,6 +127,18 @@
     <key name="show-codex-reset-time" type="b">
       <default>true</default>
       <summary>Show reset countdowns and dates</summary>
+    </key>
+    <key name="show-codex-token-lifetime" type="b">
+      <default>true</default>
+      <summary>Show lifetime token usage</summary>
+    </key>
+    <key name="show-codex-token-stats" type="b">
+      <default>true</default>
+      <summary>Show token activity statistics and history</summary>
+    </key>
+    <key name="show-codex-insights" type="b">
+      <default>true</default>
+      <summary>Show supported Codex usage insights</summary>
     </key>
     <key name="codex-refresh-minutes" type="i">
       <range min="5" max="120"/>
@@ -135,6 +156,14 @@
       </choices>
       <default>'celsius'</default>
       <summary>Temperature unit</summary>
+    </key>
+    <key name="weather-wind-unit" type="s">
+      <choices>
+        <choice value="kmh"/>
+        <choice value="mph"/>
+      </choices>
+      <default>'kmh'</default>
+      <summary>Wind speed unit</summary>
     </key>
     <key name="weather-refresh-minutes" type="i">
       <range min="15" max="180"/>
@@ -164,6 +193,10 @@
     <key name="show-weather-sun-times" type="b">
       <default>true</default>
       <summary>Show sunrise and sunset</summary>
+    </key>
+    <key name="show-weather-insights" type="b">
+      <default>true</default>
+      <summary>Show deterministic weather insights</summary>
     </key>
   </schema>
 </schemalist>

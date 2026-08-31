@@ -2,32 +2,32 @@
 
 Shadowokx Panel is a small GNOME top-bar utility that does two things well: it shows Codex usage limits and useful local weather. It targets Ubuntu 26.04.1 LTS, GNOME Shell 50, Wayland, and modern GJS ES modules.
 
-Release `2.0.3` deliberately contains only two pages:
+Release `2.1.0` deliberately contains only two pages:
 
 1. ChatGPT Codex
 2. Weather
 
-The popup behaves like a compact GNOME application with a quiet product header, two icon-first tabs, one focused page at a time, neutral surfaces, and clear cached or recovery states.
+The popup behaves like a compact GNOME application with a quiet product header, an equal-width segmented control, one focused page at a time, neutral surfaces, and clear cached or recovery states.
 
 ## Screenshots
 
 Screenshots will be added after the first 2.0 release capture.
 
 - Top bar: `[ChatGPT] 45%   [Weather] 29°`
-- Codex selected: `[ ChatGPT Codex ]   ☀`
-- Weather selected: `ChatGPT   [ ☀ Weather ]`
+- Codex selected: `[ ● ChatGPT Codex | Weather ]`
+- Weather selected: `[ ChatGPT Codex | ● Weather ]`
 
 The Codex percentage always means **remaining capacity**, never consumed capacity.
 
 ## Features
 
 - Compact configurable top-bar fields for the ChatGPT icon, remaining percentage, weekly reset countdown, weather icon, temperature, and condition.
-- Two fixed tabs with icon-only inactive state and a subtle icon-plus-label active state. There is no scrolling tab widget or separator artifact.
-- A weekly-first Codex hero with dominant remaining capacity, remaining-progress meter, tasteful 🟢/🟡/🟠/🔴 state cues, reset countdown/date, compact five-hour state, reset credits, client version, refresh, Open Codex, and PNG Share actions.
-- Verified Codex token activity for today, lifetime total, peak day, and peak-day tokens when the signed-in app-server reports them. Peak hour is shown as unsupported because the provider exposes daily buckets, not hourly timestamps.
-- Current-weather hero with condition, location, high/low, up to four optional details, four next-hour forecasts, optional sunrise/sunset, Celsius or Fahrenheit, and location-aware times.
+- Two equal-width segmented tabs with icon and text labels, a restrained accent state, keyboard navigation, and no separator artifact.
+- A weekly-first Codex hero with dominant remaining capacity, remaining-progress meter, compact status pill, reset countdown/date, compact five-hour state, reset credits, refresh, Open Codex, and PNG Share actions.
+- Verified Codex token activity with compact lifetime totals, today/7-day/peak statistics, and a seven-day bar sparkline only when the signed-in app-server reports real daily buckets.
+- Content-driven current-weather hero with condition, ellipsized location, high/low, up to five optional details, up to 12 horizontally scrollable forecast hours, optional hourly rain, sunrise/sunset, Celsius or Fahrenheit, and location-aware times.
 - Cached Codex and Weather data remain visible during temporary failures.
-- Auto, Dark, and Light modes; Claude Gray, Graphite, GNOME, and Light Neutral backgrounds; Comfortable and Compact density; seven accent presets plus a custom accent.
+- Auto, Dark, and Light modes; Claude Gray, Graphite, GNOME, and Light Neutral backgrounds; Comfortable and Compact density; Narrow, Standard, and Wide panel widths; seven accent presets plus a custom accent.
 - Native Adwaita preferences containing only General, Appearance, Codex, Weather, and About.
 - No telemetry or analytics.
 
@@ -127,7 +127,7 @@ The configured location is sent to Open-Meteo geocoding. The resolved coordinate
 
 Requests are asynchronous, time-limited, response-size bounded, cached, and made only when stale, manually refreshed, or after a relevant setting changes. A failed refresh never discards the last successful forecast. Full Weather unavailable state is shown only when no valid result has ever been loaded.
 
-The hourly forecast is a fixed four-column actor row. It does not use a horizontal `St.ScrollView`, so no scrollbar or progress-like bar can appear beneath it. The page remains wheel/touch scrollable while its vertical scrollbar chrome is hidden.
+The hourly forecast keeps up to 12 validated hours in a bounded horizontal `St.ScrollView`; roughly four are visible at once and additional hours remain available to touchpad or horizontal-wheel scrolling. Both horizontal and vertical scrollbar chrome use `EXTERNAL` policies, so content remains scrollable without an intrusive track.
 
 ## Appearance
 
@@ -165,7 +165,7 @@ services/
   logger.js                  minimal recursive redaction
 ui/
   panel.js                   top-bar summary and page lifecycle
-  tabs.js                    fixed accessible two-page tab strip
+  tabs.js                    equal-width accessible segmented control
   components.js              shared St controls and states
 schemas/                     GSettings schema
 tests/                       pure logic, provider, share, and import tests
@@ -193,6 +193,13 @@ Run an isolated GNOME Shell enable/preferences/rebuild/disable/re-enable check:
 ./scripts/runtime-check.sh
 ```
 
+Open the real popup in an isolated Wayland Shell, switch both pages repeatedly, and validate content allocations:
+
+```bash
+./scripts/ui-smoke.sh
+SHADOW_UI_DENSITY=compact SHADOW_UI_WIDTH=narrow ./scripts/ui-smoke.sh
+```
+
 Exercise the live providers with isolated caches:
 
 ```bash
@@ -217,10 +224,11 @@ Normal operation is quiet. Debug logging is disabled by default and never includ
 ## Known limitations
 
 - Some Codex accounts or sessions report only weekly capacity. The five-hour section remains compactly unavailable and no value is invented.
-- Token activity can be unavailable for unsupported authentication modes or older Codex versions. App-server currently reports daily buckets, so peak hour remains explicitly unsupported.
+- Token activity can be unavailable for unsupported authentication modes or older Codex versions. Peak hour is not displayed because the provider exposes daily buckets, not hourly timestamps.
+- Burn rate and limit runway are not displayed because the app-server returns a current rate-limit snapshot, not enough historical snapshots to calculate them honestly.
 - The local Codex app-server schema can evolve with future Codex releases; its provider is isolated so it can be updated without changing the page.
 - Share saves PNG files and opens their folder; it does not claim binary clipboard support.
-- Weather location entry uses safe text validation rather than a network-backed search chooser.
+- Weather location entry uses safe manual text validation rather than automatic geolocation or a network-backed search chooser.
 
 ## Troubleshooting
 

@@ -122,6 +122,20 @@ function localDateKey(nowMs) {
     return `${year}-${month}-${day}`;
 }
 
+function recentUsageBuckets(buckets, nowMs) {
+    const today = localDateKey(nowMs);
+    if (!today)
+        return [];
+    const todayMs = Date.parse(`${today}T00:00:00Z`);
+    return buckets
+        .filter(bucket => {
+            const bucketMs = Date.parse(`${bucket.date}T00:00:00Z`);
+            const ageDays = Math.round((todayMs - bucketMs) / 86_400_000);
+            return ageDays >= 0 && ageDays < 7;
+        })
+        .sort((left, right) => left.date.localeCompare(right.date));
+}
+
 export function normalizeAccountTokenUsage(response, nowMs = Date.now()) {
     if (!response || typeof response !== 'object')
         return null;
@@ -133,6 +147,7 @@ export function normalizeAccountTokenUsage(response, nowMs = Date.now()) {
             }))
             .filter(bucket => bucket.date && bucket.tokens !== null)
         : [];
+    buckets.sort((left, right) => left.date.localeCompare(right.date));
     const peakBucket = buckets.reduce((peak, bucket) =>
         !peak || bucket.tokens > peak.tokens ? bucket : peak, null);
     const reportedPeak = normalizeTokenCount(response.summary?.peakDailyTokens);
@@ -142,6 +157,7 @@ export function normalizeAccountTokenUsage(response, nowMs = Date.now()) {
     const lifetimeTokens = normalizeTokenCount(response.summary?.lifetimeTokens);
     if (lifetimeTokens === null && todayTokens === null && peakDailyTokens === null)
         return null;
+    const dailyBuckets = recentUsageBuckets(buckets, nowMs);
     return {
         lifetimeTokens,
         todayTokens,
@@ -149,12 +165,23 @@ export function normalizeAccountTokenUsage(response, nowMs = Date.now()) {
         peakDate,
         peakHour: null,
         granularity: 'daily',
+        dailyBuckets,
+        sevenDayTokens: dailyBuckets.length
+            ? dailyBuckets.reduce((total, bucket) => total + bucket.tokens, 0)
+            : null,
     };
 }
 
 function normalizeCachedTokenUsage(value) {
     if (!value || typeof value !== 'object')
         return null;
+    const dailyBuckets = Array.isArray(value.dailyBuckets)
+        ? value.dailyBuckets.slice(0, 7).map(bucket => ({
+            date: normalizeUsageDate(bucket?.date),
+            tokens: normalizeTokenCount(bucket?.tokens),
+        })).filter(bucket => bucket.date && bucket.tokens !== null)
+            .sort((left, right) => left.date.localeCompare(right.date))
+        : [];
     const tokenUsage = {
         lifetimeTokens: normalizeTokenCount(value.lifetimeTokens),
         todayTokens: normalizeTokenCount(value.todayTokens),
@@ -162,6 +189,10 @@ function normalizeCachedTokenUsage(value) {
         peakDate: normalizeUsageDate(value.peakDate),
         peakHour: null,
         granularity: 'daily',
+        dailyBuckets,
+        sevenDayTokens: dailyBuckets.length
+            ? dailyBuckets.reduce((total, bucket) => total + bucket.tokens, 0)
+            : normalizeTokenCount(value.sevenDayTokens),
     };
     return tokenUsage.lifetimeTokens !== null || tokenUsage.todayTokens !== null ||
         tokenUsage.peakDailyTokens !== null

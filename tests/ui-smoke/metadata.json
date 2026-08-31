@@ -1,0 +1,7 @@
+{
+  "name": "Shadowokx Panel UI Smoke Helper",
+  "description": "Package-excluded actor allocation helper for automated tests.",
+  "uuid": "shadow-panel-ui-smoke@shadowokx",
+  "shell-version": ["50"],
+  "version": 1
+}

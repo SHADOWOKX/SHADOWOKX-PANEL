@@ -3,12 +3,14 @@ import Pango from 'gi://Pango';
 import St from 'gi://St';
 
 import {
+    horizontalScrollContainer,
     iconButton,
     pageTitle,
     resolveAccent,
     scrollContainer,
     sectionTitle,
     stateMessage,
+    statusPill,
     textButton,
 } from '../../ui/components.js';
 import {BasePage} from '../basePage.js';
@@ -35,12 +37,7 @@ export class WeatherPage extends BasePage {
             return;
         const state = this._provider.getState();
         this.replaceContent(page => {
-            page.add_child(pageTitle('Weather', iconButton(
-                'view-refresh-symbolic',
-                'Refresh weather',
-                () => this._provider.refresh(true),
-                'shadow-icon-button shadow-action-icon-button'
-            )));
+            page.add_child(pageTitle('Weather', this._actions(state)));
 
             if (state.status === 'loading' && !state.lastSuccessfulRefresh) {
                 page.add_child(stateMessage(
@@ -60,6 +57,16 @@ export class WeatherPage extends BasePage {
                 return;
             }
 
+            if (!state.current || !state.today) {
+                page.add_child(stateMessage(
+                    'weather-severe-alert-symbolic',
+                    'Weather data incomplete',
+                    'The last forecast could not be displayed safely.',
+                    textButton('Retry', () => this._provider.refresh(true))
+                ));
+                return;
+            }
+
             const unit = '°';
             const content = new St.BoxLayout({
                 vertical: true,
@@ -68,11 +75,15 @@ export class WeatherPage extends BasePage {
             });
             content.add_child(this._hero(state, unit));
 
-            const metrics = this._selectedMetrics(state, unit).slice(0, 4);
+            const metrics = this._selectedMetrics(state, unit).slice(0, 5);
             if (metrics.length)
                 content.add_child(this._metricGrid(metrics));
 
             content.add_child(this._hourlyForecast(state));
+
+            const insight = this._weatherInsight(state);
+            if (insight)
+                content.add_child(insight);
 
             if (this.context.settings.get_boolean('show-weather-sun-times') &&
                 (state.today.sunrise || state.today.sunset)) {
@@ -84,13 +95,30 @@ export class WeatherPage extends BasePage {
         });
     }
 
+    _actions(state) {
+        const actions = new St.BoxLayout({style_class: 'shadow-title-actions'});
+        if (state.status === 'stale' || state.status === 'cached')
+            actions.add_child(statusPill(this.context.settings, 'Cached', 'neutral'));
+        const refreshing = state.status === 'refreshing' || state.status === 'loading';
+        const refresh = iconButton(
+            refreshing ? 'process-working-symbolic' : 'view-refresh-symbolic',
+            refreshing ? 'Refreshing weather' : 'Refresh weather',
+            () => this._provider.refresh(true),
+            'shadow-icon-button shadow-action-icon-button'
+        );
+        refresh.reactive = !refreshing;
+        refresh.can_focus = !refreshing;
+        actions.add_child(refresh);
+        return actions;
+    }
+
     _hero(state, unit) {
         const hero = new St.BoxLayout({
             vertical: true,
             style_class: 'shadow-card shadow-weather-hero',
             x_expand: true,
         });
-        const primary = new St.BoxLayout({x_expand: true});
+        const primary = new St.BoxLayout({style_class: 'shadow-weather-primary', x_expand: true});
         const temperature = new St.BoxLayout({vertical: true, x_expand: true});
         temperature.add_child(new St.Label({
             text: `${Math.round(state.current.temperature)}${unit}`,
@@ -117,7 +145,10 @@ export class WeatherPage extends BasePage {
         }));
         hero.add_child(primary);
 
-        const locationRow = new St.BoxLayout({style_class: 'shadow-weather-location-row'});
+        const locationRow = new St.BoxLayout({
+            style_class: 'shadow-weather-location-row',
+            x_expand: true,
+        });
         const location = new St.Label({
             text: state.location,
             style_class: 'shadow-weather-location',
@@ -136,10 +167,12 @@ export class WeatherPage extends BasePage {
     }
 
     _selectedMetrics(state, unit) {
+        const windUnit = this.context.settings.get_string('weather-wind-unit');
+        const wind = windUnit === 'mph' ? state.current.wind * 0.621371 : state.current.wind;
         const candidates = [
             ['show-weather-feels-like', 'Feels like', `${Math.round(state.current.feelsLike)}${unit}`],
             ['show-weather-humidity', 'Humidity', `${Math.round(state.current.humidity)}%`],
-            ['show-weather-wind', 'Wind', `${Math.round(state.current.wind)} km/h`],
+            ['show-weather-wind', 'Wind', `${Math.round(wind)} ${windUnit === 'mph' ? 'mph' : 'km/h'}`],
             ['show-weather-rain', 'Rain', Number.isFinite(state.current.rainProbability)
                 ? `${Math.round(state.current.rainProbability)}%`
                 : null],
@@ -191,15 +224,15 @@ export class WeatherPage extends BasePage {
             }));
             return section;
         }
-        const row = new St.BoxLayout({
-            style_class: 'shadow-secondary-surface shadow-hourly-row',
-            x_expand: true,
-        });
-        for (const hour of state.forecast.slice(0, 4)) {
+        const row = new St.BoxLayout({style_class: 'shadow-hourly-row'});
+        const itemWidth = this.context.settings.get_string('density') === 'compact' ? 78 : 88;
+        for (const hour of state.forecast) {
             const item = new St.BoxLayout({
                 vertical: true,
                 style_class: 'shadow-hourly-item',
-                x_expand: true,
+                width: itemWidth,
+                accessible_name: `${this._formatHour(hour.time, state.timezone)}, ` +
+                    `${Math.round(hour.temperature)} degrees`,
             });
             item.add_child(new St.Label({
                 text: this._formatHour(hour.time, state.timezone),
@@ -214,10 +247,56 @@ export class WeatherPage extends BasePage {
                 text: `${Math.round(hour.temperature)}°`,
                 style_class: 'shadow-hourly-temperature',
             }));
+            if (this.context.settings.get_boolean('show-weather-rain') &&
+                Number.isFinite(hour.precipitationChance)) {
+                item.add_child(new St.Label({
+                    text: `${Math.round(hour.precipitationChance)}%`,
+                    style_class: 'shadow-hourly-precipitation',
+                }));
+            }
             row.add_child(item);
         }
-        section.add_child(row);
+        const scroll = horizontalScrollContainer(row, 'shadow-hourly-scroll');
+        section.add_child(new St.Bin({
+            style_class: 'shadow-secondary-surface shadow-hourly-frame',
+            width: this._hourlyViewportWidth(),
+            child: scroll,
+        }));
         return section;
+    }
+
+    _hourlyViewportWidth() {
+        const widths = {narrow: 346, standard: 382, wide: 416};
+        const configured = this.context.settings.get_string('panel-width');
+        return widths[configured] ?? widths.standard;
+    }
+
+    _weatherInsight(state) {
+        if (!this.context.settings.get_boolean('show-weather-insights'))
+            return null;
+        const upcoming = state.forecast.slice(0, 6)
+            .filter(hour => Number.isFinite(hour.precipitationChance));
+        if (upcoming.length < 3)
+            return null;
+        const wettest = upcoming.reduce((peak, hour) =>
+            hour.precipitationChance > peak.precipitationChance ? hour : peak);
+        const message = wettest.precipitationChance <= 20
+            ? 'Low rain chance over the next several hours.'
+            : `Rain chance peaks at ${Math.round(wettest.precipitationChance)}% around ` +
+                `${this._formatHour(wettest.time, state.timezone)}.`;
+        const row = new St.BoxLayout({
+            style_class: 'shadow-weather-insight shadow-secondary-surface',
+            x_expand: true,
+        });
+        row.add_child(new St.Icon({
+            icon_name: wettest.precipitationChance <= 20
+                ? 'weather-clear-symbolic'
+                : 'weather-showers-scattered-symbolic',
+            icon_size: 15,
+            style: `color: ${resolveAccent(this.context.settings)};`,
+        }));
+        row.add_child(new St.Label({text: message, style_class: 'shadow-weather-insight-text'}));
+        return row;
     }
 
     _sunTimes(state) {

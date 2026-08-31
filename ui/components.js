@@ -11,9 +11,9 @@ export function resolveAccent(settings) {
     const preset = settings.get_string('accent-color');
     if (preset === 'custom') {
         const custom = settings.get_string('custom-accent');
-        return isHexColor(custom) ? custom : ACCENTS.purple;
+        return isHexColor(custom) ? custom : ACCENTS.rose;
     }
-    return ACCENTS[preset] ?? ACCENTS.purple;
+    return ACCENTS[preset] ?? ACCENTS.rose;
 }
 
 export function accentRgba(settings, alpha) {
@@ -22,6 +22,10 @@ export function accentRgba(settings, alpha) {
     const green = Number.parseInt(accent.slice(3, 5), 16);
     const blue = Number.parseInt(accent.slice(5, 7), 16);
     return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+export function animationsEnabled(settings) {
+    return settings.get_boolean('animations') && St.Settings.get().enable_animations;
 }
 
 export function moduleIcon(extension, id, size = 16, styleClass = '') {
@@ -116,6 +120,24 @@ export function sectionTitle(text, styleClass = 'shadow-section-title') {
     return label;
 }
 
+export function statusPill(settings, text, tone = 'neutral') {
+    const pill = new St.BoxLayout({
+        style_class: `shadow-status-pill shadow-status-${tone}`,
+        y_align: Clutter.ActorAlign.CENTER,
+    });
+    const dot = new St.Widget({
+        style_class: 'shadow-status-dot',
+        style: tone === 'accent' ? `background-color: ${resolveAccent(settings)};` : null,
+    });
+    pill.add_child(dot);
+    pill.add_child(new St.Label({
+        text,
+        style_class: 'shadow-status-label',
+        y_align: Clutter.ActorAlign.CENTER,
+    }));
+    return pill;
+}
+
 export function stateMessage(iconName, title, detail, action = null) {
     const box = new St.BoxLayout({
         vertical: true,
@@ -179,6 +201,18 @@ export function scrollContainer(child, styleClass = 'shadow-list-scroll') {
         vscrollbar_policy: St.PolicyType.EXTERNAL,
         x_expand: true,
         y_expand: true,
+    });
+    scroll.set_child(child);
+    return scroll;
+}
+
+export function horizontalScrollContainer(child, styleClass = 'shadow-horizontal-scroll') {
+    const scroll = new St.ScrollView({
+        style_class: styleClass,
+        overlay_scrollbars: true,
+        hscrollbar_policy: St.PolicyType.EXTERNAL,
+        vscrollbar_policy: St.PolicyType.NEVER,
+        x_expand: true,
     });
     scroll.set_child(child);
     return scroll;

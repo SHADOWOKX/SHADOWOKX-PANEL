@@ -1,3 +1,4 @@
+import Clutter from 'gi://Clutter';
 import St from 'gi://St';
 
 export class BasePage {
@@ -9,7 +10,7 @@ export class BasePage {
             vertical: true,
             style_class: `shadow-page shadow-page-${id}`,
             x_expand: true,
-            y_expand: true,
+            x_align: Clutter.ActorAlign.FILL,
         });
         this._disconnectors = [];
     }

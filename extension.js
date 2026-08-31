@@ -21,6 +21,7 @@ const REBUILD_KEYS = Object.freeze([
     'default-tab',
     'animations',
     'density',
+    'panel-width',
     'theme',
     'background-theme',
     'accent-color',
@@ -28,12 +29,17 @@ const REBUILD_KEYS = Object.freeze([
     'show-codex-weekly',
     'show-codex-five-hour',
     'show-codex-reset-time',
+    'show-codex-token-lifetime',
+    'show-codex-token-stats',
+    'show-codex-insights',
     'show-weather-feels-like',
     'show-weather-humidity',
     'show-weather-wind',
+    'weather-wind-unit',
     'show-weather-rain',
     'show-weather-uv',
     'show-weather-sun-times',
+    'show-weather-insights',
 ]);
 
 export default class ShadowPanelExtension extends Extension {

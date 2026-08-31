@@ -103,7 +103,7 @@ export function weatherCacheMatchesSettings(cached, query, unit) {
         if (timestamp != null && (!Number.isFinite(timestamp) || timestamp <= 0))
             return false;
     }
-    return state.forecast.length <= 5 && state.forecast.every(hour =>
+    return state.forecast.length <= 12 && state.forecast.every(hour =>
         Number.isFinite(hour?.time) && Number.isFinite(hour?.temperature) &&
         (hour.precipitationChance === null || Number.isFinite(hour.precipitationChance)) &&
         validCondition(hour.condition));
@@ -147,7 +147,7 @@ export function normalizeWeather(payload, location, unit, nowMs = Date.now()) {
             Number.isFinite(new Date(item.time * 1000).getTime()) &&
             Number.isFinite(item.temperature) && item.temperature >= -150 &&
             item.temperature <= 150 && item.time >= currentTime)
-        .slice(0, 5);
+        .slice(0, 12);
 
     const uv = Number(daily.uv_index_max?.[0]);
     const sunrise = Number(daily.sunrise?.[0]);

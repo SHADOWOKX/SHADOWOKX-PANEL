@@ -158,6 +158,10 @@ function testCodexNormalization() {
     equal(state.tokenUsage.lifetimeTokens, 885_281_875, 'lifetime token usage is normalized');
     equal(state.tokenUsage.peakDate, '2026-08-09', 'peak token day keeps the real bucket date');
     equal(state.tokenUsage.peakHour, null, 'peak hour is not fabricated from daily buckets');
+    equal(state.tokenUsage.dailyBuckets.length, 1,
+        'only verified buckets from the current seven-day window are retained');
+    equal(state.tokenUsage.sevenDayTokens, 5_822_658,
+        'seven-day activity is derived from real daily buckets');
     equal(state.lastSuccessfulRefresh, nowMs, 'Codex refresh timestamp');
     equal(planLabel('__proto__'), 'Codex account', 'prototype names cannot become plan labels');
 
@@ -179,6 +183,8 @@ function testCodexNormalization() {
         summary: {lifetimeTokens: Number.MAX_SAFE_INTEGER + 1},
         dailyUsageBuckets: [{startDate: 'invalid', tokens: 100}],
     }), null, 'unsafe or undated token activity is rejected');
+    equal(normalizeAccountTokenUsage({summary: {lifetimeTokens: 123}}).sevenDayTokens, null,
+        'a missing daily history never becomes a fabricated zero-token week');
     const cachedUsage = normalizeCachedRateLimits({
         lastSuccessfulRefresh: Date.now(),
         weekly: {usedPercent: 10, resetsAt: 2_000_000_000},
@@ -191,6 +197,8 @@ function testCodexNormalization() {
     });
     equal(cachedUsage.tokenUsage.todayTokens, 678,
         'validated token activity survives a cached refresh');
+    equal(cachedUsage.tokenUsage.dailyBuckets.length, 0,
+        'older caches without history remain compatible');
 }
 
 function testTopBarSummaries() {
@@ -268,6 +276,39 @@ function testWeatherNormalization() {
         'Weather cache from another location is rejected');
     ok(!weatherCacheMatchesSettings(cached, 'Cairo, Egypt', 'fahrenheit'),
         'Weather cache from another unit is rejected');
+}
+
+function testExtendedWeatherForecast() {
+    const currentTime = 2_000_000_000;
+    const hours = Array.from({length: 20}, (_value, index) => currentTime + index * 3600);
+    const payload = {
+        timezone: 'Africa/Cairo',
+        current: {
+            time: currentTime,
+            temperature_2m: 29,
+            apparent_temperature: 30,
+            relative_humidity_2m: 45,
+            weather_code: 0,
+            wind_speed_10m: 10,
+        },
+        daily: {
+            temperature_2m_max: [33],
+            temperature_2m_min: [22],
+            uv_index_max: [6],
+            sunrise: [currentTime - 6 * 3600],
+            sunset: [currentTime + 6 * 3600],
+        },
+        hourly: {
+            time: hours,
+            temperature_2m: hours.map((_time, index) => 29 - index / 2),
+            weather_code: hours.map(() => 0),
+            precipitation_probability: hours.map((_time, index) => index),
+        },
+    };
+    const state = normalizeWeather(payload, 'Cairo, Egypt', 'celsius', currentTime * 1000);
+    equal(state.forecast.length, 12, 'Weather retains a bounded scrollable hourly forecast');
+    equal(state.forecast[11].precipitationChance, 11,
+        'extended hourly precipitation remains normalized');
 }
 
 async function testWeatherLocationFallback() {
@@ -514,6 +555,7 @@ testModuleConfiguration();
 testCodexNormalization();
 testTopBarSummaries();
 testWeatherNormalization();
+testExtendedWeatherForecast();
 testContentValidation();
 await testWeatherLocationFallback();
 await testCodexShareImage();
