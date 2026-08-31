@@ -36,17 +36,3 @@ It uses a system tray popup instead of the GNOME top bar.
 gnome-extensions enable shadow-panel@shadowokx
 
 
-Open settings:
-gnome-extensions prefs shadow-panel@shadowokx
-
-Privacy
-- No telemetry
-- No analytics
-- No Codex credentials stored
-- Token history stays local
-- Weather is provided by Open-Meteo
-About
-I'm Shadowokx, a security researcher and bug bounty hunter.
-I built Shadowokx Panel for my own daily workflow and decided to make it public.
-License
-GPL-3.0-or-later
