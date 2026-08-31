@@ -97,6 +97,11 @@ export default class UiSmokeExtension extends Extension {
 
     async _exercise(indicator, services) {
         const reportPath = GLib.getenv('SHADOW_UI_REPORT');
+        const displayLocation = GLib.getenv('SHADOW_TEST_DISPLAY_LOCATION');
+        if (displayLocation && services?.weatherProvider) {
+            const weatherState = services.weatherProvider.getState();
+            services.weatherProvider._setState({...weatherState, location: displayLocation});
+        }
         const report = {
             codexProviderStatus: services?.codexProvider?.getState()?.status ?? null,
             weatherProviderStatus: services?.weatherProvider?.getState()?.status ?? null,
@@ -141,6 +146,12 @@ export default class UiSmokeExtension extends Extension {
                 report.graphDayLabels = {
                     ...allocation(dayLabels),
                     count: dayLabels?.get_children?.().length ?? 0,
+                    expectedCount: services?.codexProvider?.getState()
+                        ?.tokenUsage?.dailyBuckets?.length ?? 0,
+                    positions: dayLabels?.get_children?.().map(label => ({
+                        x: label.x,
+                        width: label.width,
+                    })) ?? [],
                 };
                 report.codexFooter = allocation(findStyle(page.actor, 'shadow-codex-footer'));
                 report.historyBadgeIcon = allocation(findStyle(page.actor, 'shadow-status-icon'));
@@ -154,6 +165,13 @@ export default class UiSmokeExtension extends Extension {
                     verticalPolicy: page?._hourlyScroll?.vscrollbar_policy ?? null,
                 };
                 report.uvRow = allocation(findStyle(page.actor, 'shadow-weather-metric-wide'));
+                const location = findStyle(page.actor, 'shadow-weather-location');
+                report.weatherLocation = {
+                    ...allocation(location),
+                    parentWidth: location?.get_parent?.()?.width ?? 0,
+                    textLength: [...(location?.text ?? '')].length,
+                    ellipsize: location?.clutter_text?.ellipsize ?? null,
+                };
             }
         }
         const codexPage = indicator._pages.get('codex');

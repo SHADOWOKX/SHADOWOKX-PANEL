@@ -11,11 +11,14 @@ The popup behaves like a compact GNOME application with a quiet product header, 
 
 ## Screenshots
 
-Release screenshots are captured during the GNOME Shell visual-QA workflow.
+Repository screenshots have not been captured yet. Before publishing the GitHub release,
+capture these five real GNOME Shell views and place them under `docs/screenshots/`:
 
-- Top bar: `[ChatGPT] 45%   [Weather] 29°`
-- Codex selected: `[ ● ChatGPT Codex | Weather ]`
-- Weather selected: `[ ChatGPT Codex | ● Weather ]`
+1. Codex page
+2. Weather page
+3. One theme/accent example
+4. Preferences window
+5. Compact top-bar indicators
 
 The Codex percentage always means **remaining capacity**, never consumed capacity.
 
@@ -93,7 +96,12 @@ The optional usage-state icon uses completed daily buckets from the same structu
 
 `account/usage/read` supplies optional account token-activity summaries and `dailyUsageBuckets`. Every chart point is the validated `tokens` value for the bucket's reported `startDate`; it is not a lifetime snapshot or an inferred delta. Buckets are deduplicated by date, ordered oldest to newest, restricted to the current seven-day calendar window, and never padded with invented zeroes. The panel never estimates a peak hour from daily data or parses private session transcripts as a substitute.
 
-The 54-pixel mini graph is drawn by a native `St.DrawingArea` with Cairo: a subtle rounded accent curve, bounded control points, a restrained gradient area fill, and one highlighted endpoint. Its X positions preserve real calendar gaps and its Y scale keeps a truthful zero baseline. It has no redraw timer or animation loop. With fewer than two real daily buckets the card says “Not enough history yet.” All-zero, duplicate, corrupt, missing-day, single-point, clipping-bound, and large-spike inputs are covered by pure tests.
+There is intentionally no lifetime-counter delta calculation: the graph uses the app-server's
+reported per-day token value directly. Invalid dates and negative or non-integer values are
+discarded, duplicate dates keep the latest valid report, missing dates remain visible as real
+calendar gaps, and both live and cached history are bounded to seven actual buckets.
+
+The 48-pixel mini graph is drawn by a native `St.DrawingArea` with Cairo: a subtle rounded accent curve, bounded control points, a restrained gradient area fill, and one highlighted endpoint. Its X positions preserve real calendar gaps and its Y scale keeps a truthful zero baseline. It has no redraw timer or animation loop. With fewer than two real daily buckets the card says “Not enough history yet.” All-zero, duplicate, corrupt, missing-day, single-point, clipping-bound, and large-spike inputs are covered by pure tests.
 
 Security properties:
 
@@ -137,6 +145,20 @@ The Weather page and top-bar summary have separate switches. If both are disable
 The hourly forecast keeps up to 12 validated hours in one bounded horizontal `St.ScrollView`. It uses exact four-column pages, so no partial fifth item or scrollbar artifact leaks through the rounded card. Additional pages remain available to touchpad or horizontal-wheel scrolling; the hourly view never creates vertical overflow.
 
 The main page remeasures resolved, styled content after every render and page switch. It compares that natural height with the active monitor's real GNOME work area after dynamically measuring the dashboard header, tabs, page title, padding, and other non-scroll chrome. Vertical policy is `NEVER` when content fits and hidden-chrome `EXTERNAL` only for genuine overflow. Codex and Weather resize independently, switching resets the new page to the top, monitor changes trigger a refit, and text-scale changes rebuild the measured layout.
+
+## Privacy and local data
+
+- Codex limits, reset times, and optional daily token totals are requested from the locally
+  installed Codex app-server. Shadowokx Panel does not read or store OpenAI credentials.
+- Normalized Codex state and its bounded history are cached in
+  `${XDG_CACHE_HOME:-~/.cache}/shadow-panel/codex.json`.
+- The configured Weather location is sent to Open-Meteo's geocoding service; the returned
+  coordinates are sent to its forecast service. The normalized forecast cache is stored in
+  `${XDG_CACHE_HOME:-~/.cache}/shadow-panel/weather.json`.
+- Usage summary images are written only when requested, under the configured Pictures directory.
+- There is no analytics, telemetry, advertising SDK, or upload of popup contents. Apart from
+  the Open-Meteo requests above and the local Codex client's own account-usage operation, the
+  extension sends no user data to another service.
 
 ## Appearance
 

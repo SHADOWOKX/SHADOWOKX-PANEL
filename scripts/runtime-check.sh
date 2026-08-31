@@ -87,6 +87,10 @@ dbus-run-session -- sh -eu -c '
       sleep 0.25
     done
     test "$shadow_reloaded" = true
+    # ACTIVE is reported before a newly enabled actor necessarily reaches the
+    # stage. Let one complete style frame settle before terminating the
+    # isolated Shell, otherwise shutdown itself produces false St warnings.
+    sleep 1
   fi
   test "$shadow_loaded" = true
 ' >"$shadow_session_log" 2>&1 || {
@@ -96,9 +100,10 @@ dbus-run-session -- sh -eu -c '
   exit 1
 }
 
-if rg -i -U "shadow-panel[\s\S]{0,900}(error|exception|critical|warning)|(js error|gjs-critical|error parsing stylesheet|stylesheet\.css.*(error|warning))[\s\S]{0,900}shadow-panel" \
+if rg -i -U "shadow-panel[\s\S]{0,900}(error|exception|critical|warning)|(js error|gjs-critical|error parsing stylesheet|stylesheet\.css.*(error|warning))[\s\S]{0,900}shadow-panel|st_widget_get_theme_node.*shadow-panel|shadow-panel.*not in the stage" \
   "$shadow_shell_log" "$shadow_session_log"; then
   printf '%s\n' 'Shadowokx Panel emitted a runtime error.' >&2
+  tail -n 240 "$shadow_shell_log" >&2
   exit 1
 fi
 

@@ -1,0 +1,14 @@
+# Local development state
+.backups/
+*.log
+*.tmp
+
+# Generated release outputs
+dist/
+schemas/gschemas.compiled
+
+# Editor and OS metadata
+.idea/
+.vscode/
+*~
+.DS_Store

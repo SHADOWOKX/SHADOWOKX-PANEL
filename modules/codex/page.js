@@ -3,7 +3,7 @@ import Gio from 'gi://Gio';
 import St from 'gi://St';
 
 import {formatCountdown, formatRelativeAge, formatResetDate} from '../../lib/format.js';
-import {normalizeSparklineBuckets} from '../../lib/sparkline.js';
+import {normalizeSparklineBuckets, sparklineDayLabels} from '../../lib/sparkline.js';
 import {codexUsageStatus} from '../../lib/summary.js';
 import {launchUri} from '../../services/launcher.js';
 import {
@@ -41,6 +41,7 @@ export class CodexPage extends BasePage {
         this._timedLabels = [];
         this._graphHasAppeared = false;
         this._refreshButton = null;
+        this._shareCancellable = null;
         this.track(this._provider.subscribe(state => {
             this._stateDirty = true;
             if (this._hasRendered && this._popupOpen &&
@@ -434,22 +435,27 @@ export class CodexPage extends BasePage {
                 layout_manager: new Clutter.FixedLayout(),
             });
             const labels = [];
-            for (const label of dayLabels) {
+            for (const day of dayLabels) {
                 const actor = new St.Label({
-                    text: label,
+                    text: day.label,
                     style_class: 'shadow-spark-day',
+                    accessible_name: this._formatUsageDate(day.date),
                 });
-                labels.push(actor);
+                labels.push({actor, position: day.position});
                 timeline.add_child(actor);
             }
             timeline.connect('notify::allocation', () => {
                 const width = timeline.width;
                 if (width <= 16)
                     return;
-                labels.forEach((label, index) => {
-                    const [, labelWidth] = label.get_preferred_width(-1);
-                    const center = 8 + index / (labels.length - 1) * (width - 16);
-                    label.set_position(Math.round(center - labelWidth / 2), 0);
+                labels.forEach(({actor, position}) => {
+                    const [, labelWidth] = actor.get_preferred_width(-1);
+                    const center = 8 + position * (width - 16);
+                    const x = Math.max(0, Math.min(
+                        Math.round(center - labelWidth / 2),
+                        width - labelWidth
+                    ));
+                    actor.set_position(x, 0);
                 });
             });
             sparkline.add_child(timeline);
@@ -458,17 +464,7 @@ export class CodexPage extends BasePage {
     }
 
     _sparklineDayLabels(buckets) {
-        const first = Date.parse(`${buckets[0].date}T00:00:00Z`);
-        const last = Date.parse(`${buckets.at(-1).date}T00:00:00Z`);
-        const dayMs = 86_400_000;
-        const span = Math.round((last - first) / dayMs);
-        if (!Number.isFinite(span) || span < 1 || span > 6)
-            return [];
-        return Array.from({length: span + 1}, (_unused, index) =>
-            new Date(first + index * dayMs).toLocaleDateString(undefined, {
-                weekday: 'narrow',
-                timeZone: 'UTC',
-            }));
+        return sparklineDayLabels(buckets);
     }
 
     _tokenInsight(usage) {
@@ -636,6 +632,8 @@ export class CodexPage extends BasePage {
         if (this._sharing || (!state.weekly && !state.fiveHour))
             return;
         this._sharing = true;
+        const cancellable = new Gio.Cancellable();
+        this._shareCancellable = cancellable;
         this._render();
         try {
             const configuredTheme = this.context.settings.get_string('theme');
@@ -648,6 +646,7 @@ export class CodexPage extends BasePage {
                 accent: resolveAccent(this.context.settings),
                 backgroundTheme: this.context.settings.get_string('background-theme'),
                 interfaceTheme,
+                cancellable,
             });
             const uri = Gio.File.new_for_path(result.directoryPath).get_uri();
             this.context.notify?.('Usage image saved', result.fileName, {
@@ -655,12 +654,17 @@ export class CodexPage extends BasePage {
                 action: () => launchUri(uri, this.context.logger).catch(() => {}),
             });
         } catch (error) {
+            if (this._destroyed ||
+                error.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+                return;
             this.context.logger?.debug('codex.share.failed', {code: error.code ?? 'image-export'});
             this.context.notify?.(
                 'Share failed',
                 'The usage image could not be saved.'
             );
         } finally {
+            if (this._shareCancellable === cancellable)
+                this._shareCancellable = null;
             this._sharing = false;
             this._stateDirty = true;
             if (!this._destroyed && this._popupOpen)
@@ -670,6 +674,8 @@ export class CodexPage extends BasePage {
 
     destroy() {
         this._destroyed = true;
+        this._shareCancellable?.cancel();
+        this._shareCancellable = null;
         this._stopRefreshAnimation();
         this.context.scheduler.cancel('codex-countdown');
         super.destroy();

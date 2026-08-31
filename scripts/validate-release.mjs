@@ -26,6 +26,14 @@ function readText(name) {
 }
 
 try {
+    for (const required of ['README.md', 'LICENSE', 'NOTICE.md', '.gitignore']) {
+        if (!GLib.file_test(
+            GLib.build_filenamev([projectDirectory, required]),
+            GLib.FileTest.IS_REGULAR
+        )) {
+            throw new Error(`required release file is missing: ${required}`);
+        }
+    }
     const metadata = readJson('metadata.json');
     const packageMetadata = readJson('package.json');
     if (metadata.uuid !== UUID || metadata['settings-schema'] !==
@@ -42,6 +50,11 @@ try {
         throw new Error('semantic version declarations are inconsistent');
     if (!readText('README.md').includes(`Release \`${APP_VERSION}\``))
         throw new Error('README release version is inconsistent');
+    const ignore = readText('.gitignore');
+    for (const generated of ['dist/', 'schemas/gschemas.compiled']) {
+        if (!ignore.includes(generated))
+            throw new Error(`generated release output is not ignored: ${generated}`);
+    }
     const modules = GLib.build_filenamev([projectDirectory, 'modules']);
     for (const removed of ['notes', 'tasks', 'todo', 'tools']) {
         if (GLib.file_test(GLib.build_filenamev([modules, removed]), GLib.FileTest.EXISTS))

@@ -29,6 +29,14 @@ const CONDITIONS = Object.freeze({
     99: ['Heavy thunderstorm', 'weather-storm-symbolic'],
 });
 
+function finiteNumber(value) {
+    if (value === null || value === undefined || typeof value === 'boolean' ||
+        typeof value === 'string' && !value.trim())
+        return Number.NaN;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : Number.NaN;
+}
+
 export function weatherCondition(code) {
     const [label, icon] = Object.hasOwn(CONDITIONS, code)
         ? CONDITIONS[code]
@@ -121,8 +129,8 @@ export function weatherCacheMatchesSettings(cached, query, unit) {
 export function normalizeWeather(payload, location, unit, nowMs = Date.now()) {
     const current = payload?.current;
     const daily = payload?.daily;
-    const hourly = payload?.hourly;
-    if (!current || !daily || !hourly)
+    const hourly = payload?.hourly ?? {};
+    if (!current || !daily)
         throw new Error('Weather service returned incomplete data');
 
     const requiredNumbers = [
@@ -132,7 +140,7 @@ export function normalizeWeather(payload, location, unit, nowMs = Date.now()) {
         current.wind_speed_10m,
         daily.temperature_2m_max?.[0],
         daily.temperature_2m_min?.[0],
-    ].map(Number);
+    ].map(finiteNumber);
     if (requiredNumbers.some(value => !Number.isFinite(value)) ||
         requiredNumbers[0] < -150 || requiredNumbers[0] > 150 ||
         requiredNumbers[1] < -150 || requiredNumbers[1] > 150 ||
@@ -142,25 +150,31 @@ export function normalizeWeather(payload, location, unit, nowMs = Date.now()) {
         requiredNumbers[5] < -150 || requiredNumbers[5] > 150)
         throw new Error('Weather service returned invalid numeric data');
 
-    const currentTime = Number(current.time) || Math.floor(nowMs / 1000);
-    const forecast = (hourly.time ?? [])
-        .map((time, index) => ({
-            time: Number(time),
-            temperature: Number(hourly.temperature_2m?.[index]),
-            precipitationChance: Number.isFinite(Number(hourly.precipitation_probability?.[index]))
-                ? Math.max(0, Math.min(100, Math.round(Number(hourly.precipitation_probability[index]))))
-                : null,
-            condition: weatherCondition(hourly.weather_code?.[index]),
-        }))
+    const reportedCurrentTime = finiteNumber(current.time);
+    const currentTime = reportedCurrentTime > 0
+        ? reportedCurrentTime
+        : Math.floor(nowMs / 1000);
+    const forecast = (Array.isArray(hourly.time) ? hourly.time : [])
+        .map((time, index) => {
+            const precipitation = finiteNumber(hourly.precipitation_probability?.[index]);
+            return {
+                time: finiteNumber(time),
+                temperature: finiteNumber(hourly.temperature_2m?.[index]),
+                precipitationChance: Number.isFinite(precipitation)
+                    ? Math.max(0, Math.min(100, Math.round(precipitation)))
+                    : null,
+                condition: weatherCondition(hourly.weather_code?.[index]),
+            };
+        })
         .filter(item => Number.isFinite(item.time) &&
             Number.isFinite(new Date(item.time * 1000).getTime()) &&
             Number.isFinite(item.temperature) && item.temperature >= -150 &&
             item.temperature <= 150 && item.time >= currentTime)
         .slice(0, 12);
 
-    const uv = Number(daily.uv_index_max?.[0]);
-    const sunrise = Number(daily.sunrise?.[0]);
-    const sunset = Number(daily.sunset?.[0]);
+    const uv = finiteNumber(daily.uv_index_max?.[0]);
+    const sunrise = finiteNumber(daily.sunrise?.[0]);
+    const sunset = finiteNumber(daily.sunset?.[0]);
 
     return {
         status: 'success',

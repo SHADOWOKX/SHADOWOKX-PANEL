@@ -285,6 +285,11 @@ export function scrollContainer(child, styleClass = 'shadow-list-scroll') {
 export function fitScrollToContent(scroll, child, context, pageActor = null) {
     if (!scroll || !child)
         return;
+    // Provider subscriptions can synchronously deliver cached state while a
+    // replacement page is still being constructed. St theme measurement is
+    // only valid after the actor reaches the stage; BasePage retries on map.
+    if (pageActor && !pageActor.mapped)
+        return;
     const width = Math.max(1, (context.pageWidth ?? 386) - 4);
     const [, naturalHeight] = child.get_preferred_height(width);
     scroll._shadowNaturalHeight = Math.max(1, Math.ceil(naturalHeight));

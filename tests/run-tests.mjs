@@ -10,7 +10,11 @@ import {
     isHexColor,
 } from '../lib/format.js';
 import {chooseInitialModule} from '../lib/moduleConfig.js';
-import {normalizeSparklineBuckets, sparklineCoordinates} from '../lib/sparkline.js';
+import {
+    normalizeSparklineBuckets,
+    sparklineCoordinates,
+    sparklineDayLabels,
+} from '../lib/sparkline.js';
 import {
     codexRemainingSummary,
     codexUsagePace,
@@ -154,6 +158,15 @@ function testSparklineData() {
     equal(normalized.length, 2, 'sparkline rejects corrupt values and deduplicates dates');
     equal(normalized[0].date, '2026-08-28', 'sparkline points are chronological');
     equal(normalized[1].tokens, 25, 'the last valid duplicate daily bucket wins');
+    const labels = sparklineDayLabels([
+        {date: '2026-08-28', tokens: 10},
+        {date: '2026-08-30', tokens: 25},
+    ], 'en-US');
+    equal(labels.length, 2, 'day labels exist only for real daily buckets');
+    equal(labels.map(item => item.date).join(','), '2026-08-28,2026-08-30',
+        'day labels preserve oldest-to-newest bucket order');
+    equal(labels[0].position, 0, 'the oldest real label aligns with the first point');
+    equal(labels[1].position, 1, 'the newest real label aligns with the final point');
 
     const missingDay = sparklineCoordinates([
         {date: '2026-08-28', tokens: 10},
@@ -378,6 +391,28 @@ function testWeatherNormalization() {
     }, 'Cairo, Egypt', 'celsius', 1000);
     equal(withoutUv.today.uv, null,
         'missing UV data remains absent instead of becoming a fabricated zero');
+    const withoutHourly = normalizeWeather({
+        ...payload,
+        hourly: undefined,
+    }, 'Cairo, Egypt', 'celsius', 1000);
+    equal(withoutHourly.forecast.length, 0,
+        'missing hourly data leaves the main Weather page usable');
+    equal(withoutHourly.current.rainProbability, null,
+        'missing hourly precipitation remains absent instead of becoming zero');
+    const nullOptionals = normalizeWeather({
+        ...payload,
+        daily: {...payload.daily, uv_index_max: [null]},
+        hourly: {...payload.hourly, precipitation_probability: [null, null, null]},
+    }, 'Cairo, Egypt', 'celsius', 1000);
+    equal(nullOptionals.today.uv, null,
+        'null UV data remains absent instead of becoming a fabricated zero');
+    equal(nullOptionals.current.rainProbability, null,
+        'null precipitation remains absent instead of becoming a fabricated zero');
+    rejects(() => normalizeWeather({
+        ...payload,
+        daily: {...payload.daily, temperature_2m_max: [null]},
+    }, 'Cairo, Egypt', 'celsius', 1000),
+    'null required temperatures are rejected instead of becoming zero');
     equal(weatherCondition(999).label, 'Unknown conditions', 'unknown weather code');
     equal(weatherCondition('__proto__').label, 'Unknown conditions',
         'prototype names cannot become weather conditions');

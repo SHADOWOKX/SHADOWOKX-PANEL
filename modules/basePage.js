@@ -13,6 +13,14 @@ export class BasePage {
             x_align: Clutter.ActorAlign.FILL,
         });
         this._disconnectors = [];
+        const mappedId = this.actor.connect('notify::mapped', () => {
+            if (this.actor?.mapped && !this._pageDestroyed)
+                this.fit?.();
+        });
+        this.track(() => {
+            if (this.actor && mappedId)
+                this.actor.disconnect(mappedId);
+        });
     }
 
     track(disconnector) {

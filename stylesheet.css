@@ -203,7 +203,8 @@
   min-height: 38px;
   margin-bottom: 12px;
   padding: 3px;
-  spacing: 3px;
+  /* An even gap keeps the remaining width divisible into exact 50/50 segments. */
+  spacing: 4px;
   border-radius: 11px;
   border: 1px solid rgba(255, 255, 255, 0.055);
   background-color: rgba(128, 128, 128, 0.07);
@@ -517,7 +518,7 @@
 }
 
 .shadow-token-sparkline-wrap {
-  spacing: 1px;
+  spacing: 3px;
 }
 
 .shadow-token-sparkline {

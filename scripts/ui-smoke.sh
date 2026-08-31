@@ -19,6 +19,9 @@ shadow_ui_lifecycle=${SHADOW_UI_LIFECYCLE:-false}
 shadow_show_weather_panel=${SHADOW_SHOW_WEATHER_PANEL:-true}
 shadow_show_weather_top_bar=${SHADOW_SHOW_WEATHER_TOP_BAR:-true}
 shadow_show_usage_state=${SHADOW_SHOW_USAGE_STATE:-false}
+shadow_weather_unit=${SHADOW_WEATHER_UNIT:-celsius}
+shadow_weather_wind_unit=${SHADOW_WEATHER_WIND_UNIT:-kmh}
+shadow_test_display_location=${SHADOW_TEST_DISPLAY_LOCATION:-}
 case ${SHADOW_EXPECT_SCROLL:-false} in
   1|true|yes) shadow_expect_scroll=true ;;
   *) shadow_expect_scroll=false ;;
@@ -61,6 +64,9 @@ export SHADOW_UI_LIFECYCLE="$shadow_ui_lifecycle"
 export SHADOW_SHOW_WEATHER_PANEL="$shadow_show_weather_panel"
 export SHADOW_SHOW_WEATHER_TOP_BAR="$shadow_show_weather_top_bar"
 export SHADOW_SHOW_USAGE_STATE="$shadow_show_usage_state"
+export SHADOW_WEATHER_UNIT="$shadow_weather_unit"
+export SHADOW_WEATHER_WIND_UNIT="$shadow_weather_wind_unit"
+export SHADOW_TEST_DISPLAY_LOCATION="$shadow_test_display_location"
 export GSETTINGS_SCHEMA_DIR="$shadow_runtime_dir/data/gnome-shell/extensions/shadow-panel@shadowokx/schemas"
 
 dbus-run-session -- sh -eu -c '
@@ -74,6 +80,8 @@ dbus-run-session -- sh -eu -c '
   gsettings set org.gnome.shell.extensions.shadow-panel show-weather-panel "$SHADOW_SHOW_WEATHER_PANEL"
   gsettings set org.gnome.shell.extensions.shadow-panel show-weather-top-bar "$SHADOW_SHOW_WEATHER_TOP_BAR"
   gsettings set org.gnome.shell.extensions.shadow-panel show-codex-usage-state "$SHADOW_SHOW_USAGE_STATE"
+  gsettings set org.gnome.shell.extensions.shadow-panel weather-unit "$SHADOW_WEATHER_UNIT"
+  gsettings set org.gnome.shell.extensions.shadow-panel weather-wind-unit "$SHADOW_WEATHER_WIND_UNIT"
   gsettings set org.gnome.desktop.interface text-scaling-factor "$SHADOW_TEXT_SCALE"
   gsettings set org.gnome.shell enabled-extensions \
     "['"'"'shadow-panel@shadowokx'"'"', '"'"'shadow-panel-ui-smoke@shadowokx'"'"']"
@@ -88,9 +96,9 @@ dbus-run-session -- sh -eu -c '
   test -s "$SHADOW_UI_REPORT"
 '
 
-gjs -c "const GLib=imports.gi.GLib; const [, bytes]=GLib.file_get_contents('$shadow_ui_report'); const report=JSON.parse(new TextDecoder().decode(bytes)); const widths=new Set(report.tabSwitches.map(item => item.page.width)); const scrolling=report.tabSwitches.some(item => item.scroll?.needsScroll); const expectScroll='$shadow_expect_scroll' === 'true'; const expectLifecycle='$shadow_ui_lifecycle' === 'true'; const expectWeatherPanel='$shadow_show_weather_panel' === 'true'; const expectWeatherTopBar='$shadow_show_weather_top_bar' === 'true'; const badPolicy=report.tabSwitches.some(item => item.scroll?.needsScroll ? item.scroll.policy === 2 : item.scroll.policy !== 2); const badLifecycle=expectLifecycle && (!report.disabledRemoved || !report.reenabled || report.timerCountAfterReenable !== report.expectedTimerCount); const badModules=report.moduleIds.includes('weather') !== expectWeatherPanel || (expectWeatherPanel ? report.tabWidths.length !== 2 || Math.abs(report.tabWidths[0] - report.tabWidths[1]) > 1 : report.tabWidths.length !== 0); const badWeatherTopBar=report.weatherTopBarVisible !== expectWeatherTopBar; const badUsageState=report.usageStateVisible !== Boolean(report.usageStateKey) || (!report.usageStateSetting && report.usageStateVisible); const badHourly=expectWeatherPanel && (!report.hourly || report.hourly.verticalPolicy !== 2 || report.hourly.contentWidth <= report.hourly.pageWidth); const badUv=expectWeatherPanel && (!report.uvRow || report.uvRow.width <= 300 || report.uvRow.height <= 0); const badCodexPolish=!report.codexFooter || report.codexFooter.width <= 300 || !report.historyBadgeIcon?.visible || !report.graphDayLabels?.visible || report.graphDayLabels.count < 2 || report.graphDayLabels.count > 7; if (!report.reopened || !report.usageSettingUpdatedLive || !report.hiddenPageTreesPreserved || !report.refreshTreesPreserved || report.openCloseCycles !== 20 || report.scrollResetValue !== 0 || !report.refreshStateExercised || widths.size !== 1 || scrolling !== expectScroll || badPolicy || badLifecycle || badModules || badWeatherTopBar || badUsageState || badHourly || badUv || badCodexPolish || report.graph.width <= 0 || report.graph.height < 45 || report.tabSwitches.length !== 4 || report.tabSwitches.some(item => !item.hasExpectedContent || item.page.width <= 0 || item.page.height <= 0 || item.stack.height <= 0 || item.childCount < 2)) throw new Error(JSON.stringify(report)); print(JSON.stringify(report));"
+gjs -m "$shadow_project_dir/tests/validate-ui-report.mjs" "$shadow_ui_report"
 
-if rg -i -U "shadow-panel[\s\S]{0,900}(error|exception|critical|warning)|(js error|gjs-critical|error parsing stylesheet|stylesheet\.css.*(error|warning))[\s\S]{0,900}shadow-panel" "$shadow_shell_log"; then
+if rg -i -U "shadow-panel[\s\S]{0,900}(error|exception|critical|warning)|(js error|gjs-critical|error parsing stylesheet|stylesheet\.css.*(error|warning))[\s\S]{0,900}shadow-panel|st_widget_get_theme_node.*shadow-panel|shadow-panel.*not in the stage" "$shadow_shell_log"; then
   printf '%s\n' 'Shadowokx Panel emitted a UI smoke-test runtime error.' >&2
   exit 1
 fi
