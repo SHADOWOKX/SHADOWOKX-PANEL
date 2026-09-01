@@ -4,6 +4,13 @@ A lightweight GNOME Shell panel for checking Codex usage and local weather from 
 
 Release `2.3.3`.
 
+## Screenshots
+
+<p align="center">
+  <img src="assets/codex.webp" alt="Shadowokx Panel Codex usage view" width="360">
+  <img src="assets/weather.webp" alt="Shadowokx Panel weather view" width="360">
+</p>
+
 ## Features
 
 - Codex weekly and five-hour limits
