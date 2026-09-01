@@ -14,6 +14,7 @@ import {
     isHexColor,
 } from '../lib/format.js';
 import {chooseInitialModule} from '../lib/moduleConfig.js';
+import {progressFillGeometry} from '../lib/progress.js';
 import {
     normalizeSparklineBuckets,
     sparklineCoordinates,
@@ -195,6 +196,10 @@ function testSparklineData() {
         {date: '2026-08-30', tokens: 25},
     ], 'en-US');
     equal(labels.length, 2, 'day labels exist only for real daily buckets');
+    equal(labels[0].label, 'Aug 28',
+        'two-point history uses an unambiguous compact real date');
+    equal(labels[1].label, 'Aug 30',
+        'the newest two-point label includes its real month and date');
     equal(labels.map(item => item.date).join(','), '2026-08-28,2026-08-30',
         'day labels preserve oldest-to-newest bucket order');
     equal(labels[0].position, 0, 'the oldest real label aligns with the first point');
@@ -242,6 +247,38 @@ function testSparklineData() {
     ok(spike[0].y > spike[1].y, 'large spikes retain truthful zero-based scale');
     equal(normalizeSparklineBuckets(normalized, Number.NaN).length, 2,
         'invalid history limits cannot disable the storage bound');
+}
+
+function testProgressGeometry() {
+    const trackWidth = 337;
+    const startInset = 3;
+    const endInset = 5;
+    const usableWidth = 329;
+    for (const [percent, expected] of [
+        [0, 0],
+        [2, 7],
+        [10, 33],
+        [50, 165],
+        [98, 322],
+        [100, 329],
+    ]) {
+        const geometry = progressFillGeometry(percent, trackWidth, startInset, endInset);
+        equal(geometry.usableWidth, usableWidth,
+            `${percent}% progress uses the measured content width`);
+        equal(geometry.fillWidth, expected,
+            `${percent}% progress has proportional allocation geometry`);
+    }
+    const nearlyFull = progressFillGeometry(98, trackWidth, startInset, endInset);
+    equal(nearlyFull.usableWidth - nearlyFull.fillWidth, 7,
+        '98% progress leaves only the rounded two-percent remainder');
+    equal(progressFillGeometry(100, trackWidth, startInset, endInset).fillWidth, usableWidth,
+        '100% progress reaches the exact usable track end');
+    equal(progressFillGeometry(-1, trackWidth).value, 0,
+        'progress values clamp only at the lower bound');
+    equal(progressFillGeometry(101, trackWidth).value, 100,
+        'progress values clamp only at the upper bound');
+    equal(progressFillGeometry(98.5, 200).fillWidth, 197,
+        'fractional progress retains proportional precision');
 }
 
 function testSchedulerLifecycle() {
@@ -1156,6 +1193,7 @@ async function testWeatherTrailingRefresh() {
 testFormatting();
 testModuleConfiguration();
 testSparklineData();
+testProgressGeometry();
 testSchedulerLifecycle();
 testCodexNormalization();
 testCodexPortability();

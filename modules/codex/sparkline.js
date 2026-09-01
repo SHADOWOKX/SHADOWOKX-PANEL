@@ -3,6 +3,7 @@ import Clutter from 'gi://Clutter';
 import St from 'gi://St';
 
 import {sparklineCoordinates} from '../../lib/sparkline.js';
+import {attachTooltip} from '../../ui/components.js';
 
 function accentRgb(accent) {
     const valid = /^#[0-9a-fA-F]{6}$/.test(accent ?? '') ? accent : '#f43f5e';
@@ -43,19 +44,47 @@ function traceSeries(context, points, move = true) {
     }
 }
 
-export function tokenSparkline(buckets, accent, animate = false) {
-    const area = new St.DrawingArea({
+export function tokenSparkline(buckets, accent, animate = false, tooltipForPoint = null) {
+    const chart = new St.Widget({
         style_class: 'shadow-token-sparkline',
         x_expand: true,
         height: 48,
         opacity: animate ? 0 : 255,
+        layout_manager: new Clutter.FixedLayout(),
     });
-    if (animate) {
-        const mappedId = area.connect('notify::mapped', () => {
-            if (!area.mapped)
+    const area = new St.DrawingArea({height: 48});
+    chart.add_child(area);
+    const targets = normalizePointTargets(chart, buckets, tooltipForPoint);
+    const syncAllocation = () => {
+        const width = chart.width;
+        const height = chart.height;
+        if (width <= 0 || height <= 0)
+            return;
+        area.set_size(width, height);
+        const points = sparklineCoordinates(buckets, width, height, {x: 8, y: 6});
+        targets.forEach((target, index) => {
+            const point = points[index];
+            if (!point)
                 return;
-            area.disconnect(mappedId);
-            area.ease({
+            target.set_position(
+                Math.max(0, Math.min(
+                    width - target.width,
+                    Math.round(point.x - target.width / 2)
+                )),
+                Math.max(0, Math.min(
+                    height - target.height,
+                    Math.round(point.y - target.height / 2)
+                ))
+            );
+        });
+    };
+    chart.connect('notify::allocation', syncAllocation);
+    if (animate) {
+        const mappedId = chart.connect('notify::mapped', () => {
+            if (!chart.mapped)
+                return;
+            chart.disconnect(mappedId);
+            chart.ease({
                 opacity: 255,
                 duration: 160,
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
@@ -108,5 +137,20 @@ export function tokenSparkline(buckets, accent, animate = false) {
             context.$dispose?.();
         }
     });
-    return area;
+    return chart;
+}
+
+function normalizePointTargets(chart, buckets, tooltipForPoint) {
+    if (typeof tooltipForPoint !== 'function')
+        return [];
+    return buckets.map(bucket => {
+        const target = new St.Widget({
+            style_class: 'shadow-token-point-target',
+            width: 16,
+            height: 16,
+        });
+        attachTooltip(target, () => tooltipForPoint(bucket));
+        chart.add_child(target);
+        return target;
+    });
 }

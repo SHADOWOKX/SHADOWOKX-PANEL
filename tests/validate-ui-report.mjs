@@ -45,9 +45,26 @@ const badLocation = expectWeatherPanel && (!report.weatherLocation ||
 const dayLabels = report.graphDayLabels;
 const badDayLabels = !dayLabels?.visible || dayLabels.count < 2 || dayLabels.count > 7 ||
     dayLabels.count !== dayLabels.expectedCount || dayLabels.positions.some(label =>
-        label.x < 0 || label.x + label.width > dayLabels.width);
+        label.x < 0 || label.x + label.width > dayLabels.width) ||
+    dayLabels.count <= 3 && dayLabels.texts.some(label =>
+        label.length <= 1 || !/\d/.test(label));
+const badGraphTooltips = !report.graphPointTooltips ||
+    report.graphPointTooltips.count !== report.graphPointTooltips.expectedCount ||
+    !report.graphPointTooltips.interactive;
+const badTodayMetric = !report.todayMetric?.labels?.includes('Today') ||
+    !Number.isSafeInteger(report.todayMetric.canonicalTokens) ||
+    !report.todayMetric.accessibleName?.includes(
+        new Intl.NumberFormat('en-US').format(report.todayMetric.canonicalTokens)
+    );
+const badProgress = report.progressGeometry?.length !== 2 ||
+    report.progressGeometry.some(item => !Number.isFinite(item.usableWidth) ||
+        item.usableWidth <= 0 || !Number.isFinite(item.fillWidth)) ||
+    Math.abs(report.progressGeometry[0].fillWidth /
+        report.progressGeometry[0].usableWidth - 0.98) > 0.005 ||
+    report.progressGeometry[1].fillWidth !== report.progressGeometry[1].usableWidth;
 const badCodexPolish = !report.codexFooter || report.codexFooter.width <= 300 ||
-    !report.historyBadgeIcon?.visible || badDayLabels;
+    !report.historyBadgeIcon?.visible || badDayLabels || badGraphTooltips ||
+    badTodayMetric || badProgress;
 const badPage = report.tabSwitches.length !== 4 || report.tabSwitches.some(item =>
     !item.hasExpectedContent || item.page.width <= 0 || item.page.height <= 0 ||
     item.stack.height <= 0 || item.childCount < 2);

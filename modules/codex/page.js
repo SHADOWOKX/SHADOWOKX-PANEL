@@ -278,7 +278,6 @@ export class CodexPage extends BasePage {
         }));
         card.add_child(value);
 
-        const width = this._progressWidth();
         const animate = this._popupOpen && this._lastWeeklyPercent !== null &&
             this._lastWeeklyPercent !== window.remainingPercent &&
             animationsEnabled(this.context.settings);
@@ -286,7 +285,6 @@ export class CodexPage extends BasePage {
         card.add_child(new ProgressMeter(
             window.remainingPercent,
             resolveAccent(this.context.settings),
-            width,
             'remaining',
             animate
         ).actor);
@@ -415,6 +413,20 @@ export class CodexPage extends BasePage {
                 }));
 
             const stats = new St.BoxLayout({style_class: 'shadow-token-row', x_expand: true});
+            const today = usage.dailyBuckets?.find(
+                bucket => bucket.date === localUsageDateKey(Date.now())
+            );
+            const todayMetric = this._tokenMetric(
+                'Today',
+                Number.isSafeInteger(today?.tokens)
+                    ? this._formatCompactTokens(today.tokens)
+                    : 'Unavailable'
+            );
+            if (Number.isSafeInteger(today?.tokens)) {
+                attachTooltip(todayMetric, `${this._formatTokens(today.tokens)} tokens`);
+                todayMetric.accessible_name = `Today ${this._formatTokens(today.tokens)} tokens`;
+            }
+            stats.add_child(todayMetric);
             if (Number.isSafeInteger(usage.peakDailyTokens))
                 stats.add_child(this._tokenMetric('Peak', this._formatCompactTokens(usage.peakDailyTokens)));
             const peakDate = this._formatUsageDate(usage.peakDate);
@@ -440,7 +452,9 @@ export class CodexPage extends BasePage {
         const chart = tokenSparkline(
             normalized,
             resolveAccent(this.context.settings),
-            shouldAnimate
+            shouldAnimate,
+            bucket => `${this._formatUsageDate(bucket.date)}\n` +
+                `${this._formatTokens(bucket.tokens)} tokens`
         );
         if (this._popupOpen)
             this._graphHasAppeared = true;
@@ -625,13 +639,6 @@ export class CodexPage extends BasePage {
             this.context.settings,
             refreshing && this._popupOpen
         );
-    }
-
-    _progressWidth() {
-        const widths = {narrow: 286, standard: 320, wide: 354};
-        const configured = this.context.settings.get_string('panel-width');
-        const base = widths[configured] ?? widths.standard;
-        return this.context.settings.get_string('density') === 'compact' ? base - 20 : base;
     }
 
     _stopRefreshAnimation() {

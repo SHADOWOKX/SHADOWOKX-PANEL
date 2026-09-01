@@ -5,7 +5,8 @@ import Pango from 'gi://Pango';
 import St from 'gi://St';
 
 import {ACCENTS, MODULE_META} from '../lib/constants.js';
-import {clampPercent, isHexColor} from '../lib/format.js';
+import {isHexColor} from '../lib/format.js';
+import {progressFillGeometry} from '../lib/progress.js';
 
 export function resolveAccent(settings) {
     const preset = settings.get_string('accent-color');
@@ -243,29 +244,59 @@ export function stateMessage(iconName, title, detail, action = null) {
 }
 
 export class ProgressMeter {
-    constructor(percent, accent, width = 310, meaning = 'used', animate = false) {
-        const value = clampPercent(percent);
-        const targetWidth = Math.round(width * value / 100);
+    constructor(percent, accent, meaning = 'used', animate = false) {
+        const {value} = progressFillGeometry(percent, 0);
         this.actor = new St.Widget({
             style_class: 'shadow-progress-track',
-            width,
+            x_expand: true,
             height: 9,
             clip_to_allocation: true,
             accessible_name: `${value}% ${meaning}`,
         });
         this._fill = new St.Widget({
             style_class: 'shadow-progress-fill',
-            width: animate ? 0 : targetWidth,
+            width: 0,
             height: 9,
             style: `background-color: ${accent};`,
         });
         this.actor.add_child(this._fill);
-        if (animate && targetWidth > 0) {
+        this._value = value;
+        this._animate = animate;
+        this._animated = false;
+        this.actor.connect('notify::allocation', () => this._syncGeometry());
+        this.actor.connect('style-changed', () => this._syncGeometry(false));
+    }
+
+    _syncGeometry(allowAnimation = true) {
+        const width = this.actor.width;
+        const height = this.actor.height;
+        if (width <= 0 || height <= 0)
+            return;
+        const allocation = new Clutter.ActorBox();
+        allocation.x1 = 0;
+        allocation.y1 = 0;
+        allocation.x2 = width;
+        allocation.y2 = height;
+        const content = this.actor.get_theme_node().get_content_box(allocation);
+        const start = Math.max(0, Math.min(width, Math.round(content.x1)));
+        const end = Math.max(start, Math.min(width, Math.round(content.x2)));
+        const top = Math.max(0, Math.min(height, Math.round(content.y1)));
+        const bottom = Math.max(top, Math.min(height, Math.round(content.y2)));
+        const geometry = progressFillGeometry(this._value, width, start, width - end);
+        const fillHeight = Math.max(0, bottom - top);
+        this._fill.set_position(geometry.start, top);
+        this._fill.height = fillHeight;
+        this._fill.remove_all_transitions();
+        if (allowAnimation && this._animate && !this._animated && geometry.fillWidth > 0) {
+            this._animated = true;
+            this._fill.width = 0;
             this._fill.ease({
-                width: targetWidth,
+                width: geometry.fillWidth,
                 duration: 160,
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             });
+        } else {
+            this._fill.width = geometry.fillWidth;
         }
     }
 }

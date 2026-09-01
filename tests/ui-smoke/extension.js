@@ -1,3 +1,4 @@
+import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
@@ -57,6 +58,32 @@ function findStyle(actor, styleClass) {
             return found;
     }
     return null;
+}
+
+function findStyles(actor, styleClass, matches = []) {
+    if (actor?.has_style_class_name?.(styleClass))
+        matches.push(actor);
+    for (const child of actor?.get_children?.() ?? [])
+        findStyles(child, styleClass, matches);
+    return matches;
+}
+
+function progressAllocation(track) {
+    if (!track)
+        return null;
+    const box = new Clutter.ActorBox();
+    box.x1 = 0;
+    box.y1 = 0;
+    box.x2 = track.width;
+    box.y2 = track.height;
+    const content = track.get_theme_node().get_content_box(box);
+    const fill = findStyle(track, 'shadow-progress-fill');
+    return {
+        trackWidth: track.width,
+        usableWidth: Math.round(content.x2) - Math.round(content.x1),
+        fillX: fill?.x ?? null,
+        fillWidth: fill?.width ?? null,
+    };
 }
 
 async function captureScreenshot(path) {
@@ -183,7 +210,52 @@ export default class UiSmokeExtension extends Extension {
                         x: label.x,
                         width: label.width,
                     })) ?? [],
+                    texts: dayLabels?.get_children?.().map(label => label.text) ?? [],
                 };
+                const graphTargets = findStyles(page.actor, 'shadow-token-point-target');
+                report.graphPointTooltips = {
+                    count: graphTargets.length,
+                    expectedCount: services?.codexProvider?.getState()
+                        ?.tokenUsage?.dailyBuckets?.length ?? 0,
+                    interactive: graphTargets.every(target => target.reactive && target.track_hover),
+                };
+                const tokenRow = findStyle(page.actor, 'shadow-token-row');
+                report.todayMetric = {
+                    labels: labelsIn(tokenRow),
+                    accessibleName: tokenRow?.get_first_child?.()?.accessible_name ?? null,
+                    canonicalTokens: services?.codexProvider?.getState()?.tokenUsage
+                        ?.dailyBuckets?.find(bucket => {
+                            const now = new Date();
+                            const key = `${now.getFullYear()}-` +
+                                `${String(now.getMonth() + 1).padStart(2, '0')}-` +
+                                String(now.getDate()).padStart(2, '0');
+                            return bucket.date === key;
+                        })?.tokens ?? null,
+                };
+                if (!report.progressGeometry) {
+                    const provider = services.codexProvider;
+                    const originalState = provider.getState();
+                    report.progressGeometry = [];
+                    for (const remainingPercent of [98, 100]) {
+                        page._lastWeeklyPercent = null;
+                        provider._setState({
+                            ...originalState,
+                            weekly: {
+                                ...originalState.weekly,
+                                remainingPercent,
+                                usedPercent: 100 - remainingPercent,
+                            },
+                        });
+                        await settle();
+                        report.progressGeometry.push({
+                            remainingPercent,
+                            ...progressAllocation(findStyle(page.actor, 'shadow-progress-track')),
+                        });
+                    }
+                    page._lastWeeklyPercent = null;
+                    provider._setState(originalState);
+                    await settle();
+                }
                 report.codexFooter = allocation(findStyle(page.actor, 'shadow-codex-footer'));
                 report.historyBadgeIcon = allocation(findStyle(page.actor, 'shadow-status-icon'));
             } else {
