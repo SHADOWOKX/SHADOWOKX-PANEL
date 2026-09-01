@@ -34,6 +34,7 @@ import {
 import {codexExecutableCandidates, findCodexExecutable} from '../modules/codex/discovery.js';
 import {
     applyCodexHistory,
+    CODEX_HISTORY_VERSION,
     mergeCodexHistory,
     normalizeCodexHistory,
     withoutCodexHistory,
@@ -211,6 +212,7 @@ function testSparklineData() {
         {date: '2026-08-28', tokens: 10},
         {date: '2026-08-29', tokens: 20},
     ], 100, 50, 7);
+    equal(padded.length, 2, 'exactly two real daily samples render a graph');
     equal(padded[0].x, 7, 'sparkline honors refined left drawing padding');
     equal(padded.at(-1).x, 93, 'sparkline honors refined right drawing padding');
     ok(padded.every(point => point.y >= 7 && point.y <= 43),
@@ -384,7 +386,14 @@ function testCodexPortability() {
 }
 
 function testCodexLocalHistory() {
-    const nowMs = new Date(2026, 7, 31, 12).getTime();
+    const aug31Ms = new Date(2026, 7, 31, 12).getTime();
+    const sep1Ms = new Date(2026, 8, 1, 12).getTime();
+    const sep2Ms = new Date(2026, 8, 2, 12).getTime();
+    equal(localUsageDateKey(new Date(2026, 8, 1, 0, 0).getTime()), '2026-09-01',
+        'history uses the local calendar day at midnight');
+    equal(localUsageDateKey(new Date(2026, 8, 1, 0, 0).getTime() - 1), '2026-08-31',
+        'the local day rolls over exactly at local midnight');
+
     const liveUsage = normalizeAccountTokenUsage({
         summary: {lifetimeTokens: 10_000},
         dailyUsageBuckets: [
@@ -392,31 +401,132 @@ function testCodexLocalHistory() {
             {startDate: '2026-08-30', tokens: 200},
             {startDate: '2026-08-31', tokens: 300},
         ],
-    }, nowMs);
-    const firstRun = mergeCodexHistory(null, liveUsage, nowMs);
+    }, aug31Ms);
+    const firstRun = mergeCodexHistory(null, liveUsage, aug31Ms);
     equal(firstRun.dailyBuckets.length, 1,
         'a fresh installation starts with only its first real current-day sample');
     equal(firstRun.dailyBuckets[0].date, '2026-08-31',
         'fresh history never imports earlier account-side buckets');
+    equal(firstRun.version, CODEX_HISTORY_VERSION,
+        'new history uses the current local aggregation schema');
+
     const existing = {
         version: 1,
-        startedAt: nowMs - 86_400_000,
+        startedAt: aug31Ms - 86_400_000,
         dailyBuckets: [{date: '2026-08-30', tokens: 175}],
     };
-    const merged = mergeCodexHistory(existing, liveUsage, nowMs);
+    const merged = mergeCodexHistory(existing, liveUsage, aug31Ms);
     equal(merged.dailyBuckets.length, 2, 'existing local history gains one current-day sample');
-    equal(mergeCodexHistory(merged, liveUsage, nowMs).dailyBuckets.length, 2,
+    equal(mergeCodexHistory(merged, liveUsage, aug31Ms).dailyBuckets.length, 2,
         'repeated refreshes never duplicate a same-day history entry');
-    const displayed = applyCodexHistory(liveUsage, merged, nowMs);
+    const displayed = applyCodexHistory(liveUsage, merged, aug31Ms);
     equal(displayed.peakDailyTokens, 300, 'local peak statistics derive from local history');
     equal(displayed.sevenDayTokens, 475, 'local seven-day total derives from local history');
     equal(withoutCodexHistory(displayed).dailyBuckets.length, 0,
         'the current-limit cache never duplicates local graph history');
+
+    const laggedSep1Usage = normalizeAccountTokenUsage({
+        summary: {lifetimeTokens: 10_040},
+        dailyUsageBuckets: [{startDate: '2026-08-31', tokens: 340}],
+    }, sep1Ms);
+    const rolled = mergeCodexHistory(firstRun, laggedSep1Usage, sep1Ms);
+    equal(rolled.dailyBuckets.length, 2,
+        'the next local day becomes graph-eligible on its first real sample');
+    equal(rolled.dailyBuckets[0].tokens, 300,
+        'local-day rollover freezes the previous real daily total');
+    equal(rolled.dailyBuckets[1].date, '2026-09-01',
+        'lifetime activity is assigned to the canonical current local day');
+    equal(rolled.dailyBuckets[1].tokens, 40,
+        'a lagging upstream date uses only the real observed lifetime increment');
+    equal(sparklineCoordinates(rolled.dailyBuckets, 120, 48).length, 2,
+        'the Aug 31 to Sep 1 two-point trend produces valid graph geometry');
+
+    const laterSep1 = mergeCodexHistory(rolled, {
+        lifetimeTokens: 10_065,
+        dailyBuckets: [{date: '2026-08-31', tokens: 365}],
+    }, sep1Ms + 60_000);
+    equal(laterSep1.dailyBuckets.length, 2,
+        'same-day adaptive refreshes replace rather than append history');
+    equal(laterSep1.dailyBuckets.at(-1).tokens, 65,
+        'same-day lifetime increments update the existing local daily total');
+    const unchangedSep1 = mergeCodexHistory(laterSep1, {
+        lifetimeTokens: 10_065,
+        dailyBuckets: [{date: '2026-08-31', tokens: 365}],
+    }, sep1Ms + 120_000);
+    equal(JSON.stringify(unchangedSep1), JSON.stringify(laterSep1),
+        'unchanged 30-second samples do not create history writes');
+
+    const zeroRollover = mergeCodexHistory(laterSep1, {
+        lifetimeTokens: 10_065,
+        dailyBuckets: [{date: '2026-08-31', tokens: 365}],
+    }, sep2Ms);
+    equal(zeroRollover.dailyBuckets.at(-1).tokens, 0,
+        'a real zero-activity rollover remains a valid daily sample');
+    const thirdDay = mergeCodexHistory(zeroRollover, {
+        lifetimeTokens: 10_080,
+        dailyBuckets: [{date: '2026-08-31', tokens: 380}],
+    }, sep2Ms + 60_000);
+    equal(thirdDay.dailyBuckets.length, 3,
+        'third and later local days continue the bounded daily series');
+    equal(thirdDay.dailyBuckets.at(-1).tokens, 15,
+        'the current local day continues accumulating real increments');
+
+    const realWorldLegacy = {
+        version: 1,
+        startedAt: aug31Ms,
+        dailyBuckets: [{date: '2026-08-31', tokens: 76_912_508}],
+    };
+    const realWorldUsage = {
+        lifetimeTokens: 1_079_439_605,
+        dailyBuckets: [{date: '2026-08-31', tokens: 172_516_170}],
+    };
+    const migrated = mergeCodexHistory(realWorldLegacy, realWorldUsage, sep1Ms);
+    equal(migrated.dailyBuckets.map(bucket => bucket.date).join(','),
+        '2026-08-31,2026-09-01',
+        'the observed Aug 31 to Sep 1 case migrates without losing either day');
+    equal(migrated.dailyBuckets.at(-1).tokens, 95_603_662,
+        'legacy migration attributes only the provider bucket increase to Sep 1');
+    const migratedDisplay = applyCodexHistory(realWorldUsage, migrated, sep1Ms);
+    equal(migratedDisplay.peakDailyTokens, 95_603_662,
+        'Peak is calculated from the same canonical daily series as the graph');
+    equal(migratedDisplay.peakDate, '2026-09-01',
+        'Peak day updates when the current real local total becomes highest');
+
+    const bankedResetState = normalizeRateLimits({
+        rateLimits: {
+            primary: {
+                usedPercent: 0,
+                windowDurationMins: 10_080,
+                resetsAt: 2_000_000_000,
+            },
+        },
+        rateLimitResetCredits: {availableCount: 0, credits: []},
+    }, sep1Ms + 180_000, {
+        usageResponse: {
+            summary: {lifetimeTokens: realWorldUsage.lifetimeTokens},
+            dailyUsageBuckets: [{startDate: '2026-08-31', tokens: 172_516_170}],
+        },
+    });
+    equal(bankedResetState.weekly.remainingPercent, 100,
+        'a banked reset can truthfully restore weekly capacity');
+    const bankedResetRefresh = mergeCodexHistory(
+        migrated,
+        bankedResetState.tokenUsage,
+        sep1Ms + 180_000
+    );
+    equal(JSON.stringify(bankedResetRefresh.dailyBuckets), JSON.stringify(migrated.dailyBuckets),
+        'weekly or banked-reset state cannot clear independent token history');
+    const reloaded = normalizeCodexHistory(JSON.parse(JSON.stringify(migrated)), sep1Ms);
+    equal(reloaded.dailyBuckets.length, 2,
+        'disable and re-enable preserves the persisted graph-eligible history');
+    equal(reloaded.dailyBuckets[0].tokens, 76_912_508,
+        'version 1 migration preserves valid existing user history');
+
     equal(normalizeCodexHistory({
         version: 999,
         startedAt: 1,
         dailyBuckets: [{date: '2026-08-30', tokens: 999}],
-    }, nowMs).dailyBuckets.length, 0, 'unsupported history formats fail closed');
+    }, aug31Ms).dailyBuckets.length, 0, 'unsupported history formats fail closed');
 }
 
 function testTopBarSummaries() {

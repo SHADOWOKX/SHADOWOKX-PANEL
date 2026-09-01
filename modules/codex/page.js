@@ -27,6 +27,7 @@ import {
 } from '../../ui/components.js';
 import {BasePage} from '../basePage.js';
 import {exportCodexSummaryImage} from './shareImage.js';
+import {localUsageDateKey} from './normalize.js';
 import {tokenSparkline} from './sparkline.js';
 
 function contentSignature(state) {
@@ -489,7 +490,7 @@ export class CodexPage extends BasePage {
     }
 
     _tokenInsight(usage) {
-        const prior = usage.dailyBuckets?.filter(bucket => bucket.date !== this._todayKey()) ?? [];
+        const prior = usage.dailyBuckets?.filter(bucket => bucket.date !== localUsageDateKey(Date.now())) ?? [];
         if (!Number.isSafeInteger(usage.todayTokens) || prior.length < 2)
             return null;
         const average = prior.reduce((total, bucket) => total + bucket.tokens, 0) / prior.length;
@@ -549,12 +550,6 @@ export class CodexPage extends BasePage {
             }
         }
         return String(value);
-    }
-
-    _todayKey() {
-        const now = new Date();
-        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-` +
-            String(now.getDate()).padStart(2, '0');
     }
 
     _formatUsageDate(value) {
