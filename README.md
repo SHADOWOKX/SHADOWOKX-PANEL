@@ -19,22 +19,29 @@ Release `2.3.3`.
 - GNOME Shell 50.x
 - Wayland
 - GJS 1.88 or newer
+- Git
 
-## Install
+## Installation
 
-Clone the repository, open its directory, and run:
+### Quick install
+
+Copy and paste this into a terminal:
 
 ```bash
-./install.sh
+git clone https://github.com/SHADOWOKX/SHADOWOKX-PANEL.git && cd SHADOWOKX-PANEL && ./install.sh
 ```
 
-Log out and back in, then enable the extension:
+When the installer finishes, **log out and back in once** so GNOME Shell can load the extension.
+
+Then enable it:
 
 ```bash
 gnome-extensions enable shadow-panel@shadowokx
 ```
 
-Open preferences:
+That's it. Shadowokx Panel should now appear in the GNOME top bar.
+
+### Open preferences
 
 ```bash
 gnome-extensions prefs shadow-panel@shadowokx
@@ -42,16 +49,23 @@ gnome-extensions prefs shadow-panel@shadowokx
 
 ## Update
 
-Pull the latest changes and run the installer again:
+If you installed the panel with the command above, update it with:
 
 ```bash
+cd SHADOWOKX-PANEL
 git pull
 ./install.sh
 ```
 
-Log out and back in to load the updated extension.
+Then log out and back in once to load the updated version. If needed, enable it again with:
+
+```bash
+gnome-extensions enable shadow-panel@shadowokx
+```
 
 ## Uninstall
+
+From the cloned `SHADOWOKX-PANEL` directory:
 
 ```bash
 ./uninstall.sh
