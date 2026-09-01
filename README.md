@@ -116,7 +116,7 @@ Security properties:
 - Raw app-server messages and stderr are not logged.
 - Responses are bounded to 1 MiB and a 15-second timeout terminates an unresponsive helper.
 - No account profile, email, authentication token, cookie, or session file is requested or stored.
-- Successful normalized limit data is cached privately and refreshed at a configurable interval; graph history is stored separately.
+- Successful normalized limit data is cached privately. Codex refreshes every 60 seconds in the background and every 30 seconds while its popup page is visible; graph history is stored separately.
 
 The integration follows the [official Codex App Server documentation](https://developers.openai.com/codex/app-server/).
 

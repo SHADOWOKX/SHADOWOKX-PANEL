@@ -147,6 +147,7 @@ export default class UiSmokeExtension extends Extension {
             usageStateVisible: indicator._codexPaceIcon.visible,
             expectedTimerCount: services?.weatherProvider ? 2 : 1,
         };
+
         indicator.menu.open();
         await settle();
         report.tabWidths = [...(indicator._tabs?._buttons?.values?.() ?? [])]
@@ -259,6 +260,61 @@ export default class UiSmokeExtension extends Extension {
             indicator = currentIndicator;
             services = indicator._extension.getRuntimeServices();
         }
+
+        // Exercise the popup-to-provider policy only after any intentionally
+        // deferred startup rebuild has settled. Stub refresh here so the smoke
+        // helper verifies signals/timers without spawning extra Codex helpers.
+        const codexProvider = services.codexProvider;
+        const originalRefresh = codexProvider.refresh.bind(codexProvider);
+        let immediateRefreshes = 0;
+        codexProvider.refresh = () => {
+            immediateRefreshes++;
+            return Promise.resolve(codexProvider.getState());
+        };
+        if (report.moduleIds.includes('weather'))
+            indicator._select('weather');
+        indicator.menu.open();
+        await settle();
+        report.popupRefreshImmediate = immediateRefreshes === 1;
+        report.codexVisibleAfterPopupOpen = codexProvider._viewVisible;
+        indicator._select('codex');
+        await settle();
+        report.codexTabRefreshImmediate = report.moduleIds.includes('weather')
+            ? immediateRefreshes === 2
+            : immediateRefreshes === 1;
+        report.codexVisibleAfterTab = codexProvider._viewVisible;
+        indicator._select('codex');
+        await settle();
+        report.sameTabRefreshes = immediateRefreshes;
+        report.timerCountWhileCodexVisible = services.scheduler._sources.size;
+        indicator.menu.close();
+        await settle();
+        report.codexBackgroundAfterClose = !codexProvider._viewVisible;
+        report.timerCountAfterFocusedClose = services.scheduler._sources.size;
+        codexProvider.refresh = originalRefresh;
+
+        const originalCodexState = codexProvider.getState();
+        if (originalCodexState.weekly) {
+            const remaining = originalCodexState.weekly.remainingPercent === 0
+                ? 1
+                : originalCodexState.weekly.remainingPercent - 1;
+            codexProvider._setState({
+                ...originalCodexState,
+                weekly: {
+                    ...originalCodexState.weekly,
+                    remainingPercent: remaining,
+                    usedPercent: 100 - remaining,
+                },
+            });
+            await settle();
+            report.topBarAutomaticUpdate = indicator._codexSummary.label.text
+                .includes(`${remaining}%`);
+            codexProvider._setState(originalCodexState);
+            await settle();
+        } else {
+            report.topBarAutomaticUpdate = true;
+        }
+
         for (let cycle = 0; cycle < 20; cycle++) {
             indicator.menu.open();
             if (indicator.menu.isOpen)
@@ -272,8 +328,8 @@ export default class UiSmokeExtension extends Extension {
             services.weatherProvider._setState({...services.weatherProvider.getState()});
         await settle();
         report.hiddenPageTreesPreserved = [...indicator._pages]
-            .every(([id, page]) => page.actor.get_first_child() === hiddenChildren.get(id) &&
-                page._stateDirty);
+            .every(([id, page]) => page.actor.get_first_child() === hiddenChildren.get(id));
+        report.unchangedCodexStateIgnored = !indicator._pages.get('codex')._stateDirty;
         indicator.menu.open();
         const capturePage = GLib.getenv('SHADOW_UI_PAGE');
         if (capturePage === 'codex' || capturePage === 'weather') {

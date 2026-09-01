@@ -68,7 +68,7 @@
     </key>
     <key name="refresh-on-open" type="b">
       <default>true</default>
-      <summary>Refresh stale providers when opening the popup</summary>
+      <summary>Refresh stale Weather data when opening the popup</summary>
     </key>
     <key name="animations" type="b">
       <default>true</default>
@@ -159,7 +159,7 @@
     <key name="codex-refresh-minutes" type="i">
       <range min="5" max="120"/>
       <default>15</default>
-      <summary>Codex refresh interval in minutes</summary>
+      <summary>Legacy Codex refresh interval retained for settings compatibility</summary>
     </key>
     <key name="weather-location" type="s">
       <default>'Cairo, Egypt'</default>

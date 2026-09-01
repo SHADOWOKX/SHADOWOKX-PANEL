@@ -1,7 +1,11 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
-import {MODULE_IDS} from '../lib/constants.js';
+import {
+    BACKGROUND_CODEX_REFRESH_INTERVAL,
+    MODULE_IDS,
+    VISIBLE_CODEX_REFRESH_INTERVAL,
+} from '../lib/constants.js';
 import {
     clampPercent,
     formatCountdown,
@@ -22,6 +26,7 @@ import {
     weatherSummaryTemperature,
 } from '../lib/summary.js';
 import {
+    localUsageDateKey,
     normalizeCachedRateLimits,
     normalizeAccountTokenUsage,
     normalizeRateLimits,
@@ -130,6 +135,26 @@ const inertScheduler = {
     cancel() {},
 };
 
+class RecordingScheduler {
+    constructor() {
+        this.jobs = new Map();
+        this.schedules = 0;
+    }
+
+    every(name, seconds, callback) {
+        this.schedules++;
+        this.jobs.set(name, {seconds, callback});
+    }
+
+    cancel(name) {
+        this.jobs.delete(name);
+    }
+
+    run(name) {
+        return this.jobs.get(name)?.callback();
+    }
+}
+
 function testFormatting() {
     equal(clampPercent(112), 100, 'percent upper clamp');
     equal(clampPercent(-4), 0, 'percent lower clamp');
@@ -137,8 +162,8 @@ function testFormatting() {
     equal(formatResetDate(Number.MAX_VALUE), 'Reset time unavailable', 'invalid reset dates are rejected');
     ok(isHexColor('#8b5cf6'), 'valid custom accent');
     ok(!isHexColor('purple'), 'invalid custom accent');
-    equal(formatRelativeAge(999_970_000, 1_000_000_000), 'just now',
-        'sub-minute refresh ages stay concise');
+    equal(formatRelativeAge(999_970_000, 1_000_000_000), '30s ago',
+        'sub-minute refresh ages update without provider work');
     equal(formatRelativeAge(999_880_000, 1_000_000_000), '2m ago',
         'minute refresh ages are formatted');
 }
@@ -795,6 +820,157 @@ async function testPersistenceAndRefreshCoalescing() {
     provider.destroy();
 }
 
+async function testAdaptiveCodexRefreshLifecycle() {
+    const scheduler = new RecordingScheduler();
+    const provider = new CodexProvider(new FakeSettings(), scheduler, null);
+    provider._cache.read = async () => null;
+    provider._historyStore.read = async () => null;
+    provider._cache.write = async () => {};
+    provider._historyStore.write = async () => {};
+    let refreshes = 0;
+    provider._refresh = async () => {
+        refreshes++;
+        return provider.getState();
+    };
+
+    await provider.start();
+    equal(refreshes, 1, 'extension startup immediately refreshes Codex');
+    equal(scheduler.jobs.get('codex-refresh').seconds, BACKGROUND_CODEX_REFRESH_INTERVAL,
+        'closed popup uses the 60-second Codex cadence');
+    equal(scheduler.jobs.size, 1, 'Codex owns one adaptive refresh timer');
+
+    await provider.setViewVisible(true, true);
+    equal(refreshes, 2, 'opening the visible Codex page refreshes immediately');
+    equal(scheduler.jobs.get('codex-refresh').seconds, VISIBLE_CODEX_REFRESH_INTERVAL,
+        'visible Codex page uses the 30-second cadence');
+    await scheduler.run('codex-refresh');
+    equal(refreshes, 3, 'visible cadence performs an automatic refresh');
+
+    await provider.setViewVisible(false, false);
+    equal(scheduler.jobs.get('codex-refresh').seconds, BACKGROUND_CODEX_REFRESH_INTERVAL,
+        'popup close returns to the background cadence');
+    await provider.setViewVisible(true, true);
+    equal(refreshes, 4, 'activating the Codex tab refreshes immediately');
+    await provider.setViewVisible(false, false);
+    await provider.setViewVisible(true, false);
+    await provider.setViewVisible(false, false);
+    equal(scheduler.jobs.size, 1, 'repeated popup transitions never multiply timers');
+
+    const schedulesBeforeManual = scheduler.schedules;
+    await provider.refresh(true);
+    equal(refreshes, 5, 'manual refresh uses the shared provider path');
+    equal(scheduler.schedules, schedulesBeforeManual,
+        'manual refresh does not create or reschedule a timer');
+
+    provider.destroy();
+    equal(scheduler.jobs.size, 0, 'provider teardown removes the adaptive refresh timer');
+
+    const startupScheduler = new RecordingScheduler();
+    const startupProvider = new CodexProvider(new FakeSettings(), startupScheduler, null);
+    let finishCacheRead = null;
+    startupProvider._cache.read = () => new Promise(resolve => { finishCacheRead = resolve; });
+    startupProvider._historyStore.read = async () => null;
+    let startupRefreshes = 0;
+    startupProvider._refresh = async () => {
+        startupRefreshes++;
+        return startupProvider.getState();
+    };
+    const startup = startupProvider.start();
+    const earlyPopup = startupProvider.setViewVisible(true, true);
+    finishCacheRead(null);
+    await Promise.all([startup, earlyPopup]);
+    equal(startupRefreshes, 1,
+        'popup activation during initialization coalesces with the startup refresh');
+    equal(startupScheduler.jobs.get('codex-refresh').seconds,
+        VISIBLE_CODEX_REFRESH_INTERVAL,
+        'early popup activation starts directly on the visible cadence');
+    startupProvider.destroy();
+}
+
+async function testFrequentCodexRefreshIntegrity() {
+    const scheduler = new RecordingScheduler();
+    const provider = new CodexProvider(new FakeSettings(), scheduler, null);
+    provider._cache.read = async () => null;
+    provider._historyStore.read = async () => null;
+    let cacheWrites = 0;
+    let historyWrites = 0;
+    provider._cache.write = async () => { cacheWrites++; };
+    provider._historyStore.write = async () => { historyWrites++; };
+    let usedPercent = 94;
+    let fail = false;
+    const today = localUsageDateKey(Date.now());
+    provider._readAppServer = async () => {
+        if (fail)
+            throw new Error('temporary failure');
+        return {
+            rateLimitsResponse: {
+                rateLimits: {
+                    primary: {
+                        usedPercent,
+                        windowDurationMins: 10080,
+                        resetsAt: 2_000_000_000,
+                    },
+                },
+                rateLimitResetCredits: {availableCount: 1, credits: []},
+            },
+            usageResponse: {
+                summary: {lifetimeTokens: 5_000},
+                dailyUsageBuckets: [{startDate: today, tokens: 200}],
+            },
+        };
+    };
+    const observedRemaining = [];
+    provider.subscribe(state => {
+        const remaining = codexRemainingSummary(state);
+        if (remaining !== null)
+            observedRemaining.push(remaining);
+    });
+
+    let state = await provider.start();
+    equal(state.weekly.remainingPercent, 6, 'initial live Codex value is truthful');
+    equal(cacheWrites, 1, 'first live limit sample is cached once');
+    equal(historyWrites, 1, 'first current-day token sample is stored once');
+
+    usedPercent = 95;
+    state = await scheduler.run('codex-refresh');
+    equal(state.weekly.remainingPercent, 5, 'automatic refresh publishes a changed percentage');
+    equal(observedRemaining.at(-1), 5,
+        'provider subscribers receive automatic changes for the top bar');
+    equal(state.tokenUsage.dailyBuckets.length, 1,
+        'frequent refresh keeps one real history bucket for the current day');
+    equal(historyWrites, 1, 'unchanged same-day activity is not written again');
+
+    const writesAfterChange = cacheWrites;
+    state = await scheduler.run('codex-refresh');
+    equal(cacheWrites, writesAfterChange,
+        'unchanged limits do not cause another cache write');
+
+    fail = true;
+    const previousReset = state.weekly.resetsAt;
+    state = await scheduler.run('codex-refresh');
+    equal(state.status, 'stale', 'transient failure marks the live sample stale');
+    equal(state.weekly.remainingPercent, 5,
+        'transient failure preserves the last-known-good percentage');
+    equal(state.weekly.resetsAt, previousReset,
+        'transient failure preserves the last-known-good reset time');
+    equal(state.resetCreditsAvailable, 1,
+        'transient failure preserves reset credits');
+    equal(state.tokenUsage.dailyBuckets.length, 1,
+        'transient failure does not inflate token history');
+
+    const weatherScheduler = new RecordingScheduler();
+    const weather = new WeatherProvider(new FakeSettings({
+        'weather-refresh-minutes': 30,
+        'weather-location': 'Cairo, Egypt',
+        'weather-unit': 'celsius',
+    }), weatherScheduler, null);
+    weather._reschedule();
+    equal(weatherScheduler.jobs.get('weather-refresh').seconds, 30 * 60,
+        'adaptive Codex work leaves Weather cadence unchanged');
+    weather.destroy();
+    provider.destroy();
+}
+
 async function testCodexProtocolOrdering() {
     const fakeServer = GLib.build_filenamev([
         GLib.get_tmp_dir(),
@@ -882,6 +1058,8 @@ await testWeatherLocationFallback();
 await testCodexShareImage();
 await testProviderFailureIsolation();
 await testPersistenceAndRefreshCoalescing();
+await testAdaptiveCodexRefreshLifecycle();
+await testFrequentCodexRefreshIntegrity();
 await testCodexProtocolOrdering();
 await testWeatherTrailingRefresh();
 

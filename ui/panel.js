@@ -204,6 +204,7 @@ class ShadowIndicator extends PanelMenu.Button {
 
     _createPages() {
         const services = this._extension.getRuntimeServices();
+        this._codexProvider = services.codexProvider;
         const context = {
             extension: this._extension,
             settings: this._settings,
@@ -352,8 +353,10 @@ class ShadowIndicator extends PanelMenu.Button {
             }
         }
         this._tabs?.setActive(id);
-        if (this._popupOpen && previousId !== id)
+        if (this._popupOpen && previousId !== id) {
+            this._codexProvider?.setViewVisible(id === 'codex', id === 'codex');
             selectedPage?.onPopupOpened();
+        }
         selectedPage?.activate();
         if (this._settings.get_boolean('remember-last-tab'))
             this._settings.set_string('last-selected-tab', id);
@@ -503,6 +506,7 @@ class ShadowIndicator extends PanelMenu.Button {
         if (this._destroyed)
             return;
         this._popupOpen = true;
+        this._codexProvider?.setViewVisible(this._activeId === 'codex', true);
         try {
             this._pages.get(this._activeId)?.onPopupOpened();
         } catch (error) {
@@ -514,6 +518,7 @@ class ShadowIndicator extends PanelMenu.Button {
         if (this._destroyed)
             return;
         this._popupOpen = false;
+        this._codexProvider?.setViewVisible(false, false);
         try {
             this._pages.get(this._activeId)?.onPopupClosed();
         } catch (error) {
@@ -550,6 +555,8 @@ class ShadowIndicator extends PanelMenu.Button {
         if (this._destroyed)
             return;
         this._destroyed = true;
+        this._codexProvider?.setViewVisible(false, false);
+        this._codexProvider = null;
         this._mounted = false;
         if (this._mountSignalId) {
             this.disconnect(this._mountSignalId);

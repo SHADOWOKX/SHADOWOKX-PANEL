@@ -51,14 +51,23 @@ const badCodexPolish = !report.codexFooter || report.codexFooter.width <= 300 ||
 const badPage = report.tabSwitches.length !== 4 || report.tabSwitches.some(item =>
     !item.hasExpectedContent || item.page.width <= 0 || item.page.height <= 0 ||
     item.stack.height <= 0 || item.childCount < 2);
+const badCodexRefreshLifecycle = !report.popupRefreshImmediate ||
+    report.codexVisibleAfterPopupOpen !== !expectWeatherPanel ||
+    !report.codexTabRefreshImmediate || !report.codexVisibleAfterTab ||
+    report.sameTabRefreshes !== (expectWeatherPanel ? 2 : 1) ||
+    !report.codexBackgroundAfterClose || !report.topBarAutomaticUpdate ||
+    report.timerCountWhileCodexVisible !== report.expectedTimerCount + 1 ||
+    report.timerCountAfterFocusedClose !== report.expectedTimerCount;
 
 if (!report.reopened || !report.usageSettingUpdatedLive ||
+    !report.unchangedCodexStateIgnored ||
     !report.hiddenPageTreesPreserved || !report.refreshTreesPreserved ||
     report.openCloseCycles !== 20 || report.scrollResetValue !== 0 ||
     !report.refreshStateExercised || pageWidths.size !== 1 ||
     scrolling !== expectScroll || badPolicy || badLifecycle || badModules ||
     badWeatherTopBar || badUsageState || badHourly || badUv || badLocation || badCodexPolish ||
-    report.graph.width <= 0 || report.graph.height < 45 || badPage) {
+    report.graph.width <= 0 || report.graph.height < 45 || badPage ||
+    badCodexRefreshLifecycle) {
     throw new Error(JSON.stringify(report));
 }
 

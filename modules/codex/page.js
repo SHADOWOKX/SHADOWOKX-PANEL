@@ -3,6 +3,7 @@ import Gio from 'gi://Gio';
 import St from 'gi://St';
 
 import {formatCountdown, formatRelativeAge, formatResetDate} from '../../lib/format.js';
+import {CODEX_TIMED_LABEL_INTERVAL} from '../../lib/constants.js';
 import {normalizeSparklineBuckets, sparklineDayLabels} from '../../lib/sparkline.js';
 import {codexUsageStatus} from '../../lib/summary.js';
 import {launchUri} from '../../services/launcher.js';
@@ -28,6 +29,22 @@ import {BasePage} from '../basePage.js';
 import {exportCodexSummaryImage} from './shareImage.js';
 import {tokenSparkline} from './sparkline.js';
 
+function contentSignature(state) {
+    if (!state?.lastSuccessfulRefresh) {
+        return JSON.stringify({
+            status: state?.status ?? null,
+            errorCode: state?.errorCode ?? null,
+            error: state?.error ?? null,
+        });
+    }
+    return JSON.stringify({
+        weekly: state.weekly,
+        fiveHour: state.fiveHour,
+        resetCreditsAvailable: state.resetCreditsAvailable,
+        tokenUsage: state.tokenUsage,
+    });
+}
+
 export class CodexPage extends BasePage {
     constructor(context) {
         super(context, 'codex');
@@ -38,17 +55,20 @@ export class CodexPage extends BasePage {
         this._lastWeeklyPercent = null;
         this._hasRendered = false;
         this._stateDirty = true;
+        this._renderedSignature = null;
         this._timedLabels = [];
         this._graphHasAppeared = false;
         this._refreshButton = null;
         this._shareCancellable = null;
         this.track(this._provider.subscribe(state => {
-            this._stateDirty = true;
-            if (this._hasRendered && this._popupOpen &&
-                state.status === 'refreshing' && state.lastSuccessfulRefresh) {
-                this._setRefreshState(true);
-            } else if (!this._hasRendered || this._popupOpen) {
+            const nextSignature = contentSignature(state);
+            const contentChanged = nextSignature !== this._renderedSignature;
+            this._stateDirty ||= contentChanged;
+            if (!this._hasRendered || this._popupOpen && contentChanged) {
                 this._render();
+            } else if (this._popupOpen) {
+                this._setRefreshState(state.status === 'refreshing' || state.status === 'loading');
+                this._refreshTimedLabels();
             }
         }));
     }
@@ -62,16 +82,14 @@ export class CodexPage extends BasePage {
             this._refreshTimedLabels();
             this.fit();
         }
-        this.context.scheduler.every('codex-countdown', 60, () =>
+        this.context.scheduler.every('codex-timed-labels', CODEX_TIMED_LABEL_INTERVAL, () =>
             this._refreshTimedLabels());
-        if (this.context.settings.get_boolean('refresh-on-open') && this._provider.isStale())
-            this._provider.refresh(false);
     }
 
     onPopupClosed() {
         this._popupOpen = false;
         this._stopRefreshAnimation();
-        this.context.scheduler.cancel('codex-countdown');
+        this.context.scheduler.cancel('codex-timed-labels');
     }
 
     activate() {
@@ -167,6 +185,7 @@ export class CodexPage extends BasePage {
             this._scroll = nextScroll;
             this._hasRendered = true;
             this._stateDirty = false;
+            this._renderedSignature = contentSignature(state);
             this._refreshButton = nextRefreshButton;
             this._timedLabels = nextTimedLabels;
         }
@@ -568,7 +587,9 @@ export class CodexPage extends BasePage {
         row.add_child(credits);
         if (hasUpdate) {
             row.add_child(this._timedLabel(
-                () => `Updated ${formatRelativeAge(state.lastSuccessfulRefresh)}`,
+                () => `Updated ${formatRelativeAge(
+                    this._provider.getState()?.lastSuccessfulRefresh
+                )}`,
                 {
                 style_class: 'shadow-footer-updated',
                 x_align: Clutter.ActorAlign.END,
@@ -679,7 +700,7 @@ export class CodexPage extends BasePage {
         this._shareCancellable?.cancel();
         this._shareCancellable = null;
         this._stopRefreshAnimation();
-        this.context.scheduler.cancel('codex-countdown');
+        this.context.scheduler.cancel('codex-timed-labels');
         super.destroy();
         this._scroll = null;
         this._scrollContent = null;

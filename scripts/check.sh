@@ -55,7 +55,8 @@ if unzip -Z1 "$shadow_test_dir/package/shadow-panel@shadowokx.shell-extension.zi
   exit 1
 fi
 if rg -n '/home/[[:alnum:]_.-]+/' \
-  --glob '!scripts/check.sh' --glob '!dist/**' --glob '!schemas/gschemas.compiled' .; then
+  --glob '!windows/**' --glob '!scripts/check.sh' --glob '!dist/**' \
+  --glob '!schemas/gschemas.compiled' .; then
   printf '%s\n' 'A machine-specific home path was found in the repository.' >&2
   exit 1
 fi

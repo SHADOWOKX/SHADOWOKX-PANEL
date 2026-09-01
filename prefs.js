@@ -125,8 +125,8 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
         panel.add(switchRow(
             settings,
             'refresh-on-open',
-            'Refresh stale data when opened',
-            'Only refreshes a provider after its configured interval has elapsed.'
+            'Refresh stale Weather when opened',
+            'Codex refreshes immediately; this setting keeps Weather on its existing cadence.'
         ));
         page.add(panel);
 
@@ -234,15 +234,6 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
         content.add(switchRow(settings, 'show-codex-weekly', 'Show weekly limit'));
         content.add(switchRow(settings, 'show-codex-five-hour', 'Show five-hour window'));
         content.add(switchRow(settings, 'show-codex-reset-time', 'Show reset times'));
-        content.add(spinRow(
-            settings,
-            'codex-refresh-minutes',
-            'Automatic refresh interval',
-            5,
-            120,
-            5,
-            'Minutes between local app-server requests.'
-        ));
         page.add(content);
 
         const activity = new Adw.PreferencesGroup({

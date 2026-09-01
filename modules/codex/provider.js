@@ -3,7 +3,11 @@ import GLib from 'gi://GLib';
 
 import {Observable} from '../../services/observable.js';
 import {JsonStore} from '../../services/jsonStore.js';
-import {APP_VERSION} from '../../lib/constants.js';
+import {
+    APP_VERSION,
+    BACKGROUND_CODEX_REFRESH_INTERVAL,
+    VISIBLE_CODEX_REFRESH_INTERVAL,
+} from '../../lib/constants.js';
 import {findCodexExecutable} from './discovery.js';
 import {
     applyCodexHistory,
@@ -17,6 +21,28 @@ Gio._promisify(Gio.OutputStream.prototype, 'write_all_async', 'write_all_finish'
 Gio._promisify(Gio.InputStream.prototype, 'read_bytes_async', 'read_bytes_finish');
 
 const MAX_MESSAGE_BYTES = 1024 * 1024;
+
+function cacheValue(state) {
+    return {
+        ...state,
+        tokenUsage: withoutCodexHistory(state.tokenUsage),
+    };
+}
+
+function dataSignature(value) {
+    if (!value)
+        return null;
+    const {
+        status: _status,
+        connection: _connection,
+        stale: _stale,
+        error: _error,
+        errorCode: _errorCode,
+        lastSuccessfulRefresh: _lastSuccessfulRefresh,
+        ...data
+    } = value;
+    return JSON.stringify(data);
+}
 
 export class CodexProvider extends Observable {
     constructor(settings, scheduler, logger) {
@@ -47,13 +73,22 @@ export class CodexProvider extends Observable {
         );
         this._history = normalizeCodexHistory(null);
         this._inFlight = null;
+        this._startPromise = null;
+        this._started = false;
         this._cancellable = null;
         this._process = null;
-        this._settingsId = 0;
+        this._viewVisible = false;
+        this._lastCacheSignature = null;
+        this._lastHistorySignature = null;
         this._destroyed = false;
     }
 
-    async start() {
+    start() {
+        this._startPromise ??= this._start();
+        return this._startPromise;
+    }
+
+    async _start() {
         const [cached, history] = await Promise.all([
             this._cache.read(null),
             this._historyStore.read(null),
@@ -61,33 +96,52 @@ export class CodexProvider extends Observable {
         if (this._destroyed)
             return this.getState();
         this._history = normalizeCodexHistory(history);
+        this._lastHistorySignature = JSON.stringify(this._history);
         const cachedState = normalizeCachedRateLimits(cached);
         if (cachedState) {
             const stale = Date.now() - cachedState.lastSuccessfulRefresh >=
-                this._settings.get_int('codex-refresh-minutes') * 60 * 1000;
+                BACKGROUND_CODEX_REFRESH_INTERVAL * 1000;
             this._setState({
                 ...cachedState,
                 tokenUsage: applyCodexHistory(cachedState.tokenUsage, this._history),
                 status: stale ? 'stale' : 'cached',
                 stale,
             });
+            this._lastCacheSignature = dataSignature(cacheValue(cachedState));
         }
+        this._started = true;
         this._reschedule();
-        this._settingsId = this._settings.connect('changed::codex-refresh-minutes', () => {
-            this._reschedule();
-            this.refresh(false);
-        });
-        return this.refresh(false);
+        return this.refresh(true);
     }
 
     _reschedule() {
-        const seconds = this._settings.get_int('codex-refresh-minutes') * 60;
-        this._scheduler.every('codex-refresh', seconds, () => this.refresh(false));
+        if (this._destroyed || !this._started)
+            return;
+        this._scheduler.every(
+            'codex-refresh',
+            this._viewVisible
+                ? VISIBLE_CODEX_REFRESH_INTERVAL
+                : BACKGROUND_CODEX_REFRESH_INTERVAL,
+            () => this.refresh(true)
+        );
+    }
+
+    setViewVisible(visible, refreshNow = false) {
+        if (this._destroyed)
+            return Promise.resolve(this.getState());
+        const next = Boolean(visible);
+        if (next !== this._viewVisible) {
+            this._viewVisible = next;
+            this._reschedule();
+        }
+        return refreshNow ? this.refresh(true) : Promise.resolve(this.getState());
     }
 
     refresh(force = true) {
         if (this._destroyed)
             return Promise.resolve(this.getState());
+        if (!this._started && this._startPromise)
+            return this._startPromise;
         if (this._inFlight)
             return this._inFlight;
         if (!force && !this.isStale())
@@ -106,7 +160,9 @@ export class CodexProvider extends Observable {
             current?.connection === 'unavailable')
             return true;
         const last = current?.lastSuccessfulRefresh;
-        const maxAge = this._settings.get_int('codex-refresh-minutes') * 60 * 1000;
+        const maxAge = (this._viewVisible
+            ? VISIBLE_CODEX_REFRESH_INTERVAL
+            : BACKGROUND_CODEX_REFRESH_INTERVAL) * 1000;
         return !last || Date.now() - last >= maxAge;
     }
 
@@ -137,14 +193,22 @@ export class CodexProvider extends Observable {
             if (this._destroyed)
                 return this.getState();
             this._setState(state);
+            const nextCacheValue = cacheValue(state);
+            const nextCacheSignature = dataSignature(nextCacheValue);
+            const nextHistorySignature = JSON.stringify(this._history);
+            const writes = [];
+            if (nextCacheSignature !== this._lastCacheSignature) {
+                writes.push(this._cache.write(nextCacheValue).then(() => {
+                    this._lastCacheSignature = nextCacheSignature;
+                }));
+            }
+            if (nextHistorySignature !== this._lastHistorySignature) {
+                writes.push(this._historyStore.write(this._history).then(() => {
+                    this._lastHistorySignature = nextHistorySignature;
+                }));
+            }
             try {
-                await Promise.all([
-                    this._cache.write({
-                        ...state,
-                        tokenUsage: withoutCodexHistory(state.tokenUsage),
-                    }),
-                    this._historyStore.write(this._history),
-                ]);
+                await Promise.all(writes);
             } catch {
                 this._logger?.debug('codex.storage.write.failed');
             }
@@ -391,9 +455,7 @@ export class CodexProvider extends Observable {
 
     destroy() {
         this._destroyed = true;
-        if (this._settingsId)
-            this._settings.disconnect(this._settingsId);
-        this._settingsId = 0;
+        this._started = false;
         this._cancellable?.cancel();
         try {
             this._process?.force_exit();
