@@ -72,8 +72,13 @@ if ! mv "$shadow_stage/$shadow_uuid" "$shadow_destination"; then
 fi
 shadow_swap_complete=true
 
-printf '%s\n' \
-  "Installed Shadowokx Panel to $shadow_destination" \
-  "Enable it with: gnome-extensions enable $shadow_uuid" \
-  'On Wayland, log out and back in if GNOME Shell has not discovered the extension yet.' \
-  'When upgrading an active copy, log out and back in before enabling so Shell clears its ES-module cache.'
+printf '\n%s\n' \
+  '✓ Shadowokx Panel installed successfully.' \
+  '' \
+  "Installed to: $shadow_destination" \
+  '' \
+  'Next step:' \
+  '  1. Log out and back in once so GNOME Shell discovers the extension.' \
+  "  2. Enable it with: gnome-extensions enable $shadow_uuid" \
+  '' \
+  "Preferences: gnome-extensions prefs $shadow_uuid"
