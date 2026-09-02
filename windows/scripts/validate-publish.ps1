@@ -69,9 +69,6 @@ $requiredFiles = @(
     $projectPriFileName,
     'Assets\chatgpt.png',
     'Assets\ShadowokxPanel.ico',
-    'Assets\Tray\shadowokx-tray.ico',
-    'Assets\Tray\shadowokx-tray-idle.ico',
-    'Assets\Tray\shadowokx-tray-peak.ico',
     'Assets\Weather\unknown.svg',
     'Assets\Weather\clear-day.svg',
     'Assets\Weather\clear-night.svg',
@@ -88,6 +85,11 @@ foreach ($relativePath in $requiredFiles) {
     if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
         throw "Publish output is missing required file: $relativePath"
     }
+}
+
+$obsoleteTrayAssets = Join-Path $PublishDirectory 'Assets\Tray'
+if (Test-Path -LiteralPath $obsoleteTrayAssets) {
+    throw 'Publish output contains obsolete static tray assets; the tray percentage is rendered dynamically.'
 }
 
 $weatherIcons = @(Get-ChildItem -LiteralPath (Join-Path $PublishDirectory 'Assets\Weather') -Filter '*.svg' -File)

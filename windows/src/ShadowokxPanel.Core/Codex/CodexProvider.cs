@@ -31,6 +31,7 @@ public sealed class CodexProvider : IAsyncDisposable
     private CancellationTokenSource _lifetime = new();
     private Task<CodexState>? _refreshTask;
     private Task? _timerTask;
+    private CodexLaunchSpec? _launchSpec;
     private TokenHistoryDocument _history = TokenHistoryDocument.Empty(DateTimeOffset.Now);
     private CodexState? _lastPersistedState;
     private bool _visible;
@@ -174,8 +175,10 @@ public sealed class CodexProvider : IAsyncDisposable
             externalCancellation, _lifetime.Token);
         try
         {
-            var launch = _discover() ?? throw new CodexProviderException(
+            var launch = _launchSpec ?? await Task.Run(_discover, linked.Token).ConfigureAwait(false) ??
+                throw new CodexProviderException(
                 "not-installed", "Install Codex for this user, then sign in and retry.");
+            _launchSpec = launch;
             var response = await _client.ReadAsync(launch, linked.Token).ConfigureAwait(false);
             var now = DateTimeOffset.Now;
             CodexState live;
@@ -210,6 +213,8 @@ public sealed class CodexProvider : IAsyncDisposable
         }
         catch (Exception error)
         {
+            if (error is CodexClientException { Failure: CodexClientFailure.StartFailed })
+                _launchSpec = null;
             var (code, message) = error switch
             {
                 CodexProviderException known => (known.Code, known.Message),

@@ -24,7 +24,9 @@
     <ProjectReference Include="..\ShadowokxPanel.Core\ShadowokxPanel.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Assets\**" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\**"
+             Exclude="Assets\Tray\**"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!--

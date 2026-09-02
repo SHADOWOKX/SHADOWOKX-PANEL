@@ -1,5 +1,6 @@
 using ShadowokxPanel.Core.Models;
 using Microsoft.Win32;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
 namespace ShadowokxPanel.Core.Codex;
@@ -12,7 +13,9 @@ public static class CodexDiscovery
         IReadOnlyDictionary<string, string?>? environment = null,
         Func<string, bool>? fileExists = null,
         IEnumerable<string?>? additionalPathValues = null,
-        IEnumerable<string?>? appPathCandidates = null)
+        IEnumerable<string?>? appPathCandidates = null,
+        IEnumerable<string?>? additionalSearchRoots = null,
+        Func<string, IEnumerable<string>>? enumerateExecutables = null)
     {
         string? Get(string name) => environment is null
             ? Environment.GetEnvironmentVariable(name)
@@ -86,6 +89,50 @@ public static class CodexDiscovery
         foreach (var directory in userDirectories.Where(value => value is not null))
             AddNames(candidates, directory!);
 
+        var direct = FindFirst(candidates, fileExists);
+        if (direct is not null)
+            return direct;
+
+        var searchRoots = new List<string?>
+        {
+            Join(profile, ".codex", "packages", "standalone", "current"),
+            Join(roaming, "npm", "node_modules", "@openai", "codex"),
+            Join(local, "pnpm", "global"),
+            Get("NVM_HOME"),
+            Join(local, "Programs", "Codex"),
+            Join(local, "Codex"),
+            Join(local, "OpenAI", "Codex"),
+            Join(local, "Programs", "OpenAI", "Codex"),
+            Join(local, "Programs", "ChatGPT"),
+            Join(local, "Programs", "OpenAI", "ChatGPT"),
+        };
+        if (additionalSearchRoots is not null)
+            searchRoots.AddRange(additionalSearchRoots);
+        else if (environment is null && OperatingSystem.IsWindows())
+            searchRoots.AddRange(ReadRegisteredInstallRoots());
+
+        enumerateExecutables ??= environment is null && OperatingSystem.IsWindows()
+            ? EnumerateExecutables : null;
+        if (enumerateExecutables is null)
+            return null;
+        var nested = new List<string>();
+        foreach (var root in searchRoots
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => Environment.ExpandEnvironmentVariables(value!))
+            .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            nested.AddRange(enumerateExecutables(root));
+        }
+        return FindFirst(nested
+            .OrderBy(CandidateArchitectureRank)
+            .ThenBy(CandidateKindRank)
+            .ThenBy(path => path.Length), fileExists);
+    }
+
+    private static CodexLaunchSpec? FindFirst(
+        IEnumerable<string> candidates,
+        Func<string, bool> fileExists)
+    {
         foreach (var path in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (!IsSafeAbsolutePath(path) || !fileExists(path))
@@ -99,6 +146,21 @@ public static class CodexDiscovery
         }
         return null;
     }
+
+    private static int CandidateArchitectureRank(string path)
+    {
+        var expected = RuntimeInformation.ProcessArchitecture == Architecture.Arm64
+            ? new[] { "aarch64", "arm64" }
+            : new[] { "x86_64", "win-x64", "x64" };
+        if (expected.Any(token => path.Contains(token, StringComparison.OrdinalIgnoreCase)))
+            return 0;
+        var architectureSpecific = new[] { "aarch64", "arm64", "x86_64", "win-x64", "x64" };
+        return architectureSpecific.Any(token =>
+            path.Contains(token, StringComparison.OrdinalIgnoreCase)) ? 2 : 1;
+    }
+
+    private static int CandidateKindRank(string path) =>
+        System.IO.Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase) ? 0 : 1;
 
     private static void AddNames(List<string> candidates, string directory)
     {
@@ -123,6 +185,49 @@ public static class CodexDiscovery
         return path.StartsWith("\\\\", StringComparison.Ordinal) ||
             path.Length >= 3 && char.IsAsciiLetter(path[0]) && path[1] == ':' &&
             (path[2] == '\\' || path[2] == '/');
+    }
+
+    private static IEnumerable<string> EnumerateExecutables(string root)
+    {
+        if (!IsSafeAbsolutePath(root) || !Directory.Exists(root))
+            yield break;
+        var options = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = true,
+            MaxRecursionDepth = 12,
+            AttributesToSkip = FileAttributes.ReparsePoint,
+            MatchCasing = MatchCasing.CaseInsensitive,
+        };
+        foreach (var name in Names)
+        {
+            IEnumerator<string> iterator;
+            try { iterator = Directory.EnumerateFiles(root, name, options).GetEnumerator(); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or
+                System.Security.SecurityException or ArgumentException)
+            {
+                continue;
+            }
+            using (iterator)
+            {
+                while (true)
+                {
+                    string current;
+                    try
+                    {
+                        if (!iterator.MoveNext())
+                            break;
+                        current = iterator.Current;
+                    }
+                    catch (Exception error) when (error is IOException or UnauthorizedAccessException or
+                        System.Security.SecurityException)
+                    {
+                        break;
+                    }
+                    yield return current;
+                }
+            }
+        }
     }
 
     private static string? ReadEnvironmentPath(EnvironmentVariableTarget target)
@@ -153,12 +258,54 @@ public static class CodexDiscovery
                         paths.Add(path);
                 }
                 catch (Exception error) when (error is System.Security.SecurityException or
-                    UnauthorizedAccessException or IOException)
+                    UnauthorizedAccessException or IOException or ArgumentException)
                 {
                     // Registry discovery is optional; other deterministic sources remain available.
                 }
             }
         }
         return paths;
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static List<string?> ReadRegisteredInstallRoots()
+    {
+        var roots = new List<string?>();
+        foreach (var hive in new[] { RegistryHive.CurrentUser, RegistryHive.LocalMachine })
+        {
+            foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
+            {
+                try
+                {
+                    using var baseKey = RegistryKey.OpenBaseKey(hive, view);
+                    using var uninstall = baseKey.OpenSubKey(
+                        @"Software\Microsoft\Windows\CurrentVersion\Uninstall", writable: false);
+                    foreach (var name in uninstall?.GetSubKeyNames() ?? [])
+                    {
+                        using var application = uninstall?.OpenSubKey(name, writable: false);
+                        var displayName = application?.GetValue("DisplayName") as string ?? string.Empty;
+                        var publisher = application?.GetValue("Publisher") as string ?? string.Empty;
+                        var isOpenAi = displayName.Contains("OpenAI", StringComparison.OrdinalIgnoreCase) ||
+                            publisher.Contains("OpenAI", StringComparison.OrdinalIgnoreCase);
+                        var isCodexHost = displayName.Contains("Codex", StringComparison.OrdinalIgnoreCase) ||
+                            displayName.Contains("ChatGPT", StringComparison.OrdinalIgnoreCase);
+                        if (!isOpenAi || !isCodexHost)
+                            continue;
+                        roots.Add(application?.GetValue("InstallLocation") as string);
+                        if (application?.GetValue("DisplayIcon") is string displayIcon)
+                        {
+                            var clean = displayIcon.Split(',', 2)[0].Trim().Trim('"');
+                            roots.Add(System.IO.Path.GetDirectoryName(clean));
+                        }
+                    }
+                }
+                catch (Exception error) when (error is System.Security.SecurityException or
+                    UnauthorizedAccessException or IOException or ArgumentException)
+                {
+                    // Per-user deterministic paths remain available when registry access is blocked.
+                }
+            }
+        }
+        return roots;
     }
 }

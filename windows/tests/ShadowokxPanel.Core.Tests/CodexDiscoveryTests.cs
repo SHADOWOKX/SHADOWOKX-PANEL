@@ -86,6 +86,42 @@ public sealed class CodexDiscoveryTests
     }
 
     [Fact]
+    public void FindsNestedNativeExecutableInsideVersionedOfficialInstall()
+    {
+        var environment = EnvironmentWith(
+            ("PATH", string.Empty),
+            ("LOCALAPPDATA", @"D:\Profiles\Local"));
+        var root = @"D:\Profiles\Local\Programs\OpenAI\Codex";
+        var expected = root +
+            @"\app-1.2.3\resources\vendor\x86_64-pc-windows-msvc\codex\codex.exe";
+        var result = CodexDiscovery.Find(
+            environment,
+            path => path == expected,
+            additionalSearchRoots: [root],
+            enumerateExecutables: candidateRoot => candidateRoot == root ? [expected] : []);
+
+        Assert.Equal(expected, result?.ExecutablePath);
+        Assert.False(result?.IsCommandShim);
+    }
+
+    [Fact]
+    public void NestedDiscoveryPrefersNativeExecutableOverCommandShim()
+    {
+        var environment = EnvironmentWith(("PATH", string.Empty));
+        var root = @"E:\Portable\Codex";
+        var shim = root + @"\codex.cmd";
+        var native = root + @"\vendor\x86_64-pc-windows-msvc\codex.exe";
+        var result = CodexDiscovery.Find(
+            environment,
+            path => path == shim || path == native,
+            additionalSearchRoots: [root],
+            enumerateExecutables: _ => [shim, native]);
+
+        Assert.Equal(native, result?.ExecutablePath);
+        Assert.False(result?.IsCommandShim);
+    }
+
+    [Fact]
     public void MissingInstallationReturnsNull()
     {
         Assert.Null(CodexDiscovery.Find(EnvironmentWith(("PATH", string.Empty)), _ => false));

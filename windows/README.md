@@ -71,7 +71,7 @@ Runtime state is isolated to the current Windows profile:
 
 ## Codex detection
 
-The app merges the process, current-user, and machine Windows `PATH`, checks the registered `codex.exe` App Path, and then checks the official standalone installer’s `%LOCALAPPDATA%\Programs\OpenAI\Codex\bin` directory plus established package-manager and per-user program locations for native `codex.exe` and npm-style `codex.cmd`/`codex.bat` shims. This avoids the stale-PATH problem common when a tray app starts before an installer updates the current process environment. It invokes the fixed `codex app-server --stdio` command and requests only:
+The app merges the process, current-user, and machine Windows `PATH`, checks the registered `codex.exe` App Path, and then checks the official standalone installer’s `%LOCALAPPDATA%\Programs\OpenAI\Codex\bin` directory plus established package-manager and per-user program locations for native `codex.exe` and npm-style `codex.cmd`/`codex.bat` shims. If the launcher is nested inside an official versioned application or native npm/pnpm payload, discovery searches only those bounded known roots and registered OpenAI install locations, preferring the native executable for the running architecture. This avoids both the stale-PATH problem and the earlier top-level-only lookup failure. It invokes the fixed `codex app-server --stdio` command and requests only:
 
 ```text
 account/usage/read
@@ -145,10 +145,11 @@ Before publishing, complete [the Windows release QA checklist](docs/RELEASE-QA.m
 ## Performance and lifecycle
 
 - A single primary instance remains alive in the notification area; later launches redirect to it.
+- The notification icon is rendered in memory as the current pixel-style Codex percentage, with true alpha, exact DPI sizing, and restrained capacity colors; no scaled tray bitmap is loaded.
 - Codex uses one adaptive scheduler: 30 seconds while its visible page is open and 60 seconds in the background. Concurrent triggers are coalesced.
 - Provider work is asynchronous, cancellable, size-bounded, and time-bounded; last-known-good data survives transient failures.
 - The graph redraws only when its data or layout changes.
-- The display timer runs only while the popup is visible, and Weather makes no requests while disabled.
+- The display timer runs only while the popup is visible and updates relative timestamps without rebuilding the page; Weather makes no requests while disabled.
 - Identical Codex results do not rewrite daily history or cache on every short refresh.
 - Tray hooks, timers, requests, providers, and event subscriptions are disposed exactly once during Exit.
 
@@ -156,7 +157,7 @@ Before publishing, complete [the Windows release QA checklist](docs/RELEASE-QA.m
 
 ### Codex not detected
 
-Confirm `codex --version` works for the same Windows user, then restart Shadowokx Panel. Installations exposed through `PATH`, npm, pnpm, Bun, Volta, nvm-windows, Scoop, Chocolatey, WindowsApps, and standard user/program directories are supported.
+Confirm `codex --version` works for the same Windows user, then restart Shadowokx Panel. Installations exposed through `PATH`, npm, pnpm, Bun, Volta, nvm-windows, Scoop, Chocolatey, WindowsApps, standard user/program directories, and versioned OpenAI application payloads are supported.
 
 ### Codex usage unavailable
 

@@ -1,5 +1,5 @@
 using System.Runtime.InteropServices;
-using ShadowokxPanel.Core.Models;
+using ShadowokxPanel.Services;
 
 namespace ShadowokxPanel.Platform;
 
@@ -22,10 +22,11 @@ public sealed class TrayIcon : IDisposable
     private readonly NativeMethods.WindowProcedure _windowProcedure;
     private readonly nint _previousProcedure;
     private readonly uint _taskbarCreated;
-    private readonly Dictionary<(TrayIconKind Kind, int Size), nint> _icons = [];
     private nint _icon;
     private string _tooltip = "Shadowokx Panel";
-    private UsagePace _pace;
+    private int? _remainingPercent;
+    private bool _useCapacityColors = true;
+    private IconKey? _iconKey;
     private bool _disposed;
 
     public TrayIcon(
@@ -62,23 +63,25 @@ public sealed class TrayIcon : IDisposable
         }
     }
 
-    public void Update(string tooltip, UsagePace pace)
+    public void Update(string tooltip, int? remainingPercent, bool useCapacityColors)
     {
         if (_disposed)
             return;
         var normalizedTooltip = tooltip.Length <= 127 ? tooltip : tooltip[..127];
-        if (_tooltip == normalizedTooltip && _pace == pace)
+        int? normalizedPercent = remainingPercent.HasValue
+            ? Math.Clamp(remainingPercent.Value, 0, 100) : null;
+        if (_tooltip == normalizedTooltip && _remainingPercent == normalizedPercent &&
+            _useCapacityColors == useCapacityColors && IconMatchesCurrentDpi())
             return;
         _tooltip = normalizedTooltip;
-        _pace = pace;
-        ReplaceIcon();
-        var data = Data(NativeMethods.NifIcon | NativeMethods.NifTip);
-        NativeMethods.ShellNotifyIcon(NativeMethods.NimModify, ref data);
+        _remainingPercent = normalizedPercent;
+        _useCapacityColors = useCapacityColors;
+        UpdateIconAndTooltip();
     }
 
     private bool Add()
     {
-        ReplaceIcon();
+        EnsureIcon();
         var data = Data(NativeMethods.NifMessage | NativeMethods.NifIcon | NativeMethods.NifTip);
         if (!NativeMethods.ShellNotifyIcon(NativeMethods.NimAdd, ref data))
             return false;
@@ -109,7 +112,7 @@ public sealed class TrayIcon : IDisposable
         if (message == CallbackMessage)
         {
             var mouseMessage = (uint)(lParam.ToInt64() & 0xffff);
-            if (mouseMessage is NativeMethods.WmLButtonUp or NativeMethods.WmLButtonDblClk)
+            if (mouseMessage == NativeMethods.WmLButtonUp)
                 _open();
             else if (mouseMessage == NativeMethods.WmContextMenu)
                 ShowMenu();
@@ -121,6 +124,8 @@ public sealed class TrayIcon : IDisposable
             _resume();
             return 1;
         }
+        if (message == NativeMethods.WmDpiChanged)
+            UpdateIconAndTooltip(forceIcon: true);
         return NativeMethods.CallWindowProc(_previousProcedure, hwnd, message, wParam, lParam);
     }
 
@@ -166,32 +171,66 @@ public sealed class TrayIcon : IDisposable
         }
     }
 
-    private void ReplaceIcon()
+    private bool IconMatchesCurrentDpi() =>
+        _iconKey is { } key && key.Size == CurrentIconSize();
+
+    private int CurrentIconSize()
     {
-        var kind = _pace switch
+        var dpi = Math.Max(96, NativeMethods.GetDpiForWindow(_hwnd));
+        var width = NativeMethods.GetSystemMetricsForDpi(NativeMethods.SmCxSmallIcon, dpi);
+        var height = NativeMethods.GetSystemMetricsForDpi(NativeMethods.SmCySmallIcon, dpi);
+        return Math.Clamp(Math.Max(width, height), 16, 64);
+    }
+
+    private void EnsureIcon()
+    {
+        var key = new IconKey(CurrentIconSize(), _remainingPercent, _useCapacityColors);
+        if (_icon != 0 && _iconKey == key)
+            return;
+        var replacement = TrayIconRenderer.Create(
+            key.Size, key.RemainingPercent, key.UseCapacityColors);
+        var previous = _icon;
+        _icon = replacement;
+        _iconKey = key;
+        if (previous != 0)
+            NativeMethods.DestroyIcon(previous);
+    }
+
+    private void UpdateIconAndTooltip(bool forceIcon = false)
+    {
+        if (_disposed)
+            return;
+        var desired = new IconKey(CurrentIconSize(), _remainingPercent, _useCapacityColors);
+        var replace = forceIcon || _icon == 0 || _iconKey != desired;
+        nint replacement;
+        try
         {
-            UsagePace.Peak => TrayIconKind.Peak,
-            UsagePace.Idle => TrayIconKind.Idle,
-            _ => TrayIconKind.Normal,
-        };
-        var scale = Math.Max(96, NativeMethods.GetDpiForWindow(_hwnd));
-        var size = Math.Clamp((int)Math.Round(16 * scale / 96d), 16, 48);
-        var key = (kind, size);
-        if (!_icons.TryGetValue(key, out _icon))
-        {
-            var name = kind switch
-            {
-                TrayIconKind.Peak => "shadowokx-tray-peak.ico",
-                TrayIconKind.Idle => "shadowokx-tray-idle.ico",
-                _ => "shadowokx-tray.ico",
-            };
-            var path = Path.Combine(AppContext.BaseDirectory, "Assets", "Tray", name);
-            _icon = NativeMethods.LoadImage(
-                0, path, NativeMethods.ImageIcon, size, size, NativeMethods.LrLoadFromFile);
-            if (_icon == 0)
-                throw new InvalidOperationException("The tray icon asset could not be loaded.");
-            _icons.Add(key, _icon);
+            replacement = replace
+                ? TrayIconRenderer.Create(
+                    desired.Size, desired.RemainingPercent, desired.UseCapacityColors)
+                : _icon;
         }
+        catch (InvalidOperationException error)
+        {
+            // Keep the last valid shell icon if a transient GDI allocation fails.
+            StartupDiagnostics.WriteException("tray icon update failed", error);
+            return;
+        }
+        var previous = _icon;
+        var data = Data(NativeMethods.NifIcon | NativeMethods.NifTip) with
+        {
+            hIcon = replacement,
+        };
+        if (!NativeMethods.ShellNotifyIcon(NativeMethods.NimModify, ref data))
+        {
+            if (replacement != previous)
+                NativeMethods.DestroyIcon(replacement);
+            return;
+        }
+        _icon = replacement;
+        _iconKey = desired;
+        if (previous != 0 && previous != replacement)
+            NativeMethods.DestroyIcon(previous);
     }
 
     public void Dispose()
@@ -202,12 +241,15 @@ public sealed class TrayIcon : IDisposable
         var data = Data(0);
         NativeMethods.ShellNotifyIcon(NativeMethods.NimDelete, ref data);
         NativeMethods.SetWindowLongPtr(_hwnd, NativeMethods.GwlpWndProc, _previousProcedure);
-        foreach (var icon in _icons.Values)
-            NativeMethods.DestroyIcon(icon);
-        _icons.Clear();
+        if (_icon != 0)
+            NativeMethods.DestroyIcon(_icon);
         _icon = 0;
+        _iconKey = null;
         GC.KeepAlive(_windowProcedure);
     }
 
-    private enum TrayIconKind { Normal, Idle, Peak }
+    private readonly record struct IconKey(
+        int Size,
+        int? RemainingPercent,
+        bool UseCapacityColors);
 }

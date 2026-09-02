@@ -12,6 +12,7 @@ using ShadowokxPanel.Platform;
 using ShadowokxPanel.Services;
 using ShadowokxPanel.ViewModels;
 using Windows.Graphics;
+using Windows.Foundation;
 using Windows.UI.ViewManagement;
 using Windows.System;
 
@@ -35,6 +36,9 @@ public sealed partial class MainWindow : Window, IDisposable
     private bool _exiting;
     private bool _disposed;
     private int _positionedHeight;
+    private int? _codexNaturalHeight;
+    private int? _weatherNaturalHeight;
+    private bool _contentResizeQueued;
     private NativeMethods.Point _anchorPoint;
     private bool _hasAnchorPoint;
 
@@ -61,6 +65,7 @@ public sealed partial class MainWindow : Window, IDisposable
         ConfigureUtilityWindow();
         var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_hwnd);
         _appWindow = AppWindow.GetFromWindowId(windowId);
+        _appWindow.IsShownInSwitchers = false;
         if (_appWindow.Presenter is OverlappedPresenter presenter)
         {
             presenter.SetBorderAndTitleBar(false, false);
@@ -158,7 +163,7 @@ public sealed partial class MainWindow : Window, IDisposable
             HidePanel();
     }
 
-    private void ClockTimer_Tick(object? sender, object eventArgs) => Render();
+    private void ClockTimer_Tick(object? sender, object eventArgs) => UpdateRelativeTimeLabels();
 
     private void Root_KeyDown(object sender, KeyRoutedEventArgs eventArgs)
     {
@@ -191,6 +196,21 @@ public sealed partial class MainWindow : Window, IDisposable
                     NativeMethods.SwpFrameChanged))
                 throw new InvalidOperationException("The panel utility-window frame could not be updated.");
         }
+        if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000))
+        {
+            var borderColor = NativeMethods.DwmColorNone;
+            _ = NativeMethods.DwmSetWindowAttribute(
+                _hwnd,
+                NativeMethods.DwmwaBorderColor,
+                ref borderColor,
+                sizeof(int));
+            var cornerPreference = NativeMethods.DwmwcpRound;
+            _ = NativeMethods.DwmSetWindowAttribute(
+                _hwnd,
+                NativeMethods.DwmwaWindowCornerPreference,
+                ref cornerPreference,
+                sizeof(int));
+        }
     }
 
     private void PositionNearTray(bool captureAnchor = true)
@@ -214,7 +234,8 @@ public sealed partial class MainWindow : Window, IDisposable
         var margin = (int)Math.Round(10 * scale);
         var width = (int)Math.Round((_host.Settings.Current.Density ==
             Core.Settings.LayoutDensity.Compact ? 400 : 430) * scale);
-        var height = (int)Math.Round(DesiredPanelHeight() * scale);
+        var desiredHeight = DesiredPanelHeight();
+        var height = (int)Math.Round(desiredHeight * scale);
         width = Math.Min(width, Math.Max(1, info.rcWork.Right - info.rcWork.Left - margin * 2));
         height = Math.Min(height, Math.Max(1, info.rcWork.Bottom - info.rcWork.Top - margin * 2));
         var taskbarBottom = info.rcWork.Bottom < info.rcMonitor.Bottom;
@@ -228,13 +249,16 @@ public sealed partial class MainWindow : Window, IDisposable
         x = Math.Clamp(x, info.rcWork.Left + margin, info.rcWork.Right - width - margin);
         y = Math.Clamp(y, info.rcWork.Top + margin, info.rcWork.Bottom - height - margin);
         _appWindow.MoveAndResize(new RectInt32(x, y, width, height));
-        _positionedHeight = DesiredPanelHeight();
+        _positionedHeight = desiredHeight;
     }
 
     private int DesiredPanelHeight()
     {
         var compact = _host.Settings.Current.Density == Core.Settings.LayoutDensity.Compact;
         var weather = _host.Settings.Current.ShowWeather && _viewModel.SelectedPage == "weather";
+        var measured = weather ? _weatherNaturalHeight : _codexNaturalHeight;
+        if (measured.HasValue)
+            return measured.Value;
         if (weather)
             return _viewModel.Weather.HasData ? (compact ? 600 : 660) : (compact ? 340 : 360);
         if (!_viewModel.Codex.HasData)
@@ -262,6 +286,7 @@ public sealed partial class MainWindow : Window, IDisposable
         RenderCodex(_viewModel.Codex, settings);
         RenderWeather(_viewModel.Weather, settings);
         UpdateTray();
+        QueueContentResize();
     }
 
     private void RenderCodex(CodexState state, Core.Settings.AppSettings settings)
@@ -448,8 +473,12 @@ public sealed partial class MainWindow : Window, IDisposable
             : "Codex: unavailable");
         if (_viewModel.Settings.ShowWeatherInTrayTooltip && _viewModel.Weather.Current is { } weather)
             lines.Add($"Weather: {Math.Round(weather.Temperature):0}° · {weather.Condition.Label}");
-        var iconPace = _viewModel.Settings.ChangeTrayIconWithUsageState ? pace : UsagePace.Unknown;
-        _tray.Update(string.Join('\n', lines), iconPace);
+        int? displayedPercent = remaining.HasValue
+            ? (int)Math.Round(remaining.Value, MidpointRounding.AwayFromZero) : null;
+        _tray.Update(
+            string.Join('\n', lines),
+            displayedPercent,
+            _viewModel.Settings.ChangeTrayIconWithUsageState);
     }
 
     private void OpenSettings()
@@ -483,12 +512,22 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
     {
+        // Codex changes already include the derived pace in the same render. Ignore the
+        // second derived-property notification so one provider sample causes one UI pass.
+        if (eventArgs.PropertyName == nameof(DashboardViewModel.UsagePace))
+            return;
+        var settingsChanged = eventArgs.PropertyName == nameof(DashboardViewModel.Settings);
+        if (settingsChanged)
+        {
+            _codexNaturalHeight = null;
+            _weatherNaturalHeight = null;
+        }
         if (_visible)
         {
             _host.Codex.SetVisible(_viewModel.SelectedPage != "weather" ||
                 !_viewModel.Settings.ShowWeather);
             Render();
-            if (_positionedHeight != DesiredPanelHeight())
+            if (settingsChanged || _positionedHeight != DesiredPanelHeight())
                 PositionNearTray(captureAnchor: false);
         }
         else
@@ -532,6 +571,63 @@ public sealed partial class MainWindow : Window, IDisposable
     }
 
     private void SettingsButton_Click(object sender, RoutedEventArgs e) => OpenSettings();
+
+    private void UpdateRelativeTimeLabels()
+    {
+        var codex = _viewModel.Codex;
+        if (codex.HasData)
+        {
+            CodexUpdated.Text = FormatUpdated(codex.LastSuccessfulRefresh, codex.IsStale);
+            if (codex.Weekly is { } weekly)
+                WeeklyCountdown.Text = FormatCountdown(weekly.ResetsAt);
+            if (codex.FiveHour is { } fiveHour)
+                FiveHourReset.Text = FormatCountdown(fiveHour.ResetsAt);
+        }
+        var weather = _viewModel.Weather;
+        if (weather.HasData)
+            WeatherUpdated.Text = FormatUpdated(weather.LastSuccessfulRefresh, weather.IsStale);
+    }
+
+    private void QueueContentResize()
+    {
+        if (!_visible || _disposed || _contentResizeQueued)
+            return;
+        _contentResizeQueued = true;
+        if (!DispatcherQueue.TryEnqueue(
+            Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+            MeasureAndFitContent))
+            _contentResizeQueued = false;
+    }
+
+    private void MeasureAndFitContent()
+    {
+        _contentResizeQueued = false;
+        if (!_visible || _disposed)
+            return;
+        Root.UpdateLayout();
+        var weather = _host.Settings.Current.ShowWeather && _viewModel.SelectedPage == "weather";
+        var scroll = weather ? WeatherScroll : CodexScroll;
+        if (scroll.Content is not FrameworkElement content ||
+            scroll.ActualWidth <= 0 || scroll.ActualHeight <= 0 || Root.ActualHeight <= 0)
+            return;
+
+        content.Measure(new Size(scroll.ActualWidth, float.PositiveInfinity));
+        var naturalHeight = Root.ActualHeight - scroll.ActualHeight + content.DesiredSize.Height;
+        if (!double.IsFinite(naturalHeight) || naturalHeight <= 0)
+            return;
+        var measured = (int)Math.Ceiling(naturalHeight);
+        var changed = weather
+            ? _weatherNaturalHeight != measured
+            : _codexNaturalHeight != measured;
+        if (!changed)
+            return;
+        if (weather)
+            _weatherNaturalHeight = measured;
+        else
+            _codexNaturalHeight = measured;
+        if (_positionedHeight != measured)
+            PositionNearTray(captureAnchor: false);
+    }
 
     public void Dispose()
     {

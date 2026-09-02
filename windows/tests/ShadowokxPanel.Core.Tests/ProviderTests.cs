@@ -131,6 +131,29 @@ public sealed class ProviderTests
     }
 
     [Fact]
+    public async Task SuccessfulCodexDiscoveryIsReusedAcrossFrequentRefreshes()
+    {
+        using var temporary = TemporaryDirectory.Create();
+        var discoveries = 0;
+        await using var provider = new CodexProvider(
+            temporary.Paths,
+            15,
+            () =>
+            {
+                Interlocked.Increment(ref discoveries);
+                return new CodexLaunchSpec(@"C:\Tools\codex.exe", false);
+            },
+            new CountingCodexClient(TimeSpan.Zero));
+
+        await provider.StartAsync();
+        await WaitForAsync(() => provider.State.Status == ProviderStatus.Success);
+        await provider.RefreshAsync(true);
+        await provider.RefreshAsync(true);
+
+        Assert.Equal(1, Volatile.Read(ref discoveries));
+    }
+
+    [Fact]
     public async Task TransientCodexFailurePreservesLastKnownGoodUsage()
     {
         using var temporary = TemporaryDirectory.Create();
