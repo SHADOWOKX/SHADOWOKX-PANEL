@@ -28,6 +28,9 @@ jobs:
   linux:
     runs-on: ubuntu-24.04
     container: ubuntu:26.04
+    env:
+      SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
+      GIT_SSL_CAINFO: /etc/ssl/certs/ca-certificates.crt
     outputs:
       commit: ${{ steps.source.outputs.commit }}
     steps:

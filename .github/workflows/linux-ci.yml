@@ -15,13 +15,16 @@ jobs:
   test:
     runs-on: ubuntu-24.04
     container: ubuntu:26.04
+    env:
+      SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
+      GIT_SSL_CAINFO: /etc/ssl/certs/ca-certificates.crt
     steps:
       - name: Install GNOME 50 test dependencies
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             dbus-daemon git gjs gnome-shell gnome-shell-extension-prefs libadwaita-1-0 \
-            libglib2.0-bin libxml2-utils python3 ripgrep unzip zip
+            libglib2.0-bin libxml2-utils nodejs python3 ripgrep unzip zip
       - uses: actions/checkout@v4
       - name: Assign isolated Developer build version
         if: github.event_name == 'push'
