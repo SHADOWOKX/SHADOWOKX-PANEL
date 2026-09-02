@@ -55,6 +55,119 @@ public sealed class ProviderTests
     }
 
     [Fact]
+    public async Task CodexUsesOneAdaptiveSchedulerAndStopsAfterDispose()
+    {
+        using var temporary = TemporaryDirectory.Create();
+        var client = new CountingCodexClient(TimeSpan.FromMilliseconds(8));
+        var provider = new CodexProvider(
+            temporary.Paths,
+            15,
+            () => new CodexLaunchSpec(@"C:\Tools\codex.exe", false),
+            client,
+            refreshPolicy: new CodexRefreshPolicy(
+                TimeSpan.FromMilliseconds(35),
+                TimeSpan.FromMilliseconds(220)));
+
+        await provider.StartAsync();
+        await WaitForAsync(() => client.Count >= 1 && provider.State.Status == ProviderStatus.Success);
+        var beforeVisible = client.Count;
+        provider.SetVisible(true);
+        await WaitForAsync(() => client.Count > beforeVisible);
+        var afterImmediate = client.Count;
+        await WaitForAsync(() => client.Count > afterImmediate);
+
+        provider.SetVisible(false);
+        var hiddenCount = client.Count;
+        await Task.Delay(90);
+        Assert.Equal(hiddenCount, client.Count);
+
+        await provider.DisposeAsync();
+        var disposedCount = client.Count;
+        await Task.Delay(240);
+        Assert.Equal(disposedCount, client.Count);
+    }
+
+    [Fact]
+    public async Task ConcurrentCodexTriggersNeverOverlapProviderProcesses()
+    {
+        using var temporary = TemporaryDirectory.Create();
+        var client = new CountingCodexClient(TimeSpan.FromMilliseconds(45));
+        await using var provider = new CodexProvider(
+            temporary.Paths,
+            15,
+            () => new CodexLaunchSpec(@"C:\Tools\codex.exe", false),
+            client,
+            refreshPolicy: new CodexRefreshPolicy(
+                TimeSpan.FromMilliseconds(20),
+                TimeSpan.FromSeconds(1)));
+        await provider.StartAsync();
+        provider.SetVisible(true);
+        var refreshes = Enumerable.Range(0, 12)
+            .Select(_ => provider.RefreshAsync(true))
+            .ToArray();
+        await Task.WhenAll(refreshes);
+        Assert.Equal(1, client.MaximumConcurrentCalls);
+    }
+
+    [Fact]
+    public async Task StartingCodexProviderTwiceDoesNotDuplicateSchedulerOrImmediateRefresh()
+    {
+        using var temporary = TemporaryDirectory.Create();
+        var client = new CountingCodexClient(TimeSpan.Zero);
+        await using var provider = new CodexProvider(
+            temporary.Paths,
+            15,
+            () => new CodexLaunchSpec(@"C:\Tools\codex.exe", false),
+            client,
+            refreshPolicy: new CodexRefreshPolicy(
+                TimeSpan.FromMilliseconds(50),
+                TimeSpan.FromMilliseconds(250)));
+        await provider.StartAsync();
+        await WaitForAsync(() => provider.State.Status == ProviderStatus.Success);
+        var count = client.Count;
+        await provider.StartAsync();
+        await Task.Delay(80);
+        Assert.Equal(count, client.Count);
+    }
+
+    [Fact]
+    public async Task TransientCodexFailurePreservesLastKnownGoodUsage()
+    {
+        using var temporary = TemporaryDirectory.Create();
+        var client = new CountingCodexClient(TimeSpan.Zero, failAfterFirst: true);
+        await using var provider = new CodexProvider(
+            temporary.Paths,
+            15,
+            () => new CodexLaunchSpec(@"C:\Tools\codex.exe", false),
+            client);
+        await provider.StartAsync();
+        await WaitForAsync(() => provider.State.Status == ProviderStatus.Success);
+        var good = provider.State;
+        var stale = await provider.RefreshAsync(true);
+        Assert.Equal(ProviderStatus.Stale, stale.Status);
+        Assert.Equal(good.Weekly, stale.Weekly);
+        Assert.Equal(good.TokenUsage?.TodayTokens, stale.TokenUsage?.TodayTokens);
+        Assert.Equal("authentication-required", stale.ErrorCode);
+    }
+
+    [Fact]
+    public async Task FrequentCodexRefreshesKeepOneCanonicalDailyHistoryEntry()
+    {
+        using var temporary = TemporaryDirectory.Create();
+        var client = new CountingCodexClient(TimeSpan.Zero);
+        await using var provider = new CodexProvider(
+            temporary.Paths,
+            15,
+            () => new CodexLaunchSpec(@"C:\Tools\codex.exe", false),
+            client);
+        await provider.StartAsync();
+        await WaitForAsync(() => provider.State.Status == ProviderStatus.Success);
+        for (var index = 0; index < 5; index++)
+            await provider.RefreshAsync(true);
+        Assert.Single(provider.State.TokenUsage?.DailyBuckets ?? []);
+    }
+
+    [Fact]
     public async Task WeatherFailureRetainsCachedDataAsStale()
     {
         using var temporary = TemporaryDirectory.Create();
@@ -117,6 +230,57 @@ public sealed class ProviderTests
             """);
             return Task.FromResult(new CodexProtocolResponse(
                 limits.RootElement.Clone(), usage.RootElement.Clone()));
+        }
+    }
+
+    private sealed class CountingCodexClient(TimeSpan delay, bool failAfterFirst = false)
+        : ICodexProtocolClient
+    {
+        private int _active;
+        private int _count;
+        private int _maximumConcurrentCalls;
+
+        public int Count => Volatile.Read(ref _count);
+        public int MaximumConcurrentCalls => Volatile.Read(ref _maximumConcurrentCalls);
+
+        public async Task<CodexProtocolResponse> ReadAsync(
+            CodexLaunchSpec launch,
+            CancellationToken cancellationToken = default)
+        {
+            var count = Interlocked.Increment(ref _count);
+            var active = Interlocked.Increment(ref _active);
+            while (true)
+            {
+                var maximum = Volatile.Read(ref _maximumConcurrentCalls);
+                if (active <= maximum || Interlocked.CompareExchange(
+                    ref _maximumConcurrentCalls, active, maximum) == maximum)
+                    break;
+            }
+            try
+            {
+                if (delay > TimeSpan.Zero)
+                    await Task.Delay(delay, cancellationToken);
+                if (failAfterFirst && count > 1)
+                    throw new CodexClientException(
+                        CodexClientFailure.AuthenticationRequired,
+                        "sensitive provider detail");
+                using var limits = JsonDocument.Parse("""
+                { "rateLimits": { "primary": {
+                  "usedPercent": 11, "windowDurationMins": 10080, "resetsAt": 2000000000
+                } } }
+                """);
+                using var usage = JsonDocument.Parse($$"""
+                { "summary": { "lifetimeTokens": 5000 }, "dailyUsageBuckets": [
+                  { "startDate": "{{DateOnly.FromDateTime(DateTime.Now):yyyy-MM-dd}}", "tokens": 200 }
+                ] }
+                """);
+                return new CodexProtocolResponse(
+                    limits.RootElement.Clone(), usage.RootElement.Clone());
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _active);
+            }
         }
     }
 

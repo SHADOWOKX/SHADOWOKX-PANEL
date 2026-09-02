@@ -1,9 +1,17 @@
 using System.Text.Json;
+using System.Threading.Channels;
 using ShadowokxPanel.Core.History;
 using ShadowokxPanel.Core.Models;
 using ShadowokxPanel.Core.Storage;
 
 namespace ShadowokxPanel.Core.Codex;
+
+public sealed record CodexRefreshPolicy(TimeSpan VisibleInterval, TimeSpan BackgroundInterval)
+{
+    public static CodexRefreshPolicy Default { get; } = new(
+        TimeSpan.FromSeconds(30),
+        TimeSpan.FromSeconds(60));
+}
 
 public sealed class CodexProvider : IAsyncDisposable
 {
@@ -12,26 +20,41 @@ public sealed class CodexProvider : IAsyncDisposable
     private readonly TokenHistoryStore _historyStore;
     private readonly JsonFileStore<CodexState> _cache;
     private readonly RedactingLogger? _logger;
+    private readonly CodexRefreshPolicy _refreshPolicy;
+    private readonly Channel<bool> _scheduleChanges = Channel.CreateBounded<bool>(new BoundedChannelOptions(1)
+    {
+        SingleReader = true,
+        SingleWriter = false,
+        FullMode = BoundedChannelFullMode.DropOldest,
+    });
     private readonly object _sync = new();
     private CancellationTokenSource _lifetime = new();
     private Task<CodexState>? _refreshTask;
     private Task? _timerTask;
     private TokenHistoryDocument _history = TokenHistoryDocument.Empty(DateTimeOffset.Now);
-    private int _refreshMinutes;
+    private CodexState? _lastPersistedState;
+    private bool _visible;
+    private bool _started;
+    private bool _ready;
 
     public CodexProvider(
         ApplicationPaths paths,
         int refreshMinutes,
         Func<CodexLaunchSpec?>? discover = null,
         ICodexProtocolClient? client = null,
-        RedactingLogger? logger = null)
+        RedactingLogger? logger = null,
+        CodexRefreshPolicy? refreshPolicy = null)
     {
-        _refreshMinutes = Math.Clamp(refreshMinutes, 5, 120);
+        _ = Math.Clamp(refreshMinutes, 5, 120); // Retained for settings-file compatibility.
         _discover = discover ?? (() => CodexDiscovery.Find());
         _client = client ?? new CodexProtocolClient();
         _historyStore = new TokenHistoryStore(paths);
         _cache = new JsonFileStore<CodexState>(paths.CodexCacheFile);
         _logger = logger;
+        _refreshPolicy = refreshPolicy ?? CodexRefreshPolicy.Default;
+        if (_refreshPolicy.VisibleInterval <= TimeSpan.Zero ||
+            _refreshPolicy.BackgroundInterval <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(refreshPolicy));
     }
 
     public CodexState State { get; private set; } = new();
@@ -39,16 +62,23 @@ public sealed class CodexProvider : IAsyncDisposable
 
     public async Task<CodexState> StartAsync(CancellationToken cancellationToken = default)
     {
+        lock (_sync)
+        {
+            if (_started)
+                return State;
+            _started = true;
+        }
         var now = DateTimeOffset.Now;
         var cacheTask = _cache.ReadAsync(cancellationToken);
         var historyTask = _historyStore.LoadAsync(now, cancellationToken);
         await Task.WhenAll(cacheTask, historyTask).ConfigureAwait(false);
         _history = historyTask.Result;
         var cached = cacheTask.Result;
+        _lastPersistedState = cached;
         if (cached?.HasData == true && cached.LastSuccessfulRefresh is { } refreshed &&
             refreshed <= now.AddMinutes(5))
         {
-            var stale = now - refreshed >= TimeSpan.FromMinutes(_refreshMinutes);
+            var stale = now - refreshed >= _refreshPolicy.BackgroundInterval;
             Publish(cached with
             {
                 Status = stale ? ProviderStatus.Stale : ProviderStatus.Cached,
@@ -56,7 +86,9 @@ public sealed class CodexProvider : IAsyncDisposable
             });
         }
         _timerTask = RunTimerAsync(_lifetime.Token);
-        _ = RefreshAsync(false, cancellationToken);
+        lock (_sync)
+            _ready = true;
+        _ = RefreshAsync(true, cancellationToken);
         return State;
     }
 
@@ -88,7 +120,20 @@ public sealed class CodexProvider : IAsyncDisposable
         }
     }
 
-    public void UpdateInterval(int minutes) => _refreshMinutes = Math.Clamp(minutes, 5, 120);
+    public void SetVisible(bool visible)
+    {
+        var refresh = false;
+        lock (_sync)
+        {
+            if (_visible == visible)
+                return;
+            _visible = visible;
+            refresh = visible && _ready;
+        }
+        _scheduleChanges.Writer.TryWrite(true);
+        if (refresh)
+            _ = RefreshAsync(true, _lifetime.Token);
+    }
 
     public async Task ClearHistoryAsync(CancellationToken cancellationToken = default)
     {
@@ -108,7 +153,13 @@ public sealed class CodexProvider : IAsyncDisposable
 
     private bool IsStale() => State.LastSuccessfulRefresh is not { } refreshed ||
         State.Status is ProviderStatus.Error or ProviderStatus.Stale ||
-        DateTimeOffset.Now - refreshed >= TimeSpan.FromMinutes(_refreshMinutes);
+        DateTimeOffset.Now - refreshed >= CurrentInterval();
+
+    private TimeSpan CurrentInterval()
+    {
+        lock (_sync)
+            return _visible ? _refreshPolicy.VisibleInterval : _refreshPolicy.BackgroundInterval;
+    }
 
     private async Task<CodexState> RefreshCoreAsync(CancellationToken externalCancellation)
     {
@@ -145,13 +196,7 @@ public sealed class CodexProvider : IAsyncDisposable
                 await LogAsync("codex.history.write.failed").ConfigureAwait(false);
             }
             var state = live with { TokenUsage = TokenHistoryStore.Apply(live.TokenUsage, _history, now) };
-            try
-            {
-                await _cache.WriteAsync(state with
-                {
-                    TokenUsage = TokenHistoryStore.WithoutHistory(state.TokenUsage),
-                }, linked.Token).ConfigureAwait(false);
-            }
+            try { await PersistCacheIfNeededAsync(state, now, linked.Token).ConfigureAwait(false); }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
                 await LogAsync("codex.cache.write.failed").ConfigureAwait(false);
@@ -168,7 +213,16 @@ public sealed class CodexProvider : IAsyncDisposable
             var (code, message) = error switch
             {
                 CodexProviderException known => (known.Code, known.Message),
-                TimeoutException => ("timeout", "Codex did not respond in time."),
+                CodexClientException { Failure: CodexClientFailure.StartFailed } =>
+                    ("start-failed", "Codex was found but could not be started."),
+                CodexClientException { Failure: CodexClientFailure.AuthenticationRequired } =>
+                    ("authentication-required", "Open Codex, sign in, then retry."),
+                CodexClientException { Failure: CodexClientFailure.AppServerFailed } =>
+                    ("app-server-failed", "Codex started, but its usage service was unavailable."),
+                CodexClientException { Failure: CodexClientFailure.UnsupportedResponse } =>
+                    ("unsupported-response", "This Codex version did not return supported usage data."),
+                CodexClientException { Failure: CodexClientFailure.Timeout } or TimeoutException =>
+                    ("timeout", "Codex did not respond in time."),
                 InvalidDataException => ("usage-unavailable", "Open Codex and confirm you are signed in, then retry."),
                 _ => ("unavailable", "Codex usage is temporarily unavailable."),
             };
@@ -187,17 +241,56 @@ public sealed class CodexProvider : IAsyncDisposable
 
     private async Task RunTimerAsync(CancellationToken cancellationToken)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
         try
         {
-            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+            while (!cancellationToken.IsCancellationRequested)
             {
-                if (IsStale())
-                    await RefreshAsync(false, cancellationToken).ConfigureAwait(false);
+                using var iteration = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                var delay = Task.Delay(CurrentInterval(), iteration.Token);
+                var changed = _scheduleChanges.Reader.WaitToReadAsync(iteration.Token).AsTask();
+                var completed = await Task.WhenAny(delay, changed).ConfigureAwait(false);
+                var cadenceChanged = completed == changed && await changed.ConfigureAwait(false);
+                iteration.Cancel();
+                try { await Task.WhenAll(delay, changed).ConfigureAwait(false); }
+                catch (OperationCanceledException) { }
+
+                if (cadenceChanged)
+                {
+                    while (_scheduleChanges.Reader.TryRead(out _)) { }
+                    continue;
+                }
+                await RefreshAsync(true, cancellationToken).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
     }
+
+    private async Task PersistCacheIfNeededAsync(
+        CodexState state,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var compact = state with { TokenUsage = TokenHistoryStore.WithoutHistory(state.TokenUsage) };
+        var last = _lastPersistedState;
+        var due = last?.LastSuccessfulRefresh is not { } lastWrite ||
+            now - lastWrite >= TimeSpan.FromMinutes(5);
+        if (!due && EquivalentUsage(last, compact))
+            return;
+        await _cache.WriteAsync(compact, cancellationToken).ConfigureAwait(false);
+        _lastPersistedState = compact;
+    }
+
+    private static bool EquivalentUsage(CodexState? left, CodexState right) =>
+        left is not null && left.Weekly == right.Weekly && left.FiveHour == right.FiveHour &&
+        left.ResetCreditsAvailable == right.ResetCreditsAvailable &&
+        TokenUsageEquals(left.TokenUsage, right.TokenUsage);
+
+    private static bool TokenUsageEquals(TokenUsage? left, TokenUsage? right) =>
+        ReferenceEquals(left, right) || left is not null && right is not null &&
+        left.LifetimeTokens == right.LifetimeTokens && left.TodayTokens == right.TodayTokens &&
+        left.PeakDailyTokens == right.PeakDailyTokens && left.PeakDate == right.PeakDate &&
+        left.SevenDayTokens == right.SevenDayTokens &&
+        left.DailyBuckets.SequenceEqual(right.DailyBuckets);
 
     private void Publish(CodexState state)
     {
@@ -211,6 +304,8 @@ public sealed class CodexProvider : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _lifetime.Cancel();
+        lock (_sync)
+            _ready = false;
         if (_timerTask is not null)
         {
             try { await _timerTask.ConfigureAwait(false); }

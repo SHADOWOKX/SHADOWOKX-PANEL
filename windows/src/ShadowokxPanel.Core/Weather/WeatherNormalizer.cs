@@ -9,22 +9,22 @@ public static partial class WeatherNormalizer
     private static readonly IReadOnlyDictionary<int, WeatherCondition> Conditions =
         new Dictionary<int, WeatherCondition>
         {
-            [0] = new("Clear sky", "sun"),
-            [1] = new("Mainly clear", "partly-cloudy"),
-            [2] = new("Partly cloudy", "partly-cloudy"),
-            [3] = new("Overcast", "cloud"),
+            [0] = new("Clear sky", "clear-day"),
+            [1] = new("Mainly clear", "partly-cloudy-day"),
+            [2] = new("Partly cloudy", "partly-cloudy-day"),
+            [3] = new("Overcast", "overcast"),
             [45] = new("Fog", "fog"), [48] = new("Rime fog", "fog"),
             [51] = new("Light drizzle", "drizzle"), [53] = new("Drizzle", "drizzle"),
             [55] = new("Heavy drizzle", "rain"), [56] = new("Light freezing drizzle", "drizzle"),
             [57] = new("Freezing drizzle", "rain"), [61] = new("Light rain", "drizzle"),
-            [63] = new("Rain", "rain"), [65] = new("Heavy rain", "rain"),
+            [63] = new("Rain", "rain"), [65] = new("Heavy rain", "heavy-rain"),
             [66] = new("Light freezing rain", "rain"), [67] = new("Freezing rain", "rain"),
             [71] = new("Light snow", "snow"), [73] = new("Snow", "snow"),
             [75] = new("Heavy snow", "snow"), [77] = new("Snow grains", "snow"),
-            [80] = new("Rain showers", "drizzle"), [81] = new("Rain showers", "rain"),
-            [82] = new("Heavy showers", "rain"), [85] = new("Light snow showers", "snow"),
-            [86] = new("Heavy snow showers", "snow"), [95] = new("Thunderstorm", "storm"),
-            [96] = new("Thunderstorm with hail", "storm"), [99] = new("Heavy thunderstorm", "storm"),
+            [80] = new("Rain showers", "showers"), [81] = new("Rain showers", "showers"),
+            [82] = new("Heavy showers", "heavy-rain"), [85] = new("Light snow showers", "snow"),
+            [86] = new("Heavy snow showers", "snow"), [95] = new("Thunderstorm", "thunderstorm"),
+            [96] = new("Thunderstorm with hail", "thunderstorm"), [99] = new("Heavy thunderstorm", "thunderstorm"),
         };
 
     public static WeatherState Normalize(
@@ -57,7 +57,9 @@ public static partial class WeatherNormalizer
                 humidity,
                 wind,
                 forecast.Count > 0 ? forecast[0].PrecipitationChance : null,
-                Condition((int)(ReadDouble(current, "weather_code") ?? -1))),
+                Condition(
+                    (int)(ReadDouble(current, "weather_code") ?? -1),
+                    ReadDouble(current, "is_day") != 0)),
             Today = new WeatherToday(
                 high,
                 low,
@@ -89,8 +91,17 @@ public static partial class WeatherNormalizer
         return relaxed != query ? [query, relaxed] : [query];
     }
 
-    public static WeatherCondition Condition(int code) => Conditions.GetValueOrDefault(
-        code, new WeatherCondition("Unknown conditions", "alert"));
+    public static WeatherCondition Condition(int code, bool isDay = true)
+    {
+        var condition = Conditions.GetValueOrDefault(
+            code, new WeatherCondition("Unknown conditions", "unknown"));
+        return !isDay ? condition.Symbol switch
+        {
+            "clear-day" => condition with { Symbol = "clear-night" },
+            "partly-cloudy-day" => condition with { Symbol = "partly-cloudy-night" },
+            _ => condition,
+        } : condition;
+    }
 
     private static List<ForecastHour> NormalizeForecast(
         JsonElement payload,
@@ -102,6 +113,7 @@ public static partial class WeatherNormalizer
             return [];
         TryArray(hourly, "temperature_2m", out var temperatures);
         TryArray(hourly, "weather_code", out var codes);
+        TryArray(hourly, "is_day", out var dayStates);
         TryArray(hourly, "precipitation_probability", out var precipitation);
         var result = new List<ForecastHour>();
         for (var index = 0; index < times.GetArrayLength() && result.Count < 12; index++)
@@ -117,7 +129,9 @@ public static partial class WeatherNormalizer
                 time.Value,
                 temperature.Value,
                 rain.HasValue ? Math.Clamp(Math.Round(rain.Value), 0, 100) : null,
-                Condition(code.HasValue ? (int)code.Value : -1)));
+                Condition(
+                    code.HasValue ? (int)code.Value : -1,
+                    ReadDouble(dayStates, index) != 0)));
         }
         return result;
     }

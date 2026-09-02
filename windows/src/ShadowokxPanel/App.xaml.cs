@@ -57,7 +57,7 @@ public partial class App : Application, IAsyncDisposable
         try
         {
             StartupDiagnostics.Write("host initialization start");
-            await _host.StartAsync();
+            await _host.InitializeAsync();
             StartupDiagnostics.Write("host initialization end");
 
             StartupDiagnostics.Write("MainWindow construction start");
@@ -69,6 +69,10 @@ public partial class App : Application, IAsyncDisposable
             StartupDiagnostics.Write("tray initialization start");
             _window.InitializeTray();
             StartupDiagnostics.Write("tray initialization successful");
+
+            StartupDiagnostics.Write("provider startup start");
+            await _host.StartProvidersAsync();
+            StartupDiagnostics.Write("provider startup end");
 
             if (!startedWithWindows || _showWhenReady)
                 _window.ShowPanel();

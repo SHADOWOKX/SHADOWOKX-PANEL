@@ -1,6 +1,5 @@
 using System.Runtime.InteropServices;
 using ShadowokxPanel.Core.Models;
-using Windows.UI;
 
 namespace ShadowokxPanel.Platform;
 
@@ -23,10 +22,10 @@ public sealed class TrayIcon : IDisposable
     private readonly NativeMethods.WindowProcedure _windowProcedure;
     private readonly nint _previousProcedure;
     private readonly uint _taskbarCreated;
+    private readonly Dictionary<(TrayIconKind Kind, int Size), nint> _icons = [];
     private nint _icon;
     private string _tooltip = "Shadowokx Panel";
     private UsagePace _pace;
-    private Color _accent;
     private bool _disposed;
 
     public TrayIcon(
@@ -36,8 +35,7 @@ public sealed class TrayIcon : IDisposable
         Action settings,
         Action toggleStartup,
         Action exit,
-        Action resume,
-        Color accent)
+        Action resume)
     {
         _hwnd = hwnd;
         _open = open;
@@ -46,38 +44,46 @@ public sealed class TrayIcon : IDisposable
         _toggleStartup = toggleStartup;
         _exit = exit;
         _resume = resume;
-        _accent = accent;
         _windowProcedure = WindowProc;
         var pointer = Marshal.GetFunctionPointerForDelegate(_windowProcedure);
         _previousProcedure = NativeMethods.SetWindowLongPtr(hwnd, NativeMethods.GwlpWndProc, pointer);
         if (_previousProcedure == 0 && Marshal.GetLastWin32Error() != 0)
             throw new InvalidOperationException("The tray message handler could not be installed.");
         _taskbarCreated = NativeMethods.RegisterWindowMessage("TaskbarCreated");
-        Add();
+        try
+        {
+            if (!Add())
+                throw new InvalidOperationException("The notification-area icon could not be added.");
+        }
+        catch
+        {
+            Dispose();
+            throw;
+        }
     }
 
-    public void Update(string tooltip, UsagePace pace, Color accent)
+    public void Update(string tooltip, UsagePace pace)
     {
         if (_disposed)
             return;
         var normalizedTooltip = tooltip.Length <= 127 ? tooltip : tooltip[..127];
-        if (_tooltip == normalizedTooltip && _pace == pace && _accent.Equals(accent))
+        if (_tooltip == normalizedTooltip && _pace == pace)
             return;
         _tooltip = normalizedTooltip;
         _pace = pace;
-        _accent = accent;
         ReplaceIcon();
         var data = Data(NativeMethods.NifIcon | NativeMethods.NifTip);
         NativeMethods.ShellNotifyIcon(NativeMethods.NimModify, ref data);
     }
 
-    private void Add()
+    private bool Add()
     {
         ReplaceIcon();
         var data = Data(NativeMethods.NifMessage | NativeMethods.NifIcon | NativeMethods.NifTip);
-        NativeMethods.ShellNotifyIcon(NativeMethods.NimAdd, ref data);
+        if (!NativeMethods.ShellNotifyIcon(NativeMethods.NimAdd, ref data))
+            return false;
         data.uVersion = NativeMethods.NotifyIconVersion4;
-        NativeMethods.ShellNotifyIcon(NativeMethods.NimSetVersion, ref data);
+        return NativeMethods.ShellNotifyIcon(NativeMethods.NimSetVersion, ref data);
     }
 
     private NativeMethods.NotifyIconData Data(uint flags) => new()
@@ -97,7 +103,7 @@ public sealed class TrayIcon : IDisposable
     {
         if (message == _taskbarCreated)
         {
-            Add();
+            _ = Add();
             return 0;
         }
         if (message == CallbackMessage)
@@ -162,45 +168,30 @@ public sealed class TrayIcon : IDisposable
 
     private void ReplaceIcon()
     {
-        var color = _pace switch
+        var kind = _pace switch
         {
-            UsagePace.Peak => Color.FromArgb(255, 249, 115, 22),
-            UsagePace.Idle => Color.FromArgb(255, 59, 130, 246),
-            _ => _accent,
+            UsagePace.Peak => TrayIconKind.Peak,
+            UsagePace.Idle => TrayIconKind.Idle,
+            _ => TrayIconKind.Normal,
         };
-        var replacement = CreateIcon(color);
-        var previous = _icon;
-        _icon = replacement;
-        if (previous != 0)
-            NativeMethods.DestroyIcon(previous);
-    }
-
-    private static nint CreateIcon(Color color)
-    {
-        const int size = 32;
-        var andMask = new byte[size * size / 8];
-        var pixels = new byte[size * size * 4];
-        for (var y = 0; y < size; y++)
+        var scale = Math.Max(96, NativeMethods.GetDpiForWindow(_hwnd));
+        var size = Math.Clamp((int)Math.Round(16 * scale / 96d), 16, 48);
+        var key = (kind, size);
+        if (!_icons.TryGetValue(key, out _icon))
         {
-            for (var x = 0; x < size; x++)
+            var name = kind switch
             {
-                var dx = x - 15.5;
-                var dy = y - 15.5;
-                var distance = Math.Sqrt(dx * dx + dy * dy);
-                var index = ((size - 1 - y) * size + x) * 4;
-                if (distance <= 14)
-                {
-                    var whiteMark = distance is >= 5.2 and <= 7.4 ||
-                        Math.Abs(dx) < 1.6 && Math.Abs(dy) < 10;
-                    pixels[index] = whiteMark ? (byte)245 : color.B;
-                    pixels[index + 1] = whiteMark ? (byte)245 : color.G;
-                    pixels[index + 2] = whiteMark ? (byte)245 : color.R;
-                    pixels[index + 3] = 255;
-                }
-            }
+                TrayIconKind.Peak => "shadowokx-tray-peak.ico",
+                TrayIconKind.Idle => "shadowokx-tray-idle.ico",
+                _ => "shadowokx-tray.ico",
+            };
+            var path = Path.Combine(AppContext.BaseDirectory, "Assets", "Tray", name);
+            _icon = NativeMethods.LoadImage(
+                0, path, NativeMethods.ImageIcon, size, size, NativeMethods.LrLoadFromFile);
+            if (_icon == 0)
+                throw new InvalidOperationException("The tray icon asset could not be loaded.");
+            _icons.Add(key, _icon);
         }
-        var icon = NativeMethods.CreateIcon(0, size, size, 1, 32, andMask, pixels);
-        return icon != 0 ? icon : throw new InvalidOperationException("Tray icon creation failed.");
     }
 
     public void Dispose()
@@ -211,9 +202,12 @@ public sealed class TrayIcon : IDisposable
         var data = Data(0);
         NativeMethods.ShellNotifyIcon(NativeMethods.NimDelete, ref data);
         NativeMethods.SetWindowLongPtr(_hwnd, NativeMethods.GwlpWndProc, _previousProcedure);
-        if (_icon != 0)
-            NativeMethods.DestroyIcon(_icon);
+        foreach (var icon in _icons.Values)
+            NativeMethods.DestroyIcon(icon);
+        _icons.Clear();
         _icon = 0;
         GC.KeepAlive(_windowProcedure);
     }
+
+    private enum TrayIconKind { Normal, Idle, Peak }
 }

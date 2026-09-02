@@ -107,19 +107,25 @@ public sealed class TokenGraphControl : Canvas
             SetLeft(marker, point.X - marker.Width / 2);
             SetTop(marker, point.Y - marker.Height / 2);
             ToolTipService.SetToolTip(marker,
-                $"{point.Date.ToString("MMM d", CultureInfo.CurrentCulture)}\n{FormatTokens(point.Tokens)} tokens");
+                $"{point.Date.ToString("MMM d, yyyy", CultureInfo.CurrentCulture)}\n" +
+                $"{FormatTokens(point.Tokens)} tokens");
             Children.Add(marker);
 
+            var sparse = points.Count <= 3;
+            var labelWidth = sparse ? 52d : 34d;
             var label = new TextBlock
             {
-                Text = FirstTextElement(
-                    point.Date.ToString("ddd", CultureInfo.CurrentCulture)),
+                Text = sparse
+                    ? point.Date.ToString("MMM d", CultureInfo.CurrentCulture)
+                    : point.Date.ToString("ddd", CultureInfo.CurrentCulture),
                 Foreground = ResourceBrush("SecondaryTextBrush"),
                 FontSize = 10,
                 HorizontalTextAlignment = TextAlignment.Center,
-                Width = 18,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Width = labelWidth,
             };
-            SetLeft(label, Math.Clamp(point.X - 9, 0, Math.Max(0, ActualWidth - 18)));
+            SetLeft(label, Math.Clamp(
+                point.X - labelWidth / 2, 0, Math.Max(0, ActualWidth - labelWidth)));
             SetTop(label, graphHeight + 3);
             Children.Add(label);
         }
@@ -143,9 +149,6 @@ public sealed class TokenGraphControl : Canvas
 
     private static Brush ResourceBrush(string name) =>
         (Brush)Application.Current.Resources[name];
-
-    private static string FirstTextElement(string value) =>
-        string.IsNullOrEmpty(value) ? value : StringInfo.GetNextTextElement(value);
 
     private static string FormatTokens(long tokens) => tokens switch
     {

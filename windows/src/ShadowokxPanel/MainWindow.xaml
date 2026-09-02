@@ -8,7 +8,8 @@
         BorderBrush="{ThemeResource CardBorderBrush}"
         BorderThickness="1"
         CornerRadius="18"
-        Padding="20">
+        Padding="20"
+        KeyDown="Root_KeyDown">
         <Grid RowSpacing="16">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -73,7 +74,7 @@
                         AutomationProperties.Name="Weather page"
                         Click="WeatherTab_Click">
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon Glyph="&#xE706;" FontSize="15" />
+                            <Image Source="Assets/Weather/clear-day.svg" Width="17" Height="17" Stretch="Uniform" />
                             <TextBlock Text="Weather" FontWeight="SemiBold" />
                         </StackPanel>
                     </Button>
@@ -112,7 +113,8 @@
                                 <FontIcon Glyph="&#xE783;" FontSize="25" Foreground="{ThemeResource SecondaryTextBrush}" />
                                 <TextBlock x:Name="CodexErrorTitle" FontWeight="SemiBold" FontSize="15" HorizontalAlignment="Center" />
                                 <TextBlock x:Name="CodexErrorMessage" Foreground="{ThemeResource SecondaryTextBrush}" TextAlignment="Center" TextWrapping="Wrap" />
-                                <Button Content="Retry" HorizontalAlignment="Center" Click="CodexRefreshButton_Click" />
+                                <ProgressRing x:Name="CodexInitialProgress" Width="20" Height="20" IsActive="False" Visibility="Collapsed" />
+                                <Button x:Name="CodexRetryButton" Content="Retry" HorizontalAlignment="Center" Click="CodexRefreshButton_Click" />
                             </StackPanel>
                         </Border>
 
@@ -170,18 +172,23 @@
                                         </Border>
                                     </Grid>
                                     <TextBlock x:Name="LifetimeTokens" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="24" FontWeight="SemiBold" />
-                                    <TextBlock Text="Lifetime tokens" Style="{StaticResource MetricLabelStyle}" Margin="0,-8,0,0" />
+                                    <TextBlock x:Name="LifetimeTokensLabel" Text="Lifetime tokens" Style="{StaticResource MetricLabelStyle}" Margin="0,-8,0,0" />
                                     <Grid x:Name="TokenGraphHost" Height="92" MinWidth="120" />
-                                    <Grid ColumnSpacing="18">
+                                    <Grid ColumnSpacing="14">
                                         <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <StackPanel>
+                                            <TextBlock Text="Today" Style="{StaticResource MetricLabelStyle}" />
+                                            <TextBlock x:Name="TodayTokens" Style="{StaticResource MetricValueStyle}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1">
                                             <TextBlock Text="Peak" Style="{StaticResource MetricLabelStyle}" />
                                             <TextBlock x:Name="PeakTokens" Style="{StaticResource MetricValueStyle}" />
                                         </StackPanel>
-                                        <StackPanel Grid.Column="1">
+                                        <StackPanel Grid.Column="2">
                                             <TextBlock Text="Peak day" Style="{StaticResource MetricLabelStyle}" />
                                             <TextBlock x:Name="PeakDate" Style="{StaticResource MetricValueStyle}" />
                                         </StackPanel>
@@ -225,9 +232,10 @@
                         <Border x:Name="WeatherErrorCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
                             <StackPanel Spacing="8" HorizontalAlignment="Center" Padding="10">
                                 <FontIcon Glyph="&#xE9CE;" FontSize="25" Foreground="{ThemeResource SecondaryTextBrush}" />
-                                <TextBlock Text="Weather unavailable" FontWeight="SemiBold" FontSize="15" HorizontalAlignment="Center" />
+                                <TextBlock x:Name="WeatherErrorTitle" Text="Weather unavailable" FontWeight="SemiBold" FontSize="15" HorizontalAlignment="Center" />
                                 <TextBlock x:Name="WeatherErrorMessage" Foreground="{ThemeResource SecondaryTextBrush}" TextAlignment="Center" TextWrapping="Wrap" />
-                                <Button Content="Retry" HorizontalAlignment="Center" Click="WeatherRefreshButton_Click" />
+                                <ProgressRing x:Name="WeatherInitialProgress" Width="20" Height="20" IsActive="False" Visibility="Collapsed" />
+                                <Button x:Name="WeatherRetryButton" Content="Retry" HorizontalAlignment="Center" Click="WeatherRefreshButton_Click" />
                             </StackPanel>
                         </Border>
 
@@ -244,7 +252,7 @@
                                         <TextBlock x:Name="WeatherLocation" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" TextTrimming="CharacterEllipsis" MaxWidth="285" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="8">
-                                        <FontIcon x:Name="WeatherHeroIcon" Glyph="&#xE706;" FontSize="34" Foreground="{ThemeResource AccentBrush}" />
+                                        <Image x:Name="WeatherHeroIcon" Source="Assets/Weather/unknown.svg" Width="42" Height="42" Stretch="Uniform" />
                                         <TextBlock x:Name="WeatherHighLow" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
                                     </StackPanel>
                                 </Grid>
@@ -265,7 +273,7 @@
                                     <StackPanel Grid.Column="1"><TextBlock Text="Humidity" Style="{StaticResource MetricLabelStyle}" /><TextBlock x:Name="Humidity" Style="{StaticResource MetricValueStyle}" /></StackPanel>
                                     <StackPanel Grid.Row="1"><TextBlock Text="Wind" Style="{StaticResource MetricLabelStyle}" /><TextBlock x:Name="Wind" Style="{StaticResource MetricValueStyle}" /></StackPanel>
                                     <StackPanel Grid.Row="1" Grid.Column="1"><TextBlock Text="Rain" Style="{StaticResource MetricLabelStyle}" /><TextBlock x:Name="Rain" Style="{StaticResource MetricValueStyle}" /></StackPanel>
-                                    <Grid Grid.Row="2" Grid.ColumnSpan="2" Margin="0,2,0,0">
+                                    <Grid x:Name="UvRow" Grid.Row="2" Grid.ColumnSpan="2" Margin="0,2,0,0">
                                         <TextBlock Text="UV Index" Style="{StaticResource MetricLabelStyle}" />
                                         <TextBlock x:Name="UvIndex" HorizontalAlignment="Right" Style="{StaticResource MetricValueStyle}" />
                                     </Grid>
@@ -275,17 +283,20 @@
                             <TextBlock Text="NEXT HOURS" Style="{StaticResource SectionLabelStyle}" Margin="2,2,0,-3" />
                             <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" HorizontalScrollMode="Enabled" VerticalScrollMode="Disabled">
                                 <Border Style="{StaticResource CardStyle}" Padding="10">
-                                    <StackPanel x:Name="ForecastRow" Orientation="Horizontal" Spacing="8" />
+                                    <Grid>
+                                        <TextBlock x:Name="ForecastEmpty" Text="Hourly forecast is temporarily unavailable." Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" Visibility="Collapsed" />
+                                        <StackPanel x:Name="ForecastRow" Orientation="Horizontal" Spacing="8" />
+                                    </Grid>
                                 </Border>
                             </ScrollViewer>
 
                             <Grid Margin="2,2,2,0">
                                 <StackPanel Orientation="Horizontal" Spacing="7">
-                                    <FontIcon Glyph="&#xE706;" FontSize="12" Foreground="{ThemeResource SecondaryTextBrush}" />
+                                    <Image Source="Assets/Weather/clear-day.svg" Width="14" Height="14" Stretch="Uniform" />
                                     <TextBlock x:Name="Sunrise" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="7" HorizontalAlignment="Right">
-                                    <FontIcon Glyph="&#xE708;" FontSize="12" Foreground="{ThemeResource SecondaryTextBrush}" />
+                                    <Image Source="Assets/Weather/clear-night.svg" Width="14" Height="14" Stretch="Uniform" />
                                     <TextBlock x:Name="Sunset" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
                                 </StackPanel>
                             </Grid>

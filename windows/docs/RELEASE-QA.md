@@ -35,7 +35,10 @@ Record the Windows version, release commit, application version, installer SHA-2
 - [ ] One Shadowokx Panel tray icon appears; its tooltip and icon are correct at normal DPI.
 - [ ] Left click opens the popup near the current taskbar work area.
 - [ ] Closing the popup hides it without terminating the process.
-- [ ] Reopen and close the popup at least ten times; no duplicate tray icons or processes appear.
+- [ ] Reopen and close the popup at least twenty times; no duplicate tray icons, timers, handles, or processes appear.
+- [ ] The main popup never creates a taskbar button and is absent from normal Alt-Tab switching; Settings remains an intentional normal window.
+- [ ] ESC and clicking outside hide the popup without exiting the process.
+- [ ] Inspect the tray asset at 100%, 125%, 150%, and 200%: corners are fully transparent, edges have no white halo, and the mark remains crisp.
 - [ ] Launch the Start menu shortcut again; the second process redirects to the existing primary instance and exits.
 - [ ] The primary process and tray icon remain alive after secondary activation.
 - [ ] Right-click **Open**, **Refresh**, **Settings**, and **Start with Windows** work.
@@ -46,9 +49,13 @@ Record the Windows version, release commit, application version, installer SHA-2
 ## 4. Functional smoke test
 
 - [ ] Codex reports current structured usage when Codex is installed and signed in.
+- [ ] Codex discovery succeeds independently for process PATH, user PATH, machine PATH, registered App Paths, npm, pnpm, Bun, Volta, nvm-windows, Scoop, Chocolatey, and WindowsApps installations available to the current user.
+- [ ] Found-but-cannot-start, app-server failure, signed-out, malformed-response, and timeout cases produce distinct concise states without revealing paths or protocol payloads.
 - [ ] Codex unavailable state is truthful and the application remains usable when Codex is absent or signed out.
-- [ ] Manual and automatic refresh do not overlap, blank cached data, or create extra processes.
+- [ ] Startup, popup-open, Codex-tab selection, and manual actions refresh immediately; visible cadence is about 30 seconds and hidden cadence about 60 seconds.
+- [ ] Manual and automatic refresh do not overlap, blank cached data, inflate same-day history, or create extra processes.
 - [ ] Weather refresh displays current and hourly data for a valid location.
+- [ ] Clear day/night, partly cloudy day/night, cloud, overcast, fog, drizzle, rain, heavy rain, snow, showers, thunderstorm, and unknown all render app-owned icons—never missing-glyph squares.
 - [ ] Cached Weather remains visible during a temporary network failure.
 - [ ] Theme, accent, density, Weather visibility, and startup settings persist after full Exit and relaunch.
 - [ ] Token history adds only valid canonical samples and is preserved after relaunch.

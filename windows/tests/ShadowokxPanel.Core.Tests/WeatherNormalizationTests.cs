@@ -15,6 +15,17 @@ public sealed class WeatherNormalizationTests
         Assert.Equal(48, state.Current?.Humidity);
         Assert.Equal(7, state.Today?.Uv);
         Assert.Equal(12, state.Forecast.Count);
+        Assert.Equal("clear-day", state.Current?.Condition.Symbol);
+        Assert.All(state.Forecast, hour => Assert.Equal("clear-day", hour.Condition.Symbol));
+    }
+
+    [Fact]
+    public void DayNightAndUnknownConditionsAlwaysHaveOwnedIconKeys()
+    {
+        Assert.Equal("clear-night", WeatherNormalizer.Condition(0, isDay: false).Symbol);
+        Assert.Equal("partly-cloudy-night", WeatherNormalizer.Condition(2, isDay: false).Symbol);
+        Assert.Equal("thunderstorm", WeatherNormalizer.Condition(95).Symbol);
+        Assert.Equal("unknown", WeatherNormalizer.Condition(-1).Symbol);
     }
 
     [Fact]
@@ -47,7 +58,7 @@ public sealed class WeatherNormalizationTests
           "timezone":"Africa/Cairo",
           "current":{
             "time":{{now.ToUnixTimeSeconds()}},"temperature_2m":29,"apparent_temperature":31,
-            "relative_humidity_2m":48,"weather_code":0,"wind_speed_10m":12
+            "relative_humidity_2m":48,"weather_code":0,"wind_speed_10m":12,"is_day":1
           },
           "daily":{
             "temperature_2m_max":[32],"temperature_2m_min":[24],"uv_index_max":[7],
@@ -55,7 +66,8 @@ public sealed class WeatherNormalizationTests
           },
           "hourly":{
             "time":[{{times}}],"temperature_2m":[{{temperatures}}],
-            "weather_code":[{{codes}}],"precipitation_probability":[{{rain}}]
+            "weather_code":[{{codes}}],"precipitation_probability":[{{rain}}],
+            "is_day":[{{string.Join(',', Enumerable.Repeat(1, 16))}}]
           }
         }
         """;

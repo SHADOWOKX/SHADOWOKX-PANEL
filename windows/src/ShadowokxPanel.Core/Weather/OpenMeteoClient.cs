@@ -68,8 +68,8 @@ public sealed class OpenMeteoClient(HttpClient? httpClient = null) : IWeatherCli
         [
             $"latitude={location.Latitude.ToString(culture)}",
             $"longitude={location.Longitude.ToString(culture)}",
-            "current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m",
-            "hourly=temperature_2m,weather_code,precipitation_probability",
+            "current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,is_day",
+            "hourly=temperature_2m,weather_code,precipitation_probability,is_day",
             "daily=temperature_2m_max,temperature_2m_min,uv_index_max,sunrise,sunset",
             $"temperature_unit={(unit == "fahrenheit" ? "fahrenheit" : "celsius")}",
             "wind_speed_unit=kmh",

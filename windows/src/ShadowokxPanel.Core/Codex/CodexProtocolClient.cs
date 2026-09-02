@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.ComponentModel;
 using System.Text.Json;
 using ShadowokxPanel.Core.Models;
 
@@ -23,8 +24,17 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(Timeout);
         using var process = new Process { StartInfo = CreateStartInfo(launch) };
-        if (!process.Start())
-            throw new InvalidOperationException("Codex could not be started.");
+        try
+        {
+            if (!process.Start())
+                throw new CodexClientException(CodexClientFailure.StartFailed,
+                    "Codex could not be started.");
+        }
+        catch (Exception error) when (error is Win32Exception or InvalidOperationException)
+        {
+            throw new CodexClientException(CodexClientFailure.StartFailed,
+                "Codex could not be started.", error);
+        }
         var stderrDrain = process.StandardError.ReadToEndAsync(timeout.Token);
         JsonElement? rateLimits = null;
         JsonElement? usage = null;
@@ -58,13 +68,15 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
                 using var message = await ReadMessageAsync(process, timeout.Token).ConfigureAwait(false);
                 if (ReadId(message.RootElement) != 1)
                     continue;
-                if (message.RootElement.TryGetProperty("error", out _) ||
+                if (message.RootElement.TryGetProperty("error", out var initializationError) ||
                     !message.RootElement.TryGetProperty("result", out _))
-                    throw new InvalidDataException("Codex rejected initialization.");
+                    throw ProtocolFailure(initializationError,
+                        "Codex app-server rejected initialization.");
                 initialized = true;
             }
             if (!initialized)
-                throw new InvalidDataException("Codex did not initialize.");
+                throw new CodexClientException(CodexClientFailure.AppServerFailed,
+                    "Codex app-server did not initialize.");
 
             await WriteAsync(process, new { jsonrpc = "2.0", method = "initialized" }, timeout.Token)
                 .ConfigureAwait(false);
@@ -90,16 +102,18 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
                 }
                 else if (id == 3)
                 {
-                    if (message.RootElement.TryGetProperty("error", out _))
-                        throw new InvalidDataException("Codex usage is unavailable.");
+                    if (message.RootElement.TryGetProperty("error", out var protocolError))
+                        throw ProtocolFailure(protocolError, "Codex usage is unavailable.");
                     if (!message.RootElement.TryGetProperty("result", out var result))
-                        throw new InvalidDataException("Codex returned an invalid limit response.");
+                        throw new CodexClientException(CodexClientFailure.UnsupportedResponse,
+                            "Codex returned an invalid limit response.");
                     rateLimits = result.Clone();
                 }
                 if (rateLimits.HasValue && usageSettled)
                     return new CodexProtocolResponse(rateLimits.Value, usage);
             }
-            throw new InvalidDataException("Codex returned too many unrelated messages.");
+            throw new CodexClientException(CodexClientFailure.AppServerFailed,
+                "Codex app-server returned too many unrelated messages.");
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && rateLimits.HasValue)
         {
@@ -107,7 +121,8 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new TimeoutException("Codex did not respond in time.");
+            throw new CodexClientException(CodexClientFailure.Timeout,
+                "Codex did not respond in time.");
         }
         finally
         {
@@ -149,6 +164,18 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
         return info;
     }
 
+    private static CodexClientException ProtocolFailure(JsonElement error, string fallback)
+    {
+        var detail = error.ValueKind == JsonValueKind.Undefined ? string.Empty : error.GetRawText();
+        var authentication = detail.Contains("auth", StringComparison.OrdinalIgnoreCase) ||
+            detail.Contains("login", StringComparison.OrdinalIgnoreCase) ||
+            detail.Contains("sign in", StringComparison.OrdinalIgnoreCase) ||
+            detail.Contains("unauthorized", StringComparison.OrdinalIgnoreCase);
+        return new CodexClientException(
+            authentication ? CodexClientFailure.AuthenticationRequired : CodexClientFailure.AppServerFailed,
+            authentication ? "Codex requires sign-in." : fallback);
+    }
+
     private static async Task WriteAsync(
         Process process,
         object message,
@@ -168,15 +195,36 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
         {
             var line = await process.StandardOutput.ReadLineAsync(cancellationToken).ConfigureAwait(false);
             if (line is null)
-                throw new InvalidDataException("Codex closed the protocol stream.");
+                throw new CodexClientException(CodexClientFailure.AppServerFailed,
+                    "Codex app-server closed the protocol stream.");
             if (line.Length > MaximumLineCharacters)
-                throw new InvalidDataException("Codex response exceeded the safe size limit.");
+                throw new CodexClientException(CodexClientFailure.UnsupportedResponse,
+                    "Codex response exceeded the safe size limit.");
             try { return JsonDocument.Parse(line); }
             catch (JsonException) { }
         }
-        throw new InvalidDataException("Codex returned too many non-JSON lines.");
+        throw new CodexClientException(CodexClientFailure.UnsupportedResponse,
+            "Codex returned too many non-JSON lines.");
     }
 
     private static int? ReadId(JsonElement root) =>
         root.TryGetProperty("id", out var id) && id.TryGetInt32(out var number) ? number : null;
+}
+
+
+public enum CodexClientFailure
+{
+    StartFailed,
+    AppServerFailed,
+    AuthenticationRequired,
+    UnsupportedResponse,
+    Timeout,
+}
+
+public sealed class CodexClientException(
+    CodexClientFailure failure,
+    string message,
+    Exception? inner = null) : Exception(message, inner)
+{
+    public CodexClientFailure Failure { get; } = failure;
 }

@@ -26,7 +26,7 @@ public sealed class CodexDiscoveryTests
         var result = CodexDiscovery.Find(environment, path => path == expected);
         Assert.NotNull(result);
         Assert.Equal(expected, result.ExecutablePath);
-        Assert.True(result.IsCommandShim);
+        Assert.True(result?.IsCommandShim == true);
     }
 
     [Fact]
@@ -36,6 +36,52 @@ public sealed class CodexDiscoveryTests
             ("PATH", string.Empty),
             ("LOCALAPPDATA", @"E:\Profiles\case\Local"));
         var expected = @"E:\Profiles\case\Local\pnpm\codex.exe";
+        Assert.Equal(expected, CodexDiscovery.Find(environment, path => path == expected)?.ExecutablePath);
+    }
+
+    [Fact]
+    public void MergesCurrentUserAndMachinePathWithProcessPath()
+    {
+        var environment = EnvironmentWith(("PATH", @"C:\Windows\System32"));
+        var expected = @"D:\UserTools\codex.cmd";
+        var result = CodexDiscovery.Find(
+            environment,
+            path => path == expected,
+            [@"D:\UserTools", @"E:\MachineTools"]);
+        Assert.NotNull(result);
+        Assert.Equal(expected, result?.ExecutablePath);
+        Assert.True(result?.IsCommandShim == true);
+    }
+
+    [Fact]
+    public void FindsRegisteredAppPath()
+    {
+        var environment = EnvironmentWith(("PATH", string.Empty));
+        var expected = @"E:\Apps\OpenAI\codex.exe";
+        var result = CodexDiscovery.Find(
+            environment,
+            path => path == expected,
+            appPathCandidates: [expected]);
+        Assert.Equal(expected, result?.ExecutablePath);
+    }
+
+    [Fact]
+    public void FindsKnownPerUserChatGptBundledLocation()
+    {
+        var environment = EnvironmentWith(
+            ("PATH", string.Empty),
+            ("LOCALAPPDATA", @"D:\Profiles\Local"));
+        var expected = @"D:\Profiles\Local\Programs\ChatGPT\resources\codex\codex.exe";
+        Assert.Equal(expected, CodexDiscovery.Find(environment, path => path == expected)?.ExecutablePath);
+    }
+
+    [Fact]
+    public void FindsOfficialWindowsStandaloneInstallerLocation()
+    {
+        var environment = EnvironmentWith(
+            ("PATH", string.Empty),
+            ("LOCALAPPDATA", @"D:\Profiles\Local"));
+        var expected = @"D:\Profiles\Local\Programs\OpenAI\Codex\bin\codex.exe";
         Assert.Equal(expected, CodexDiscovery.Find(environment, path => path == expected)?.ExecutablePath);
     }
 

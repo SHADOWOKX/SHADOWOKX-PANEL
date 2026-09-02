@@ -69,6 +69,12 @@ $requiredFiles = @(
     $projectPriFileName,
     'Assets\chatgpt.png',
     'Assets\ShadowokxPanel.ico',
+    'Assets\Tray\shadowokx-tray.ico',
+    'Assets\Tray\shadowokx-tray-idle.ico',
+    'Assets\Tray\shadowokx-tray-peak.ico',
+    'Assets\Weather\unknown.svg',
+    'Assets\Weather\clear-day.svg',
+    'Assets\Weather\clear-night.svg',
     'hostfxr.dll',
     'hostpolicy.dll',
     'coreclr.dll',
@@ -82,6 +88,11 @@ foreach ($relativePath in $requiredFiles) {
     if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
         throw "Publish output is missing required file: $relativePath"
     }
+}
+
+$weatherIcons = @(Get-ChildItem -LiteralPath (Join-Path $PublishDirectory 'Assets\Weather') -Filter '*.svg' -File)
+if ($weatherIcons.Count -lt 14) {
+    throw 'Publish output does not contain the complete app-owned weather icon set.'
 }
 
 $expectedXbf = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)

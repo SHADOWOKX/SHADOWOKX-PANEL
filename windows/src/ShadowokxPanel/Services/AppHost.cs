@@ -13,6 +13,7 @@ public sealed class AppHost : IAsyncDisposable
     private WeatherProvider? _weather;
     private Task? _disposeTask;
     private bool _started;
+    private bool _initialized;
     private bool _disposed;
     private bool _settingsSubscribed;
     private AppSettings _appliedSettings = new();
@@ -25,18 +26,19 @@ public sealed class AppHost : IAsyncDisposable
 
     public ApplicationPaths Paths { get; }
     public SettingsStore Settings { get; }
+    public bool ProvidersReady { get; private set; }
     public CodexProvider Codex => _codex ??
         throw new InvalidOperationException("The application host has not started.");
     public WeatherProvider Weather => _weather ??
         throw new InvalidOperationException("The application host has not started.");
 
-    public async Task StartAsync(CancellationToken cancellationToken = default)
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         await _lifecycle.WaitAsync(cancellationToken);
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            if (_started)
+            if (_initialized)
                 return;
             var settings = await Settings.LoadAsync(cancellationToken);
             var logger = new RedactingLogger(Paths, () => Settings.Current.DebugLogging);
@@ -52,15 +54,48 @@ public sealed class AppHost : IAsyncDisposable
             Settings.Changed += OnSettingsChanged;
             _settingsSubscribed = true;
             _appliedSettings = settings;
-            await Task.WhenAll(
-                _codex.StartAsync(cancellationToken),
-                _weather.StartAsync(cancellationToken));
-            _started = true;
+            _initialized = true;
         }
         finally
         {
             _lifecycle.Release();
         }
+    }
+
+    public async Task StartProvidersAsync(CancellationToken cancellationToken = default)
+    {
+        await _lifecycle.WaitAsync(cancellationToken);
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_started)
+                return;
+            if (!_initialized || _codex is null || _weather is null)
+                throw new InvalidOperationException("The application host has not been initialized.");
+            _started = true;
+            try
+            {
+                await Task.WhenAll(
+                    Codex.StartAsync(cancellationToken),
+                    Weather.StartAsync(cancellationToken));
+                ProvidersReady = true;
+            }
+            catch
+            {
+                _started = false;
+                throw;
+            }
+        }
+        finally
+        {
+            _lifecycle.Release();
+        }
+    }
+
+    public async Task StartAsync(CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        await StartProvidersAsync(cancellationToken);
     }
 
     public Task RefreshAllAsync(bool force = true, CancellationToken cancellationToken = default) =>
@@ -80,7 +115,6 @@ public sealed class AppHost : IAsyncDisposable
 
     private void OnSettingsChanged(object? sender, AppSettings settings)
     {
-        Codex.UpdateInterval(settings.CodexRefreshMinutes);
         var wasEnabled = _appliedSettings.ShowWeather;
         var weatherConfigurationChanged =
             settings.WeatherLocation != _appliedSettings.WeatherLocation ||
@@ -123,6 +157,8 @@ public sealed class AppHost : IAsyncDisposable
             _codex = null;
             _weather = null;
             _started = false;
+            _initialized = false;
+            ProvidersReady = false;
         }
         finally
         {

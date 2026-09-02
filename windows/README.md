@@ -40,12 +40,12 @@ To uninstall, use **Settings → Apps → Installed apps → Shadowokx Panel →
 
 ## Experience
 
-- Native notification-area icon; left click toggles the compact panel.
+- Dedicated multi-resolution notification-area icon; left click toggles the compact taskbar-free panel.
 - Right-click menu: Open, Refresh, Settings, Start with Windows, and Exit.
 - Equal-width ChatGPT Codex and Weather navigation.
 - Weekly capacity, reset information, five-hour availability, reset credits, lifetime token total, and privacy-safe local history.
 - Seven-day graph with real date spacing, a zero baseline, point tooltips, and no redraw timer.
-- Current Weather, hourly forecast, rain, UV, high/low, sunrise, and sunset.
+- Current Weather, hourly forecast, rain, UV, high/low, sunrise, and sunset with bundled vector condition icons.
 - Multiple native themes, accent choices, and compact/comfortable density.
 
 Closing the popup leaves Shadowokx Panel running in the notification area. Use **Exit** from the tray menu to stop it completely.
@@ -71,7 +71,7 @@ Runtime state is isolated to the current Windows profile:
 
 ## Codex detection
 
-The app checks the effective Windows `PATH` and established current-user package-manager locations for native `codex.exe` and npm-style `codex.cmd`/`codex.bat` shims. It invokes the fixed `codex app-server --stdio` command and requests only:
+The app merges the process, current-user, and machine Windows `PATH`, checks the registered `codex.exe` App Path, and then checks the official standalone installer’s `%LOCALAPPDATA%\Programs\OpenAI\Codex\bin` directory plus established package-manager and per-user program locations for native `codex.exe` and npm-style `codex.cmd`/`codex.bat` shims. This avoids the stale-PATH problem common when a tray app starts before an installer updates the current process environment. It invokes the fixed `codex app-server --stdio` command and requests only:
 
 ```text
 account/usage/read
@@ -145,9 +145,11 @@ Before publishing, complete [the Windows release QA checklist](docs/RELEASE-QA.m
 ## Performance and lifecycle
 
 - A single primary instance remains alive in the notification area; later launches redirect to it.
-- Concurrent refreshes are coalesced and provider work is asynchronous, cancellable, size-bounded, and time-bounded.
+- Codex uses one adaptive scheduler: 30 seconds while its visible page is open and 60 seconds in the background. Concurrent triggers are coalesced.
+- Provider work is asynchronous, cancellable, size-bounded, and time-bounded; last-known-good data survives transient failures.
 - The graph redraws only when its data or layout changes.
 - The display timer runs only while the popup is visible, and Weather makes no requests while disabled.
+- Identical Codex results do not rewrite daily history or cache on every short refresh.
 - Tray hooks, timers, requests, providers, and event subscriptions are disposed exactly once during Exit.
 
 ## Troubleshooting

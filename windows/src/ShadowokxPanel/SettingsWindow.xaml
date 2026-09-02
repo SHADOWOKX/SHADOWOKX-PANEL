@@ -17,7 +17,7 @@
                     <ToggleSwitch x:Name="CodexStateToggle" Header="Show Codex usage state" Toggled="SettingChanged" />
                     <ToggleSwitch x:Name="WeatherTooltipToggle" Header="Weather in tray tooltip" Toggled="SettingChanged" />
                     <ToggleSwitch x:Name="TrayStateToggle" Header="Adapt tray icon to usage state" Toggled="SettingChanged" />
-                    <ToggleSwitch x:Name="RefreshOnOpenToggle" Header="Refresh stale data when opened" Toggled="SettingChanged" />
+                    <ToggleSwitch x:Name="RefreshOnOpenToggle" Header="Refresh stale Weather when opened" Toggled="SettingChanged" />
                 </StackPanel>
 
                 <StackPanel Spacing="10">
@@ -59,7 +59,7 @@
 
                 <StackPanel Spacing="10">
                     <TextBlock Text="REFRESH" Style="{StaticResource SectionLabelStyle}" />
-                    <NumberBox x:Name="CodexInterval" Header="Codex refresh interval (minutes)" Minimum="5" Maximum="120" SpinButtonPlacementMode="Inline" ValueChanged="NumberChanged" />
+                    <TextBlock Text="Codex updates every 30 seconds while visible and every 60 seconds in the background." TextWrapping="Wrap" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
                     <NumberBox x:Name="WeatherInterval" Header="Weather refresh interval (minutes)" Minimum="15" Maximum="180" SpinButtonPlacementMode="Inline" ValueChanged="NumberChanged" />
                 </StackPanel>
 

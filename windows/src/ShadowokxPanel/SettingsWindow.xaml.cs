@@ -48,7 +48,6 @@ public sealed partial class SettingsWindow : Window
         WindCombo.SelectedIndex = settings.WindUnit == "mph" ? 1 : 0;
         UvToggle.IsOn = settings.ShowUv;
         PrecipitationToggle.IsOn = settings.ShowHourlyPrecipitation;
-        CodexInterval.Value = settings.CodexRefreshMinutes;
         WeatherInterval.Value = settings.WeatherRefreshMinutes;
         DebugToggle.IsOn = settings.DebugLogging;
         CustomAccentBox.IsEnabled = settings.Accent == AccentPreset.Custom;
@@ -92,8 +91,6 @@ public sealed partial class SettingsWindow : Window
             WindUnit = WindCombo.SelectedIndex == 1 ? "mph" : "kmh",
             ShowUv = UvToggle.IsOn,
             ShowHourlyPrecipitation = PrecipitationToggle.IsOn,
-            CodexRefreshMinutes = double.IsFinite(CodexInterval.Value)
-                ? (int)Math.Round(CodexInterval.Value) : 15,
             WeatherRefreshMinutes = double.IsFinite(WeatherInterval.Value)
                 ? (int)Math.Round(WeatherInterval.Value) : 30,
             DebugLogging = DebugToggle.IsOn,

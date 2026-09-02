@@ -46,7 +46,9 @@ public sealed class TokenHistoryStore
                 .ToArray();
             normalized = normalized with { DailyBuckets = Bounded(merged, now) };
         }
-        await _store.WriteAsync(normalized, cancellationToken).ConfigureAwait(false);
+        if (!normalized.DailyBuckets.SequenceEqual(history.DailyBuckets) ||
+            normalized.StartedAt != history.StartedAt || normalized.Version != history.Version)
+            await _store.WriteAsync(normalized, cancellationToken).ConfigureAwait(false);
         return normalized;
     }
 

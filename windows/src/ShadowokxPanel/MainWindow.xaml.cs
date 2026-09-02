@@ -3,6 +3,7 @@ using System.Globalization;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using ShadowokxPanel.Controls;
 using ShadowokxPanel.Core.History;
@@ -12,6 +13,7 @@ using ShadowokxPanel.Services;
 using ShadowokxPanel.ViewModels;
 using Windows.Graphics;
 using Windows.UI.ViewManagement;
+using Windows.System;
 
 namespace ShadowokxPanel;
 
@@ -32,6 +34,9 @@ public sealed partial class MainWindow : Window, IDisposable
     private bool _visible;
     private bool _exiting;
     private bool _disposed;
+    private int _positionedHeight;
+    private NativeMethods.Point _anchorPoint;
+    private bool _hasAnchorPoint;
 
     public MainWindow(AppHost host)
     {
@@ -53,6 +58,7 @@ public sealed partial class MainWindow : Window, IDisposable
         TokenGraphHost.Children.Add(_tokenGraph);
         StartupDiagnostics.Write("graph construction successful");
         _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        ConfigureUtilityWindow();
         var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_hwnd);
         _appWindow = AppWindow.GetFromWindowId(windowId);
         if (_appWindow.Presenter is OverlappedPresenter presenter)
@@ -83,12 +89,19 @@ public sealed partial class MainWindow : Window, IDisposable
         _tray = new TrayIcon(
             _hwnd,
             TogglePanel,
-            () => _ = _viewModel.RefreshAllAsync(),
+            () =>
+            {
+                if (_host.ProvidersReady)
+                    _ = _viewModel.RefreshAllAsync();
+            },
             OpenSettings,
             ToggleStartup,
             () => _ = ((App)Application.Current).ExitAsync("tray menu"),
-            () => _ = _host.ResumeAsync(),
-            ThemeService.AccentColor(_host.Settings.Current));
+            () =>
+            {
+                if (_host.ProvidersReady)
+                    _ = _host.ResumeAsync();
+            });
         UpdateTray();
     }
 
@@ -96,14 +109,19 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         if (_disposed)
             return;
+        _visible = true;
+        var codexVisible = _viewModel.SelectedPage != "weather" ||
+            !_viewModel.Settings.ShowWeather;
+        _host.Codex.SetVisible(codexVisible);
+        Render();
         PositionNearTray();
         _appWindow.Show();
         Activate();
-        _visible = true;
         _clockTimer.Start();
-        if (_host.Settings.Current.RefreshOnOpen)
-            _ = _viewModel.RefreshAllAsync(false);
-        Render();
+        if (codexVisible && _host.ProvidersReady)
+            _ = _viewModel.RefreshCodexAsync();
+        else if (_host.ProvidersReady && _host.Settings.Current.RefreshOnOpen)
+            _ = _host.Weather.RefreshAsync(false);
     }
 
     private void TogglePanel()
@@ -119,6 +137,7 @@ public sealed partial class MainWindow : Window, IDisposable
         if (!_visible)
             return;
         _visible = false;
+        _host.Codex.SetVisible(false);
         _clockTimer.Stop();
         _appWindow.Hide();
     }
@@ -141,27 +160,91 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void ClockTimer_Tick(object? sender, object eventArgs) => Render();
 
-    private void PositionNearTray()
+    private void Root_KeyDown(object sender, KeyRoutedEventArgs eventArgs)
     {
-        NativeMethods.GetCursorPos(out var cursor);
+        if (eventArgs.Key != VirtualKey.Escape)
+            return;
+        eventArgs.Handled = true;
+        HidePanel();
+    }
+
+    private void ConfigureUtilityWindow()
+    {
+        var extended = NativeMethods.GetWindowLongPtr(_hwnd, NativeMethods.GwlExStyle).ToInt64();
+        var utility = (extended | NativeMethods.WsExToolWindow) & ~NativeMethods.WsExAppWindow;
+        if (utility != extended)
+        {
+            System.Runtime.InteropServices.Marshal.SetLastPInvokeError(0);
+            var previous = NativeMethods.SetWindowLongPtr(
+                _hwnd, NativeMethods.GwlExStyle, new nint(utility));
+            if (previous == 0 && System.Runtime.InteropServices.Marshal.GetLastPInvokeError() != 0)
+                throw new InvalidOperationException("The panel utility-window style could not be applied.");
+            if (!NativeMethods.SetWindowPos(
+                _hwnd,
+                0,
+                0,
+                0,
+                0,
+                0,
+                NativeMethods.SwpNoActivate | NativeMethods.SwpNoMove |
+                    NativeMethods.SwpNoSize | NativeMethods.SwpNoZOrder |
+                    NativeMethods.SwpFrameChanged))
+                throw new InvalidOperationException("The panel utility-window frame could not be updated.");
+        }
+    }
+
+    private void PositionNearTray(bool captureAnchor = true)
+    {
+        if ((captureAnchor || !_hasAnchorPoint) && NativeMethods.GetCursorPos(out var point))
+        {
+            _anchorPoint = point;
+            _hasAnchorPoint = true;
+        }
+        var cursor = _anchorPoint;
         var monitor = NativeMethods.MonitorFromPoint(cursor, NativeMethods.MonitorDefaultToNearest);
         var info = new NativeMethods.MonitorInfo
         {
             cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MonitorInfo>(),
         };
-        NativeMethods.GetMonitorInfo(monitor, ref info);
-        var scale = Math.Max(1, NativeMethods.GetDpiForWindow(_hwnd)) / 96d;
+        if (!NativeMethods.GetMonitorInfo(monitor, ref info))
+            return;
+        var dpi = NativeMethods.GetDpiForMonitor(monitor, 0, out var monitorDpi, out _) == 0
+            ? monitorDpi : NativeMethods.GetDpiForWindow(_hwnd);
+        var scale = Math.Max(96, dpi) / 96d;
+        var margin = (int)Math.Round(10 * scale);
         var width = (int)Math.Round((_host.Settings.Current.Density ==
             Core.Settings.LayoutDensity.Compact ? 400 : 430) * scale);
-        var height = (int)Math.Round((_host.Settings.Current.Density ==
-            Core.Settings.LayoutDensity.Compact ? 650 : 720) * scale);
-        height = Math.Min(height, info.rcWork.Bottom - info.rcWork.Top - (int)(12 * scale));
-        var margin = (int)Math.Round(10 * scale);
-        var x = Math.Clamp(cursor.X - width + margin,
-            info.rcWork.Left + margin, info.rcWork.Right - width - margin);
-        var y = Math.Clamp(cursor.Y - height - margin,
-            info.rcWork.Top + margin, info.rcWork.Bottom - height - margin);
+        var height = (int)Math.Round(DesiredPanelHeight() * scale);
+        width = Math.Min(width, Math.Max(1, info.rcWork.Right - info.rcWork.Left - margin * 2));
+        height = Math.Min(height, Math.Max(1, info.rcWork.Bottom - info.rcWork.Top - margin * 2));
+        var taskbarBottom = info.rcWork.Bottom < info.rcMonitor.Bottom;
+        var taskbarTop = info.rcWork.Top > info.rcMonitor.Top;
+        var taskbarLeft = info.rcWork.Left > info.rcMonitor.Left;
+        var taskbarRight = info.rcWork.Right < info.rcMonitor.Right;
+        var x = taskbarLeft ? info.rcWork.Left + margin : taskbarRight
+            ? info.rcWork.Right - width - margin : cursor.X - width + margin;
+        var y = taskbarTop ? info.rcWork.Top + margin : taskbarBottom
+            ? info.rcWork.Bottom - height - margin : cursor.Y - height + margin;
+        x = Math.Clamp(x, info.rcWork.Left + margin, info.rcWork.Right - width - margin);
+        y = Math.Clamp(y, info.rcWork.Top + margin, info.rcWork.Bottom - height - margin);
         _appWindow.MoveAndResize(new RectInt32(x, y, width, height));
+        _positionedHeight = DesiredPanelHeight();
+    }
+
+    private int DesiredPanelHeight()
+    {
+        var compact = _host.Settings.Current.Density == Core.Settings.LayoutDensity.Compact;
+        var weather = _host.Settings.Current.ShowWeather && _viewModel.SelectedPage == "weather";
+        if (weather)
+            return _viewModel.Weather.HasData ? (compact ? 600 : 660) : (compact ? 340 : 360);
+        if (!_viewModel.Codex.HasData)
+            return compact ? 340 : 360;
+        var height = compact ? 610 : 690;
+        if (!_host.Settings.Current.ShowTokenHistory)
+            height -= compact ? 90 : 105;
+        if (!_host.Settings.Current.ShowLifetimeTokens)
+            height -= compact ? 35 : 40;
+        return height;
     }
 
     private void Render()
@@ -184,19 +267,33 @@ public sealed partial class MainWindow : Window, IDisposable
     private void RenderCodex(CodexState state, Core.Settings.AppSettings settings)
     {
         var hasData = state.HasData;
-        CodexErrorCard.Visibility = !hasData && state.Status == ProviderStatus.Error
-            ? Visibility.Visible : Visibility.Collapsed;
+        CodexErrorCard.Visibility = !hasData ? Visibility.Visible : Visibility.Collapsed;
         CodexContent.Visibility = hasData ? Visibility.Visible : Visibility.Collapsed;
-        CodexErrorTitle.Text = state.ErrorCode == "not-installed"
-            ? "Codex not detected" : state.ErrorCode == "unsupported-response"
-                ? "Unsupported Codex response" : "Codex usage unavailable";
-        CodexErrorMessage.Text = state.ErrorMessage ?? "No usage data has been reported yet.";
+        CodexErrorTitle.Text = state.Status == ProviderStatus.Loading ? "Loading Codex usage" :
+            state.ErrorCode switch
+            {
+                "not-installed" => "Codex not detected",
+                "start-failed" => "Codex could not start",
+                "authentication-required" => "Codex needs sign-in",
+                "app-server-failed" => "Codex service unavailable",
+                "unsupported-response" => "Unsupported Codex response",
+                "timeout" => "Codex timed out",
+                _ => "Codex usage unavailable",
+            };
+        CodexErrorMessage.Text = state.Status == ProviderStatus.Loading
+            ? "Checking this Windows user’s Codex installation…"
+            : state.ErrorMessage ?? "No usage data has been reported yet.";
         var refreshing = state.Status is ProviderStatus.Loading or ProviderStatus.Refreshing;
         var animateRefresh = refreshing && settings.Animations && _uiSettings.AnimationsEnabled;
         CodexRefreshRing.IsActive = animateRefresh;
         CodexRefreshRing.Visibility = animateRefresh ? Visibility.Visible : Visibility.Collapsed;
         CodexRefreshIcon.Visibility = animateRefresh ? Visibility.Collapsed : Visibility.Visible;
         CodexRefreshButton.IsEnabled = !refreshing;
+        CodexInitialProgress.IsActive = animateRefresh && !hasData;
+        CodexInitialProgress.Visibility = animateRefresh && !hasData
+            ? Visibility.Visible : Visibility.Collapsed;
+        CodexRetryButton.Visibility = state.Status == ProviderStatus.Error
+            ? Visibility.Visible : Visibility.Collapsed;
         if (!hasData)
             return;
 
@@ -226,9 +323,12 @@ public sealed partial class MainWindow : Window, IDisposable
             ? Visibility.Visible : Visibility.Collapsed;
         var usage = state.TokenUsage;
         LifetimeTokens.Visibility = settings.ShowLifetimeTokens ? Visibility.Visible : Visibility.Collapsed;
+        LifetimeTokensLabel.Visibility = LifetimeTokens.Visibility;
         LifetimeTokens.Text = FormatTokens(usage?.LifetimeTokens);
         _tokenGraph.Visibility = settings.ShowTokenHistory ? Visibility.Visible : Visibility.Collapsed;
+        TokenGraphHost.Visibility = _tokenGraph.Visibility;
         _tokenGraph.SetData(usage?.DailyBuckets);
+        TodayTokens.Text = FormatTokens(usage?.TodayTokens);
         PeakTokens.Text = FormatTokens(usage?.PeakDailyTokens);
         PeakDate.Text = usage?.PeakDate?.ToString(
             "MMM d, yyyy", CultureInfo.CurrentCulture) ?? "Not reported";
@@ -239,16 +339,24 @@ public sealed partial class MainWindow : Window, IDisposable
     private void RenderWeather(WeatherState state, Core.Settings.AppSettings settings)
     {
         var hasData = state.HasData;
-        WeatherErrorCard.Visibility = !hasData && state.Status == ProviderStatus.Error
-            ? Visibility.Visible : Visibility.Collapsed;
+        WeatherErrorCard.Visibility = !hasData ? Visibility.Visible : Visibility.Collapsed;
         WeatherContent.Visibility = hasData ? Visibility.Visible : Visibility.Collapsed;
-        WeatherErrorMessage.Text = state.ErrorMessage ?? "No forecast has been received yet.";
+        WeatherErrorTitle.Text = state.Status == ProviderStatus.Loading
+            ? "Loading weather" : "Weather unavailable";
+        WeatherErrorMessage.Text = state.Status == ProviderStatus.Loading
+            ? "Contacting Open-Meteo…"
+            : state.ErrorMessage ?? "No forecast has been received yet.";
         var refreshing = state.Status is ProviderStatus.Loading or ProviderStatus.Refreshing;
         var animateRefresh = refreshing && settings.Animations && _uiSettings.AnimationsEnabled;
         WeatherRefreshRing.IsActive = animateRefresh;
         WeatherRefreshRing.Visibility = animateRefresh ? Visibility.Visible : Visibility.Collapsed;
         WeatherRefreshIcon.Visibility = animateRefresh ? Visibility.Collapsed : Visibility.Visible;
         WeatherRefreshButton.IsEnabled = !refreshing;
+        WeatherInitialProgress.IsActive = animateRefresh && !hasData;
+        WeatherInitialProgress.Visibility = animateRefresh && !hasData
+            ? Visibility.Visible : Visibility.Collapsed;
+        WeatherRetryButton.Visibility = state.Status == ProviderStatus.Error
+            ? Visibility.Visible : Visibility.Collapsed;
         if (!hasData || state.Current is null || state.Today is null)
             return;
 
@@ -256,7 +364,7 @@ public sealed partial class MainWindow : Window, IDisposable
         WeatherTemperature.Text = $"{Math.Round(state.Current.Temperature):0}°";
         WeatherCondition.Text = state.Current.Condition.Label;
         WeatherLocation.Text = CompactLocation(state.Location);
-        WeatherHeroIcon.Glyph = WeatherGlyph(state.Current.Condition.Symbol);
+        WeatherIconAssets.Set(WeatherHeroIcon, state.Current.Condition.Symbol);
         WeatherHighLow.Text = $"H{Math.Round(state.Today.High):0}° · L{Math.Round(state.Today.Low):0}°";
         FeelsLike.Text = $"{Math.Round(state.Current.FeelsLike):0}{suffix}";
         Humidity.Text = $"{Math.Round(state.Current.Humidity):0}%";
@@ -266,7 +374,11 @@ public sealed partial class MainWindow : Window, IDisposable
             ? $"{Math.Round(state.Current.RainProbability.Value):0}%" : "Unavailable";
         UvIndex.Text = state.Today.Uv.HasValue
             ? $"{state.Today.Uv.Value:0.#} · {UvSeverity(state.Today.Uv.Value)}" : "Unavailable";
-        UvIndex.Visibility = settings.ShowUv ? Visibility.Visible : Visibility.Collapsed;
+        UvRow.Visibility = settings.ShowUv ? Visibility.Visible : Visibility.Collapsed;
+        ForecastEmpty.Visibility = state.Forecast.Count == 0
+            ? Visibility.Visible : Visibility.Collapsed;
+        ForecastRow.Visibility = state.Forecast.Count == 0
+            ? Visibility.Collapsed : Visibility.Visible;
         if (!_renderedForecast.SequenceEqual(state.Forecast) ||
             _renderedForecastTimeZone != state.TimeZone ||
             _renderedForecastPrecipitation != settings.ShowHourlyPrecipitation)
@@ -288,12 +400,7 @@ public sealed partial class MainWindow : Window, IDisposable
                     Foreground = ResourceBrush("SecondaryTextBrush"),
                     HorizontalAlignment = HorizontalAlignment.Center,
                 });
-                item.Children.Add(new FontIcon
-                {
-                    Glyph = WeatherGlyph(hour.Condition.Symbol),
-                    FontSize = 16,
-                    Foreground = ResourceBrush("PrimaryTextBrush"),
-                });
+                item.Children.Add(WeatherIconAssets.Create(hour.Condition.Symbol, 18));
                 item.Children.Add(new TextBlock
                 {
                     Text = $"{Math.Round(hour.Temperature):0}°",
@@ -342,7 +449,7 @@ public sealed partial class MainWindow : Window, IDisposable
         if (_viewModel.Settings.ShowWeatherInTrayTooltip && _viewModel.Weather.Current is { } weather)
             lines.Add($"Weather: {Math.Round(weather.Temperature):0}° · {weather.Condition.Label}");
         var iconPace = _viewModel.Settings.ChangeTrayIconWithUsageState ? pace : UsagePace.Unknown;
-        _tray.Update(string.Join('\n', lines), iconPace, ThemeService.AccentColor(_viewModel.Settings));
+        _tray.Update(string.Join('\n', lines), iconPace);
     }
 
     private void OpenSettings()
@@ -377,20 +484,38 @@ public sealed partial class MainWindow : Window, IDisposable
     private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
     {
         if (_visible)
+        {
+            _host.Codex.SetVisible(_viewModel.SelectedPage != "weather" ||
+                !_viewModel.Settings.ShowWeather);
             Render();
+            if (_positionedHeight != DesiredPanelHeight())
+                PositionNearTray(captureAnchor: false);
+        }
         else
             UpdateTray();
     }
 
     private async void CodexTab_Click(object sender, RoutedEventArgs e)
     {
-        try { await _viewModel.SelectPageAsync("codex"); }
+        try
+        {
+            await _viewModel.SelectPageAsync("codex");
+            _host.Codex.SetVisible(_visible);
+            if (_visible && _host.ProvidersReady)
+                await _viewModel.RefreshCodexAsync();
+        }
         catch (IOException) { }
     }
 
     private async void WeatherTab_Click(object sender, RoutedEventArgs e)
     {
-        try { await _viewModel.SelectPageAsync("weather"); }
+        try
+        {
+            await _viewModel.SelectPageAsync("weather");
+            _host.Codex.SetVisible(false);
+            if (_visible && _host.ProvidersReady)
+                await _host.Weather.RefreshAsync(false);
+        }
         catch (IOException) { }
     }
 
@@ -415,6 +540,7 @@ public sealed partial class MainWindow : Window, IDisposable
         _disposed = true;
         _exiting = true;
         _visible = false;
+        _host.Codex.SetVisible(false);
         _clockTimer.Stop();
         _clockTimer.Tick -= ClockTimer_Tick;
         _appWindow.Closing -= AppWindow_Closing;
@@ -482,19 +608,6 @@ public sealed partial class MainWindow : Window, IDisposable
         < 8 => "High",
         < 11 => "Very high",
         _ => "Extreme",
-    };
-
-    private static string WeatherGlyph(string symbol) => symbol switch
-    {
-        "sun" => "\uE706",
-        "partly-cloudy" => "\uE9BD",
-        "cloud" => "\uE753",
-        "fog" => "\uE9B8",
-        "drizzle" => "\uE9C4",
-        "rain" => "\uE9C4",
-        "snow" => "\uE9C7",
-        "storm" => "\uE9C6",
-        _ => "\uE7BA",
     };
 
     private static DateTime LocationTime(DateTimeOffset value, string? zone)
