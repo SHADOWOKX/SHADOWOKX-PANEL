@@ -23,6 +23,14 @@ jobs:
             dbus-daemon git gjs gnome-shell gnome-shell-extension-prefs libadwaita-1-0 \
             libglib2.0-bin libxml2-utils python3 ripgrep unzip zip
       - uses: actions/checkout@v4
+      - name: Assign isolated Developer build version
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=$(tr -d '[:space:]' < VERSION)
+          base=${base%%-*}
+          node scripts/release/version.mjs set . "${base}-dev.${GITHUB_RUN_NUMBER}"
       - name: Validate version contract
         run: node scripts/release/version.mjs check .
       - name: Run Linux tests and package validation

@@ -44,7 +44,8 @@ function check(root) {
     }
     if (fs.existsSync(locations.metadata)) {
         const metadata = JSON.parse(read(locations.metadata));
-        if (metadata['version-name'] !== canonical.value)
+        if (Object.hasOwn(metadata, 'version-name') &&
+            metadata['version-name'] !== canonical.value)
             throw new Error('metadata.json version-name differs from VERSION');
     }
     return canonical;
@@ -64,15 +65,20 @@ function setVersion(root, requested) {
     }
     if (fs.existsSync(locations.metadata)) {
         const metadata = JSON.parse(read(locations.metadata));
-        metadata['version-name'] = target.value;
-        write(locations.metadata, `${JSON.stringify(metadata, null, 2)}\n`);
+        if (Object.hasOwn(metadata, 'version-name')) {
+            metadata['version-name'] = target.value;
+            write(locations.metadata, `${JSON.stringify(metadata, null, 2)}\n`);
+        }
     }
     if (fs.existsSync(locations.readme)) {
         const contents = read(locations.readme);
-        const replaced = contents.replace(/Release `[^`]+`/, `Release \`${target.value}\``);
-        if (replaced === contents && !contents.includes(`Release \`${target.value}\``))
-            throw new Error('README release marker was not found');
-        write(locations.readme, replaced);
+        if (/Release `[^`]+`/.test(contents)) {
+            const replaced = contents.replace(
+                /Release `[^`]+`/,
+                `Release \`${target.value}\``
+            );
+            write(locations.readme, replaced);
+        }
     }
     check(root);
     return target;

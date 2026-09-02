@@ -65,12 +65,19 @@ try {
     );
     safeEntries(portableEntries, 'Windows portable package');
     for (const required of ['ShadowokxPanel.exe', 'ShadowokxPanel.pri', 'App.xbf',
-        'MainWindow.xbf', 'SettingsWindow.xbf']) {
+        'MainWindow.xbf', 'SettingsWindow.xbf', 'VERSION']) {
         if (!portableEntries.some(entry => entry.endsWith(required)))
             throw new Error(`Windows portable package is missing ${required}`);
     }
     if (portableEntries.some(entry => entry.toLowerCase().endsWith('.pdb')))
         throw new Error('Windows portable package contains developer symbols');
+    const portableVersion = execFileSync('unzip', [
+        '-p',
+        path.join(directory, manifest.platforms.windows.portable.asset),
+        portableEntries.find(entry => entry.endsWith('VERSION')),
+    ], {encoding: 'utf8'}).trim();
+    if (portableVersion !== manifest.version)
+        throw new Error('Windows portable VERSION does not match the manifest');
     process.stdout.write(`Validated release bundle ${manifest.version} (${manifest.channel})\n`);
 } catch (error) {
     console.error(`Release bundle validation failed: ${error.message}`);

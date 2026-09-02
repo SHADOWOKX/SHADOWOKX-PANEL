@@ -1,0 +1,51 @@
+name: Windows CI
+
+on:
+  push:
+    branches: [windows-port]
+    paths:
+      - 'windows/**'
+      - 'VERSION'
+      - '.github/workflows/windows-ci.yml'
+  pull_request:
+    paths:
+      - 'windows/**'
+      - 'VERSION'
+
+permissions:
+  contents: read
+
+jobs:
+  native-build:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Assign isolated Developer build version
+        shell: pwsh
+        run: |
+          $base = (Get-Content -LiteralPath VERSION -Raw).Trim().Split('-', 2)[0]
+          [IO.File]::WriteAllText(
+            (Resolve-Path VERSION),
+            "$base-dev.${{ github.run_number }}`n",
+            [Text.UTF8Encoding]::new($false))
+      - name: Run strict tests, native XAML compile, publish, and release validation
+        shell: pwsh
+        working-directory: windows
+        run: .\scripts\release.ps1 -Configuration Release -Runtime win-x64
+      - name: Upload temporary Developer artifacts
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShadowokxPanel-Windows-dev-${{ github.sha }}
+          path: |
+            windows/artifacts/release/ShadowokxPanel-Setup-x64.exe
+            windows/artifacts/release/ShadowokxPanel-Portable-x64.zip
+            windows/artifacts/release/checksums.txt
+          if-no-files-found: error
+          retention-days: 7
