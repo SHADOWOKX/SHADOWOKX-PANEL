@@ -55,14 +55,14 @@ public static class ThemeService
         Set("TrackBrush", preset == ThemePreset.Light ? "#d5d6d1" : "#4d4e49");
         var accent = settings.Accent == AccentPreset.Custom
             ? settings.CustomAccent
-            : Accents.GetValueOrDefault(settings.Accent, "#f43f5e");
+            : Accents.GetValueOrDefault(settings.Accent, "#f97316");
         Set("AccentBrush", accent);
     }
 
     public static Color AccentColor(AppSettings settings)
     {
         var value = settings.Accent == AccentPreset.Custom
-            ? settings.CustomAccent : Accents.GetValueOrDefault(settings.Accent, "#f43f5e");
+            ? settings.CustomAccent : Accents.GetValueOrDefault(settings.Accent, "#f97316");
         return Parse(value);
     }
 

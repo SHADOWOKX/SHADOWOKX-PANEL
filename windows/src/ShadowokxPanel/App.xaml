@@ -13,7 +13,7 @@
             <Color x:Key="BorderColor">#FF464742</Color>
             <Color x:Key="PrimaryTextColor">#FFF5F3ED</Color>
             <Color x:Key="SecondaryTextColor">#FFB6B4AC</Color>
-            <Color x:Key="AccentColor">#FFF43F5E</Color>
+            <Color x:Key="AccentColor">#FFF97316</Color>
             <Color x:Key="TrackColor">#FF4D4E49</Color>
             <SolidColorBrush x:Key="AppBackgroundBrush" Color="{StaticResource AppBackgroundColor}" />
             <SolidColorBrush x:Key="CardBrush" Color="{StaticResource CardColor}" />
@@ -23,12 +23,20 @@
             <SolidColorBrush x:Key="SecondaryTextBrush" Color="{StaticResource SecondaryTextColor}" />
             <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
             <SolidColorBrush x:Key="TrackBrush" Color="{StaticResource TrackColor}" />
+            <x:Double x:Key="ProgressBarMinHeight">9</x:Double>
+            <x:Double x:Key="ProgressBarTrackHeight">9</x:Double>
+            <CornerRadius x:Key="ProgressBarTrackCornerRadius">5</CornerRadius>
             <Style x:Key="CardStyle" TargetType="Border">
                 <Setter Property="Background" Value="{ThemeResource CardBrush}" />
                 <Setter Property="BorderBrush" Value="{ThemeResource CardBorderBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="14" />
-                <Setter Property="Padding" Value="16" />
+                <Setter Property="CornerRadius" Value="12" />
+                <Setter Property="Padding" Value="14" />
+            </Style>
+            <Style x:Key="CardTitleStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource PrimaryTextBrush}" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="FontWeight" Value="SemiBold" />
             </Style>
             <Style x:Key="SectionLabelStyle" TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{ThemeResource SecondaryTextBrush}" />

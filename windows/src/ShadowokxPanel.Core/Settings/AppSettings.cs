@@ -40,8 +40,8 @@ public sealed record AppSettings
     public bool RememberLastPage { get; init; } = true;
     public string LastPage { get; init; } = "codex";
     public ThemePreset Theme { get; init; } = ThemePreset.System;
-    public AccentPreset Accent { get; init; } = AccentPreset.Rose;
-    public string CustomAccent { get; init; } = "#f43f5e";
+    public AccentPreset Accent { get; init; } = AccentPreset.Orange;
+    public string CustomAccent { get; init; } = "#f97316";
     public LayoutDensity Density { get; init; } = LayoutDensity.Comfortable;
     public bool Animations { get; init; } = true;
     public bool ShowLifetimeTokens { get; init; } = true;
@@ -55,4 +55,5 @@ public sealed record AppSettings
     public int CodexRefreshMinutes { get; init; } = 15;
     public int WeatherRefreshMinutes { get; init; } = 30;
     public bool DebugLogging { get; init; }
+    public int SettingsSchemaVersion { get; init; }
 }

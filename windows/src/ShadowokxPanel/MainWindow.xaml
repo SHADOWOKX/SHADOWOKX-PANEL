@@ -5,10 +5,12 @@
     <Border
         x:Name="Root"
         Background="{ThemeResource AppBackgroundBrush}"
+        BorderBrush="{ThemeResource CardBorderBrush}"
+        BorderThickness="1"
         CornerRadius="18"
-        Padding="20"
+        Padding="18"
         KeyDown="Root_KeyDown">
-        <Grid RowSpacing="16">
+        <Grid RowSpacing="14">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -96,14 +98,17 @@
                     VerticalScrollMode="Enabled"
                     HorizontalScrollBarVisibility="Disabled"
                     HorizontalScrollMode="Disabled">
-                    <StackPanel Spacing="12" Padding="0,0,0,4">
+                    <StackPanel Spacing="10" Padding="0,0,0,3">
                         <Grid Margin="0,2,0,2">
-                            <TextBlock
-                                Text="Codex Usage"
-                                Foreground="{ThemeResource PrimaryTextBrush}"
-                                FontSize="16"
-                                FontWeight="SemiBold"
-                                VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <Image Source="Assets/chatgpt.png" Width="16" Height="16" Stretch="Uniform" />
+                                <TextBlock
+                                    Text="Codex Usage"
+                                    Foreground="{ThemeResource PrimaryTextBrush}"
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    VerticalAlignment="Center" />
+                            </StackPanel>
                             <Button
                                 x:Name="CodexRefreshButton"
                                 HorizontalAlignment="Right"
@@ -128,27 +133,38 @@
                             </StackPanel>
                         </Border>
 
-                        <StackPanel x:Name="CodexContent" Spacing="12">
+                        <StackPanel x:Name="CodexContent" Spacing="10">
                             <Border x:Name="WeeklyCard" Style="{StaticResource CardStyle}">
-                                <StackPanel Spacing="12">
+                                <StackPanel Spacing="10">
                                     <Grid>
-                                        <TextBlock Text="WEEKLY CAPACITY" Style="{StaticResource SectionLabelStyle}" />
+                                        <TextBlock Text="Weekly capacity" Style="{StaticResource CardTitleStyle}" />
                                         <Border x:Name="CapacityPill" HorizontalAlignment="Right" Background="{ThemeResource CardHoverBrush}" CornerRadius="9" Padding="9,4">
-                                            <TextBlock x:Name="CapacityLabel" FontSize="11" FontWeight="SemiBold" />
+                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                <Ellipse Width="6" Height="6" Fill="{ThemeResource AccentBrush}" VerticalAlignment="Center" />
+                                                <TextBlock x:Name="CapacityLabel" FontSize="11" FontWeight="SemiBold" />
+                                            </StackPanel>
                                         </Border>
                                     </Grid>
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <TextBlock x:Name="WeeklyRemaining" Foreground="{ThemeResource AccentBrush}" FontSize="38" FontWeight="Bold" />
                                         <TextBlock Text="remaining" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="13" VerticalAlignment="Bottom" Margin="0,0,0,7" />
                                     </StackPanel>
-                                    <ProgressBar x:Name="WeeklyProgress" Height="7" Minimum="0" Maximum="100" Foreground="{ThemeResource AccentBrush}" Background="{ThemeResource TrackBrush}" CornerRadius="4" />
-                                    <Grid>
+                                    <ProgressBar x:Name="WeeklyProgress" Height="9" MinHeight="9" Minimum="0" Maximum="100" Foreground="{ThemeResource AccentBrush}" Background="{ThemeResource TrackBrush}" CornerRadius="5" />
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
                                         <TextBlock x:Name="WeeklyUsed" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
-                                        <TextBlock x:Name="WeeklyAvailable" HorizontalAlignment="Right" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
+                                        <TextBlock x:Name="WeeklyAvailable" Grid.Column="1" HorizontalAlignment="Right" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="12" FontWeight="SemiBold" />
                                     </Grid>
-                                    <Grid>
-                                        <TextBlock x:Name="WeeklyCountdown" Foreground="{ThemeResource PrimaryTextBrush}" FontWeight="SemiBold" FontSize="12" />
-                                        <TextBlock x:Name="WeeklyResetDate" HorizontalAlignment="Right" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="WeeklyCountdown" TextTrimming="CharacterEllipsis" Foreground="{ThemeResource PrimaryTextBrush}" FontWeight="SemiBold" FontSize="12" />
+                                        <TextBlock x:Name="WeeklyResetDate" Grid.Column="1" HorizontalAlignment="Right" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
                                     </Grid>
                                 </StackPanel>
                             </Border>
@@ -160,20 +176,23 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Spacing="5">
-                                        <TextBlock Text="5-HOUR WINDOW" Style="{StaticResource SectionLabelStyle}" />
+                                        <TextBlock Text="5-Hour Window" Style="{StaticResource CardTitleStyle}" />
                                         <TextBlock x:Name="FiveHourText" Foreground="{ThemeResource PrimaryTextBrush}" FontWeight="SemiBold" />
                                         <TextBlock x:Name="FiveHourReset" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
                                     </StackPanel>
                                     <Border Grid.Column="1" Background="{ThemeResource CardHoverBrush}" CornerRadius="9" Padding="9,4" VerticalAlignment="Top">
-                                        <TextBlock x:Name="FiveHourPill" FontSize="11" FontWeight="SemiBold" />
+                                        <StackPanel Orientation="Horizontal" Spacing="5">
+                                            <Ellipse Width="6" Height="6" Fill="{ThemeResource SecondaryTextBrush}" Opacity="0.75" VerticalAlignment="Center" />
+                                            <TextBlock x:Name="FiveHourPill" FontSize="11" FontWeight="SemiBold" />
+                                        </StackPanel>
                                     </Border>
                                 </Grid>
                             </Border>
 
                             <Border x:Name="TokenCard" Style="{StaticResource CardStyle}">
-                                <StackPanel Spacing="11">
+                                <StackPanel Spacing="10">
                                     <Grid>
-                                        <TextBlock Text="TOKEN ACTIVITY" Style="{StaticResource SectionLabelStyle}" />
+                                        <TextBlock Text="Token activity" Style="{StaticResource CardTitleStyle}" />
                                         <Border HorizontalAlignment="Right" Background="{ThemeResource CardHoverBrush}" CornerRadius="9" Padding="9,4">
                                             <StackPanel Orientation="Horizontal" Spacing="5">
                                                 <FontIcon Glyph="&#xE81C;" FontSize="11" />
@@ -206,12 +225,27 @@
                                 </StackPanel>
                             </Border>
 
-                            <Grid Margin="2,2,2,0">
+                            <Border x:Name="UsageStateCard" Style="{StaticResource CardStyle}" Padding="12" Visibility="Collapsed">
+                                <Grid ColumnSpacing="9">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE73E;" FontSize="14" Foreground="{ThemeResource AccentBrush}" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="UsageStateText" Grid.Column="1" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+
+                            <Grid Margin="2,3,2,0" ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <FontIcon Glyph="&#xE777;" FontSize="12" Foreground="{ThemeResource SecondaryTextBrush}" />
                                     <TextBlock x:Name="ResetCredits" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
                                 </StackPanel>
-                                <TextBlock x:Name="CodexUpdated" HorizontalAlignment="Right" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
+                                <TextBlock x:Name="CodexUpdated" Grid.Column="1" HorizontalAlignment="Right" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
                             </Grid>
                         </StackPanel>
                     </StackPanel>
@@ -224,7 +258,7 @@
                     VerticalScrollMode="Enabled"
                     HorizontalScrollBarVisibility="Disabled"
                     HorizontalScrollMode="Disabled">
-                    <StackPanel Spacing="12" Padding="0,0,0,4">
+                    <StackPanel Spacing="10" Padding="0,0,0,3">
                         <Grid Margin="0,2,0,2">
                             <TextBlock Text="Weather" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
                             <Button
@@ -251,7 +285,7 @@
                             </StackPanel>
                         </Border>
 
-                        <StackPanel x:Name="WeatherContent" Spacing="12">
+                        <StackPanel x:Name="WeatherContent" Spacing="10">
                             <Border Style="{StaticResource CardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>

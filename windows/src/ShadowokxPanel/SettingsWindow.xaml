@@ -29,7 +29,7 @@
                         <x:String>Rose</x:String><x:String>Orange</x:String><x:String>Emerald</x:String><x:String>Cyan</x:String>
                         <x:String>Blue</x:String><x:String>Violet</x:String><x:String>Amber</x:String><x:String>Monochrome</x:String><x:String>Custom</x:String>
                     </ComboBox>
-                    <TextBox x:Name="CustomAccentBox" Header="Custom accent" PlaceholderText="#f43f5e" MaxLength="7" LostFocus="SettingChanged" />
+                    <TextBox x:Name="CustomAccentBox" Header="Custom accent" PlaceholderText="#f97316" MaxLength="7" LostFocus="SettingChanged" />
                     <ComboBox x:Name="DensityCombo" Header="Layout density" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged">
                         <x:String>Compact</x:String><x:String>Comfortable</x:String>
                     </ComboBox>

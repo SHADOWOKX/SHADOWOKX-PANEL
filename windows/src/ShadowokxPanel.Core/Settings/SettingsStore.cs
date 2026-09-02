@@ -4,6 +4,7 @@ namespace ShadowokxPanel.Core.Settings;
 
 public sealed class SettingsStore
 {
+    private const int CurrentSettingsSchemaVersion = 1;
     private readonly JsonFileStore<AppSettings> _store;
 
     public SettingsStore(ApplicationPaths paths)
@@ -35,11 +36,19 @@ public sealed class SettingsStore
         var settings = value ?? new AppSettings();
         var accent = settings.CustomAccent?.Trim() ?? string.Empty;
         if (!System.Text.RegularExpressions.Regex.IsMatch(accent, "^#[0-9a-fA-F]{6}$"))
-            accent = "#f43f5e";
+            accent = "#f97316";
+        var accentPreset = Enum.IsDefined(settings.Accent)
+            ? settings.Accent : AccentPreset.Orange;
+        // Rose was the pre-release default. Migrate that default once while preserving
+        // an explicit Rose choice made after this schema revision.
+        if (settings.SettingsSchemaVersion < CurrentSettingsSchemaVersion &&
+            accentPreset == AccentPreset.Rose)
+            accentPreset = AccentPreset.Orange;
         return settings with
         {
+            SettingsSchemaVersion = CurrentSettingsSchemaVersion,
             Theme = Enum.IsDefined(settings.Theme) ? settings.Theme : ThemePreset.System,
-            Accent = Enum.IsDefined(settings.Accent) ? settings.Accent : AccentPreset.Rose,
+            Accent = accentPreset,
             Density = Enum.IsDefined(settings.Density) ? settings.Density : LayoutDensity.Comfortable,
             CustomAccent = accent.ToLowerInvariant(),
             WeatherLocation = NormalizeLocation(settings.WeatherLocation),

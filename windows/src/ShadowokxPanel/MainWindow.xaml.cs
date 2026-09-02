@@ -9,6 +9,7 @@ using ShadowokxPanel.Controls;
 using ShadowokxPanel.Core.History;
 using ShadowokxPanel.Core.Models;
 using ShadowokxPanel.Core.Presentation;
+using ShadowokxPanel.Core.Settings;
 using ShadowokxPanel.Platform;
 using ShadowokxPanel.Services;
 using ShadowokxPanel.ViewModels;
@@ -40,6 +41,16 @@ public sealed partial class MainWindow : Window, IDisposable
     private int? _codexNaturalHeight;
     private int? _weatherNaturalHeight;
     private bool _contentResizeQueued;
+    private ThemePreset? _appliedTheme;
+    private AccentPreset? _appliedAccent;
+    private string? _appliedCustomAccent;
+    private ApplicationTheme? _appliedApplicationTheme;
+    private Core.Settings.AppSettings? _lastRenderedSettings;
+    private CodexLayoutKey? _codexLayoutKey;
+    private WeatherLayoutKey? _weatherLayoutKey;
+    private int _regionWidth;
+    private int _regionHeight;
+    private int _regionDiameter;
     private NativeMethods.Point _anchorPoint;
     private bool _hasAnchorPoint;
 
@@ -63,7 +74,6 @@ public sealed partial class MainWindow : Window, IDisposable
         TokenGraphHost.Children.Add(_tokenGraph);
         StartupDiagnostics.Write("graph construction successful");
         _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-        ConfigureUtilityWindow();
         var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_hwnd);
         _appWindow = AppWindow.GetFromWindowId(windowId);
         _appWindow.IsShownInSwitchers = false;
@@ -75,6 +85,7 @@ public sealed partial class MainWindow : Window, IDisposable
             presenter.IsMaximizable = false;
             presenter.IsMinimizable = false;
         }
+        ConfigureUtilityWindow();
         ApplyPanelFrameStyling();
         _appWindow.Title = "Shadowokx Panel";
         _appWindow.Closing += AppWindow_Closing;
@@ -84,7 +95,6 @@ public sealed partial class MainWindow : Window, IDisposable
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
         _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
         _clockTimer.Tick += ClockTimer_Tick;
-        ThemeService.Apply(Root, _host.Settings.Current);
         Render();
     }
 
@@ -177,15 +187,21 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void ConfigureUtilityWindow()
     {
+        var style = NativeMethods.GetWindowLongPtr(_hwnd, NativeMethods.GwlStyle).ToInt64();
+        var frameless = style & ~(NativeMethods.WsCaption | NativeMethods.WsBorder |
+            NativeMethods.WsDlgFrame | NativeMethods.WsThickFrame);
         var extended = NativeMethods.GetWindowLongPtr(_hwnd, NativeMethods.GwlExStyle).ToInt64();
         var utility = (extended | NativeMethods.WsExToolWindow) & ~NativeMethods.WsExAppWindow;
-        if (utility != extended)
+        var styleChanged = frameless != style;
+        var extendedChanged = utility != extended;
+        if (styleChanged)
+            SetWindowStyle(NativeMethods.GwlStyle, frameless,
+                "The panel borderless-window style could not be applied.");
+        if (extendedChanged)
+            SetWindowStyle(NativeMethods.GwlExStyle, utility,
+                "The panel utility-window style could not be applied.");
+        if (styleChanged || extendedChanged)
         {
-            System.Runtime.InteropServices.Marshal.SetLastPInvokeError(0);
-            var previous = NativeMethods.SetWindowLongPtr(
-                _hwnd, NativeMethods.GwlExStyle, new nint(utility));
-            if (previous == 0 && System.Runtime.InteropServices.Marshal.GetLastPInvokeError() != 0)
-                throw new InvalidOperationException("The panel utility-window style could not be applied.");
             if (!NativeMethods.SetWindowPos(
                 _hwnd,
                 0,
@@ -198,6 +214,14 @@ public sealed partial class MainWindow : Window, IDisposable
                     NativeMethods.SwpFrameChanged))
                 throw new InvalidOperationException("The panel utility-window frame could not be updated.");
         }
+    }
+
+    private void SetWindowStyle(int index, long value, string errorMessage)
+    {
+        System.Runtime.InteropServices.Marshal.SetLastPInvokeError(0);
+        var previous = NativeMethods.SetWindowLongPtr(_hwnd, index, new nint(value));
+        if (previous == 0 && System.Runtime.InteropServices.Marshal.GetLastPInvokeError() != 0)
+            throw new InvalidOperationException(errorMessage);
     }
 
     private void ApplyPanelFrameStyling()
@@ -262,7 +286,33 @@ public sealed partial class MainWindow : Window, IDisposable
         y = Math.Clamp(y, info.rcWork.Top + margin, info.rcWork.Bottom - height - margin);
         _appWindow.MoveAndResize(new RectInt32(x, y, width, height));
         ApplyPanelFrameStyling();
+        ApplyRoundedWindowRegion(width, height, scale);
         _positionedHeight = desiredHeight;
+    }
+
+    private void ApplyRoundedWindowRegion(int width, int height, double scale)
+    {
+        var diameter = Math.Max(2, (int)Math.Round(36 * scale));
+        if (_regionWidth == width && _regionHeight == height && _regionDiameter == diameter)
+            return;
+        var region = NativeMethods.CreateRoundRectRgn(
+            0, 0, checked(width + 1), checked(height + 1), diameter, diameter);
+        if (region == 0)
+        {
+            StartupDiagnostics.Write("rounded window region allocation failed");
+            return;
+        }
+        if (NativeMethods.SetWindowRgn(_hwnd, region, redraw: true) != 0)
+        {
+            _regionWidth = width;
+            _regionHeight = height;
+            _regionDiameter = diameter;
+            return;
+        }
+
+        // SetWindowRgn owns the region only after success.
+        NativeMethods.DeleteObject(region);
+        StartupDiagnostics.Write("rounded window region application failed");
     }
 
     private int DesiredPanelHeight()
@@ -287,7 +337,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private void Render()
     {
         var settings = _viewModel.Settings;
-        ThemeService.Apply(Root, settings);
+        ApplyThemeIfChanged(settings);
         WeatherTab.Visibility = settings.ShowWeather ? Visibility.Visible : Visibility.Collapsed;
         WeatherColumn.Width = settings.ShowWeather ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
         SegmentedBorder.Visibility = settings.ShowWeather ? Visibility.Visible : Visibility.Collapsed;
@@ -298,8 +348,27 @@ public sealed partial class MainWindow : Window, IDisposable
         WeatherTab.Background = weatherSelected ? ResourceBrush("AccentBrush", 0.22) : Transparent();
         RenderCodex(_viewModel.Codex, settings);
         RenderWeather(_viewModel.Weather, settings);
+        _codexLayoutKey = CodexLayoutKey.Create(_viewModel.Codex, settings);
+        _weatherLayoutKey = WeatherLayoutKey.Create(_viewModel.Weather, settings);
+        _lastRenderedSettings = settings;
         UpdateTray();
         QueueContentResize();
+    }
+
+    private void ApplyThemeIfChanged(Core.Settings.AppSettings settings)
+    {
+        var applicationTheme = Application.Current.RequestedTheme;
+        if (_appliedTheme == settings.Theme && _appliedAccent == settings.Accent &&
+            string.Equals(_appliedCustomAccent, settings.CustomAccent,
+                StringComparison.OrdinalIgnoreCase) &&
+            (settings.Theme != ThemePreset.System || _appliedApplicationTheme == applicationTheme))
+            return;
+
+        ThemeService.Apply(Root, settings);
+        _appliedTheme = settings.Theme;
+        _appliedAccent = settings.Accent;
+        _appliedCustomAccent = settings.CustomAccent;
+        _appliedApplicationTheme = applicationTheme;
     }
 
     private void RenderCodex(CodexState state, Core.Settings.AppSettings settings)
@@ -365,11 +434,23 @@ public sealed partial class MainWindow : Window, IDisposable
         LifetimeTokens.Text = FormatTokens(usage?.LifetimeTokens);
         _tokenGraph.Visibility = settings.ShowTokenHistory ? Visibility.Visible : Visibility.Collapsed;
         TokenGraphHost.Visibility = _tokenGraph.Visibility;
+        var graphHeight = usage?.DailyBuckets.Count >= 2 ? 92 : 58;
+        TokenGraphHost.Height = graphHeight;
+        _tokenGraph.Height = graphHeight;
         _tokenGraph.SetData(usage?.DailyBuckets);
         TodayTokens.Text = FormatTokens(usage?.TodayTokens);
         PeakTokens.Text = FormatTokens(usage?.PeakDailyTokens);
         PeakDate.Text = usage?.PeakDate?.ToString(
             "MMM d, yyyy", CultureInfo.CurrentCulture) ?? "Not reported";
+        var pace = _viewModel.UsagePace;
+        UsageStateCard.Visibility = settings.ShowUsageState && pace != UsagePace.Unknown
+            ? Visibility.Visible : Visibility.Collapsed;
+        UsageStateText.Text = pace switch
+        {
+            UsagePace.Idle => "Recent daily usage is below your normal pace.",
+            UsagePace.Peak => "Recent daily usage is above your normal pace.",
+            _ => "Recent daily usage is close to your normal pace.",
+        };
         ResetCredits.Text = $"Reset credits: {state.ResetCreditsAvailable}";
         CodexUpdated.Text = FormatUpdated(state.LastSuccessfulRefresh, state.IsStale);
     }
@@ -527,21 +608,64 @@ public sealed partial class MainWindow : Window, IDisposable
         if (eventArgs.PropertyName == nameof(DashboardViewModel.UsagePace))
             return;
         var settingsChanged = eventArgs.PropertyName == nameof(DashboardViewModel.Settings);
+        if (settingsChanged && _lastRenderedSettings is { } previousSettings &&
+            (previousSettings with { LastPage = _viewModel.Settings.LastPage }) ==
+                _viewModel.Settings)
+        {
+            // Remembering a tab follows the SelectedPage render; do not render the same
+            // page a second time when only LastPage is persisted.
+            _lastRenderedSettings = _viewModel.Settings;
+            UpdateTray();
+            return;
+        }
         if (settingsChanged)
         {
             _codexNaturalHeight = null;
             _weatherNaturalHeight = null;
         }
-        if (_visible)
+        if (!_visible)
         {
-            _host.Codex.SetVisible(_viewModel.SelectedPage != "weather" ||
-                !_viewModel.Settings.ShowWeather);
-            Render();
-            if (settingsChanged || _positionedHeight != DesiredPanelHeight())
-                PositionNearTray(captureAnchor: false);
-        }
-        else
             UpdateTray();
+            return;
+        }
+
+        var weatherSelected = _viewModel.Settings.ShowWeather &&
+            _viewModel.SelectedPage == "weather";
+        _host.Codex.SetVisible(!weatherSelected);
+        if (eventArgs.PropertyName == nameof(DashboardViewModel.Codex))
+        {
+            var nextLayout = CodexLayoutKey.Create(_viewModel.Codex, _viewModel.Settings);
+            var layoutChanged = _codexLayoutKey != nextLayout;
+            _codexLayoutKey = nextLayout;
+            if (!weatherSelected)
+                RenderCodex(_viewModel.Codex, _viewModel.Settings);
+            UpdateTray();
+            if (layoutChanged && !weatherSelected)
+            {
+                _codexNaturalHeight = null;
+                QueueContentResize();
+            }
+            return;
+        }
+        if (eventArgs.PropertyName == nameof(DashboardViewModel.Weather))
+        {
+            var nextLayout = WeatherLayoutKey.Create(_viewModel.Weather, _viewModel.Settings);
+            var layoutChanged = _weatherLayoutKey != nextLayout;
+            _weatherLayoutKey = nextLayout;
+            if (weatherSelected)
+                RenderWeather(_viewModel.Weather, _viewModel.Settings);
+            UpdateTray();
+            if (layoutChanged && weatherSelected)
+            {
+                _weatherNaturalHeight = null;
+                QueueContentResize();
+            }
+            return;
+        }
+
+        Render();
+        if (settingsChanged || _positionedHeight != DesiredPanelHeight())
+            PositionNearTray(captureAnchor: false);
     }
 
     private async void CodexTab_Click(object sender, RoutedEventArgs e)
@@ -720,5 +844,50 @@ public sealed partial class MainWindow : Window, IDisposable
             catch (InvalidTimeZoneException) { }
         }
         return value.LocalDateTime;
+    }
+
+    private readonly record struct CodexLayoutKey(
+        bool HasData,
+        bool HasWeekly,
+        bool HasFiveHour,
+        bool ShowTokenCard,
+        bool ShowHistory,
+        bool HasGraph,
+        bool ShowUsageInsight,
+        ProviderStatus EmptyStatus,
+        string? ErrorCode)
+    {
+        public static CodexLayoutKey Create(
+            CodexState state,
+            Core.Settings.AppSettings settings) => new(
+                state.HasData,
+                state.Weekly is not null,
+                state.FiveHour is not null,
+                settings.ShowLifetimeTokens || settings.ShowTokenHistory,
+                settings.ShowTokenHistory,
+                state.TokenUsage?.DailyBuckets.Count >= 2,
+                settings.ShowUsageState &&
+                    UsageAnalytics.GetPace(state.TokenUsage, DateTimeOffset.Now) != UsagePace.Unknown,
+                state.HasData ? ProviderStatus.Success : state.Status,
+                state.HasData ? null : state.ErrorCode);
+    }
+
+    private readonly record struct WeatherLayoutKey(
+        bool HasData,
+        bool HasForecast,
+        bool ShowUv,
+        bool ShowPrecipitation,
+        ProviderStatus EmptyStatus,
+        string? ErrorCode)
+    {
+        public static WeatherLayoutKey Create(
+            WeatherState state,
+            Core.Settings.AppSettings settings) => new(
+                state.HasData && state.Current is not null && state.Today is not null,
+                state.Forecast.Count > 0,
+                settings.ShowUv,
+                settings.ShowHourlyPrecipitation,
+                state.HasData ? ProviderStatus.Success : state.Status,
+                state.HasData ? null : state.ErrorCode);
     }
 }

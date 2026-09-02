@@ -7,11 +7,16 @@ namespace ShadowokxPanel.Platform;
 internal static class NativeMethods
 {
     internal const int GwlpWndProc = -4;
+    internal const int GwlStyle = -16;
     internal const int GwlExStyle = -20;
     internal const int SmCxSmallIcon = 49;
     internal const int SmCySmallIcon = 50;
     internal const long WsExToolWindow = 0x00000080L;
     internal const long WsExAppWindow = 0x00040000L;
+    internal const long WsCaption = 0x00C00000L;
+    internal const long WsBorder = 0x00800000L;
+    internal const long WsDlgFrame = 0x00400000L;
+    internal const long WsThickFrame = 0x00040000L;
     internal const uint WmApp = 0x8000;
     internal const uint WmCommand = 0x0111;
     internal const uint WmContextMenu = 0x007B;
@@ -138,6 +143,12 @@ internal static class NativeMethods
     internal static extern bool SetWindowPos(
         nint hwnd, nint insertAfter, int x, int y, int width, int height, uint flags);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern int SetWindowRgn(
+        nint hwnd,
+        nint region,
+        [MarshalAs(UnmanagedType.Bool)] bool redraw);
+
     [DllImport("user32.dll", EntryPoint = "CallWindowProcW")]
     internal static extern nint CallWindowProc(nint previous, nint hwnd, uint message, nint wParam, nint lParam);
 
@@ -206,6 +217,15 @@ internal static class NativeMethods
         uint planes,
         uint bitsPerPixel,
         nint bits);
+
+    [DllImport("gdi32.dll", SetLastError = true)]
+    internal static extern nint CreateRoundRectRgn(
+        int left,
+        int top,
+        int right,
+        int bottom,
+        int ellipseWidth,
+        int ellipseHeight);
 
     [DllImport("gdi32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

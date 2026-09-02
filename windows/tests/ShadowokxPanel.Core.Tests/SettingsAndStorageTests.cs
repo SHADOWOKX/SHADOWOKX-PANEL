@@ -37,13 +37,29 @@ public sealed class SettingsAndStorageTests
             Accent = (AccentPreset)999,
             Density = (LayoutDensity)999,
         });
-        Assert.Equal("#f43f5e", value.CustomAccent);
+        Assert.Equal("#f97316", value.CustomAccent);
         Assert.Equal(5, value.CodexRefreshMinutes);
         Assert.Equal(180, value.WeatherRefreshMinutes);
         Assert.Equal("celsius", value.TemperatureUnit);
         Assert.Equal(ThemePreset.System, value.Theme);
-        Assert.Equal(AccentPreset.Rose, value.Accent);
+        Assert.Equal(AccentPreset.Orange, value.Accent);
         Assert.Equal(LayoutDensity.Comfortable, value.Density);
+        Assert.Equal(1, value.SettingsSchemaVersion);
+    }
+
+    [Fact]
+    public void LegacyDefaultAccentMigratesOnceWithoutRemovingRoseChoice()
+    {
+        var legacy = SettingsStore.Validate(new AppSettings
+        {
+            Accent = AccentPreset.Rose,
+            SettingsSchemaVersion = 0,
+        });
+        var explicitRose = SettingsStore.Validate(legacy with { Accent = AccentPreset.Rose });
+
+        Assert.Equal(AccentPreset.Orange, legacy.Accent);
+        Assert.Equal(1, legacy.SettingsSchemaVersion);
+        Assert.Equal(AccentPreset.Rose, explicitRose.Accent);
     }
 
     [Fact]

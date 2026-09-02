@@ -43,7 +43,8 @@ To uninstall, use **Settings → Apps → Installed apps → Shadowokx Panel →
 - Dedicated multi-resolution notification-area icon; left click toggles the compact taskbar-free panel.
 - Right-click menu: Open, Refresh, Settings, Start with Windows, and Exit.
 - Equal-width ChatGPT Codex and Weather navigation.
-- Weekly capacity, reset information, five-hour availability, reset credits, lifetime token total, and privacy-safe local history.
+- Ubuntu-inspired orange is the release default, while native accent presets remain configurable.
+- Weekly capacity, reset information, five-hour availability, reset credits, lifetime token total, truthful usage insight, and privacy-safe local history.
 - Seven-day graph with real date spacing, a zero baseline, point tooltips, and no redraw timer.
 - Current Weather, hourly forecast, rain, UV, high/low, sunrise, and sunset with bundled vector condition icons.
 - Multiple native themes, accent choices, and compact/comfortable density.
@@ -149,6 +150,7 @@ Before publishing, complete [the Windows release QA checklist](docs/RELEASE-QA.m
 - Codex uses one adaptive scheduler: 30 seconds while its visible page is open and 60 seconds in the background. Concurrent triggers are coalesced.
 - Provider work is asynchronous, cancellable, size-bounded, and time-bounded; last-known-good data survives transient failures.
 - The graph redraws only when its data or layout changes.
+- Provider updates repaint only the visible module; theme resources and rounded-window geometry are reapplied only when their inputs change.
 - The display timer runs only while the popup is visible and updates relative timestamps without rebuilding the page; Weather makes no requests while disabled.
 - Identical Codex results do not rewrite daily history or cache on every short refresh.
 - Tray hooks, timers, requests, providers, and event subscriptions are disposed exactly once during Exit.

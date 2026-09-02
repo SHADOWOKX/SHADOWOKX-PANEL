@@ -68,7 +68,7 @@ public sealed partial class SettingsWindow : Window
         var theme = Enum.IsDefined(typeof(ThemePreset), ThemeCombo.SelectedIndex)
             ? (ThemePreset)ThemeCombo.SelectedIndex : ThemePreset.System;
         var accent = Enum.IsDefined(typeof(AccentPreset), AccentCombo.SelectedIndex)
-            ? (AccentPreset)AccentCombo.SelectedIndex : AccentPreset.Rose;
+            ? (AccentPreset)AccentCombo.SelectedIndex : AccentPreset.Orange;
         var next = _host.Settings.Current with
         {
             StartWithWindows = StartWithWindowsToggle.IsOn,
