@@ -43,6 +43,8 @@ cp "$shadow_project_dir/extension.js" \
   "$shadow_project_dir/NOTICE.md" \
   "$shadow_project_dir/prefs.js" \
   "$shadow_project_dir/stylesheet.css" \
+  "$shadow_project_dir/VERSION" \
+  "$shadow_project_dir/update-helper.py" \
   "$shadow_stage/$shadow_uuid/"
 cp -R "$shadow_project_dir/lib" \
   "$shadow_project_dir/modules" \

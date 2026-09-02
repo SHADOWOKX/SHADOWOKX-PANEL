@@ -18,6 +18,7 @@ Release `2.3.3`.
 - Local weather, UV, hourly forecast, and sunrise/sunset
 - Custom themes, colors, density, and panel width
 - Cached data during temporary connection failures
+- Built-in opt-in updates with Stable and Beta channels
 - No telemetry or analytics
 
 ## Requirements
@@ -54,7 +55,14 @@ That's it. Shadowokx Panel should now appear in the GNOME top bar.
 gnome-extensions prefs shadow-panel@shadowokx
 ```
 
-## Update
+## Updates
+
+The first updater-capable release requires one final manual installation. After
+that, Shadowokx Panel checks GitHub asynchronously and offers verified updates
+in **Preferences → Updates**. Installation is always confirmed by the user;
+updates are never installed automatically.
+
+To update an older installation manually:
 
 If you installed the panel with the command above, update it with:
 
@@ -69,6 +77,10 @@ Then log out and back in once to load the updated version. If needed, enable it 
 ```bash
 gnome-extensions enable shadow-panel@shadowokx
 ```
+
+Maintainers should follow the protected Developer → Beta → Stable process in
+[Updates and releases](docs/UPDATES.md). A normal push never updates Stable
+users.
 
 ## Uninstall
 

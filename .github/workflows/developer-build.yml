@@ -1,0 +1,40 @@
+name: Developer cross-platform build
+
+on:
+  workflow_dispatch:
+    inputs:
+      linux_ref:
+        description: Linux source ref
+        required: true
+        default: main
+      windows_ref:
+        description: Windows source ref
+        required: true
+        default: windows-port
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.linux_ref }}
+      - id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=$(tr -d '[:space:]' < VERSION)
+          echo "version=${base}-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+  build:
+    needs: prepare
+    uses: ./.github/workflows/_cross-platform-build.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      channel: developer
+      linux_ref: ${{ inputs.linux_ref }}
+      windows_ref: ${{ inputs.windows_ref }}

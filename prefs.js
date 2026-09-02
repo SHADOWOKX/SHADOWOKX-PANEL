@@ -10,6 +10,9 @@ import {ACCENTS, APP_VERSION, MODULE_IDS, MODULE_META} from './lib/constants.js'
 import {isHexColor} from './lib/format.js';
 import {findCodexExecutable} from './modules/codex/discovery.js';
 import {normalizeWeatherQuery} from './modules/weather/normalize.js';
+import {Logger} from './services/logger.js';
+import {Scheduler} from './services/scheduler.js';
+import {UpdateProvider} from './services/update/provider.js';
 
 function switchRow(settings, key, title, subtitle = '') {
     const row = new Adw.SwitchRow({title, subtitle});
@@ -97,6 +100,7 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
         window.add(this._appearancePage(settings));
         window.add(this._codexPage(settings, window));
         window.add(this._weatherPage(settings));
+        window.add(this._updatesPage(settings, window));
         window.add(this._aboutPage(settings));
     }
 
@@ -334,6 +338,82 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
             'Uses only the returned hourly precipitation forecast.'
         ));
         page.add(details);
+        return page;
+    }
+
+    _updatesPage(settings, window) {
+        const page = new Adw.PreferencesPage({
+            title: 'Updates',
+            icon_name: 'software-update-available-symbolic',
+        });
+        const configuration = new Adw.PreferencesGroup({title: 'Release channel'});
+        configuration.add(new Adw.ActionRow({
+            title: 'Current version',
+            subtitle: APP_VERSION,
+        }));
+        configuration.add(comboRow(settings, 'update-channel', 'Channel', [
+            {value: 'stable', label: 'Stable'},
+            {value: 'beta', label: 'Beta'},
+        ], 'Stable never receives prereleases. Beta may receive Beta or newer Stable releases.'));
+        configuration.add(switchRow(
+            settings,
+            'automatic-update-checks',
+            'Automatically check for updates',
+            'Checks after startup and then approximately every 12 hours.'
+        ));
+        page.add(configuration);
+
+        const actions = new Adw.PreferencesGroup({title: 'Update status'});
+        const status = new Adw.ActionRow({
+            title: 'Not checked yet',
+            subtitle: 'Update failures never affect Codex or Weather.',
+        });
+        const button = new Gtk.Button({label: 'Check now', valign: Gtk.Align.CENTER});
+        status.add_suffix(button);
+        status.activatable_widget = button;
+        actions.add(status);
+        page.add(actions);
+
+        const scheduler = new Scheduler(new Logger(settings));
+        const provider = new UpdateProvider(
+            this.path,
+            settings,
+            scheduler,
+            new Logger(settings)
+        );
+        let latestState = provider.getState();
+        const unsubscribe = provider.subscribe(state => {
+            latestState = state;
+            const version = state.available?.version;
+            status.title = {
+                checking: 'Checking for updates…',
+                downloading: `Downloading ${version ?? 'update'}…`,
+                verifying: 'Verifying download…',
+                installing: 'Installing update…',
+                'up-to-date': 'Up to date',
+                available: `${version} available`,
+                error: 'Update check failed',
+            }[state.status] ?? 'Ready to check';
+            status.subtitle = state.error ?? (state.status === 'available'
+                ? 'The package will be verified before the external helper installs it.'
+                : 'Update failures never affect Codex or Weather.');
+            const available = state.status === 'available';
+            button.label = available ? 'Update' : state.status === 'error' ? 'Retry' : 'Check now';
+            button.sensitive = !['checking', 'downloading', 'verifying', 'installing']
+                .includes(state.status);
+        });
+        button.connect('clicked', () => {
+            if (latestState.status === 'available')
+                provider.installAvailable();
+            else
+                provider.check(true);
+        });
+        window.connect('close-request', () => {
+            unsubscribe();
+            provider.destroy();
+            scheduler.destroy();
+            return false;
+        });
         return page;
     }
 

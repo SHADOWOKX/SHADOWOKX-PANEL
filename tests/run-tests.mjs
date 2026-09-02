@@ -55,6 +55,18 @@ import {Observable} from '../services/observable.js';
 import {Logger} from '../services/logger.js';
 import {JsonStore} from '../services/jsonStore.js';
 import {Scheduler} from '../services/scheduler.js';
+import {
+    baseVersion,
+    canUpgrade,
+    compareSemver,
+    parseSemver,
+    versionChannel,
+} from '../services/update/semver.js';
+import {
+    selectUpdate,
+    validateChannelIndex,
+    validateUpdateManifest,
+} from '../services/update/manifest.js';
 
 if (GLib.getenv('SHADOW_PANEL_TEST_ISOLATED') !== '1')
     throw new Error('Refusing to run persistence tests without an isolated XDG environment');
@@ -177,6 +189,157 @@ function testModuleConfiguration() {
     equal(chooseInitialModule(pages, false, 'weather', 'codex'), 'codex', 'default page wins');
     equal(chooseInitialModule(pages, true, 'removed', 'codex'), 'codex',
         'removed pages safely fall back to Codex');
+}
+
+function updateManifest(version = '2.4.0', channel = 'stable') {
+    const asset = (name, size = 123) => ({
+        asset: name,
+        url: `https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/v${version}/${name}`,
+        sha256: 'a'.repeat(64),
+        size,
+    });
+    return {
+        schema_version: 1,
+        product: 'shadowokx-panel',
+        version,
+        channel,
+        published_at: '2026-09-02T18:00:00Z',
+        revoked: false,
+        minimum_updater_version: '2.3.3',
+        release_notes_url: 'https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases',
+        rollout: 100,
+        source: {
+            linux_commit: '1'.repeat(40),
+            windows_commit: '2'.repeat(40),
+            workflow_run_id: '42',
+            built_at: '2026-09-02T18:00:00Z',
+        },
+        platforms: {
+            linux: {
+                ...asset('ShadowokxPanel-Linux.zip'),
+                uuid: 'shadow-panel@shadowokx',
+                gnome_shell_minimum: 50,
+                gnome_shell_maximum: 50,
+            },
+            windows: {
+                architecture: 'x64',
+                minimum_os: '10.0.22000',
+                installer: asset('ShadowokxPanel-Setup-x64.exe'),
+                portable: asset('ShadowokxPanel-Portable-x64.zip'),
+            },
+        },
+        future_optional_field: {ignored: true},
+    };
+}
+
+function testUpdateContracts() {
+    ok(parseSemver('1.0.0'), 'stable semantic version parses');
+    ok(parseSemver('2.1.0-beta.2'), 'Beta semantic version parses');
+    ok(parseSemver('2.1.0-dev.42'), 'Developer semantic version parses');
+    ok(!parseSemver('2.1'), 'incomplete semantic version is rejected');
+    ok(!parseSemver('2.1.0-beta.01'), 'numeric prerelease leading zero is rejected');
+    equal(compareSemver('1.0.0', '1.0.1'), -1, 'patch precedence');
+    equal(compareSemver('1.0.1', '1.1.0'), -1, 'minor precedence');
+    equal(compareSemver('1.1.0', '2.0.0'), -1, 'major precedence');
+    equal(compareSemver('2.1.0-beta.1', '2.1.0-beta.2'), -1, 'Beta precedence');
+    equal(compareSemver('2.1.0-beta.2', '2.1.0'), -1, 'Stable outranks its prerelease');
+    equal(versionChannel('2.1.0'), 'stable', 'Stable channel classification');
+    equal(versionChannel('2.1.0-beta.1'), 'beta', 'Beta channel classification');
+    equal(versionChannel('2.1.0-dev.9'), 'developer', 'Developer channel classification');
+    equal(baseVersion('2.1.0-beta.4'), '2.1.0', 'prerelease base version');
+    ok(canUpgrade('2.3.3', 'stable', '2.4.0', 'stable'),
+        'Stable accepts a newer Stable');
+    ok(!canUpgrade('2.3.3', 'stable', '2.4.0-beta.1', 'beta'),
+        'Stable ignores Beta');
+    ok(!canUpgrade('2.3.3', 'stable', '2.4.0-dev.1', 'developer'),
+        'Stable ignores Developer');
+    ok(canUpgrade('2.3.3', 'beta', '2.4.0-beta.1', 'beta'),
+        'Beta accepts a newer Beta');
+    ok(canUpgrade('2.4.0-beta.2', 'beta', '2.4.0', 'stable'),
+        'Beta accepts the newer Stable release');
+    ok(!canUpgrade('2.5.0-beta.1', 'stable', '2.4.0', 'stable'),
+        'channel migration never downgrades');
+    ok(canUpgrade('2.4.0-beta.2', 'developer', '2.4.0-dev.9', 'developer') === false,
+        'Developer precedence still follows SemVer instead of labels');
+
+    const index = validateChannelIndex({
+        schema_version: 1,
+        generated_at: '2026-09-02T18:00:00Z',
+        channels: {
+            stable: {
+                version: '2.4.0',
+                manifest_url: 'https://example.test/2.4.0/update.json',
+                published_at: '2026-09-02T18:00:00Z',
+                rollout: 100,
+            },
+            beta: {
+                version: '2.5.0-beta.1',
+                manifest_url: 'https://example.test/2.5.0-beta.1/update.json',
+                published_at: '2026-09-02T18:00:00Z',
+                rollout: 100,
+            },
+        },
+        revoked: ['2.3.4'],
+        future_optional_field: true,
+    });
+    const stableManifest = validateUpdateManifest(updateManifest());
+    const betaManifest = validateUpdateManifest(updateManifest('2.5.0-beta.1', 'beta'));
+    const manifests = new Map([
+        [stableManifest.version, stableManifest],
+        [betaManifest.version, betaManifest],
+    ]);
+    equal(selectUpdate({
+        index,
+        manifests,
+        currentVersion: '2.3.3',
+        selectedChannel: 'stable',
+        updaterVersion: '2.3.3',
+        platform: 'linux',
+        compatibility: platform => platform.gnomeShellMinimum === 50,
+    }).manifest.version, '2.4.0', 'Stable selects only the Stable manifest');
+    equal(selectUpdate({
+        index,
+        manifests,
+        currentVersion: '2.3.3',
+        selectedChannel: 'beta',
+        updaterVersion: '2.3.3',
+        platform: 'windows',
+        compatibility: platform => platform.architecture === 'x64',
+    }).manifest.version, '2.5.0-beta.1', 'Beta selects the highest eligible manifest');
+    const revokedIndex = {...index, revoked: ['2.4.0', '2.5.0-beta.1']};
+    equal(selectUpdate({
+        index: revokedIndex,
+        manifests,
+        currentVersion: '2.3.3',
+        selectedChannel: 'beta',
+        updaterVersion: '2.3.3',
+        platform: 'linux',
+        compatibility: () => true,
+    }), null, 'revoked targets are silently skipped');
+    equal(selectUpdate({
+        index,
+        manifests,
+        currentVersion: '2.3.4',
+        selectedChannel: 'stable',
+        updaterVersion: '2.3.3',
+        platform: 'linux',
+        compatibility: () => true,
+    }).important, true, 'a replacement is prioritized when the installed version is revoked');
+    equal(selectUpdate({
+        index,
+        manifests,
+        currentVersion: '2.3.3',
+        selectedChannel: 'stable',
+        updaterVersion: '2.3.3',
+        platform: 'linux',
+        compatibility: () => false,
+    }), null, 'incompatible targets are skipped');
+    rejects(() => validateUpdateManifest({...updateManifest(), schema_version: 2}),
+        'future manifest schemas fail closed');
+    rejects(() => validateUpdateManifest({
+        ...updateManifest(),
+        platforms: {...updateManifest().platforms, linux: {}},
+    }), 'missing platform assets fail closed');
 }
 
 function testSparklineData() {
@@ -1192,6 +1355,7 @@ async function testWeatherTrailingRefresh() {
 
 testFormatting();
 testModuleConfiguration();
+testUpdateContracts();
 testSparklineData();
 testProgressGeometry();
 testSchedulerLifecycle();

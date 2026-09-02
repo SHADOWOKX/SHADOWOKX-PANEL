@@ -4,6 +4,7 @@
   "uuid": "shadow-panel@shadowokx",
   "shell-version": ["50"],
   "settings-schema": "org.gnome.shell.extensions.shadow-panel",
+  "version-name": "2.3.3",
   "url": "https://github.com/shadowokx/shadow-panel",
   "version": 16
 }

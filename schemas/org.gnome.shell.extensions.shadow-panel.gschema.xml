@@ -5,6 +5,18 @@
       <default>false</default>
       <summary>Enable redacted debug logging</summary>
     </key>
+    <key name="automatic-update-checks" type="b">
+      <default>true</default>
+      <summary>Check GitHub release metadata for updates automatically</summary>
+    </key>
+    <key name="update-channel" type="s">
+      <choices>
+        <choice value="stable"/>
+        <choice value="beta"/>
+      </choices>
+      <default>'stable'</default>
+      <summary>Selected release channel</summary>
+    </key>
     <key name="panel-placement" type="s">
       <choices>
         <choice value="left"/>

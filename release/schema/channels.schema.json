@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SHADOWOKX/SHADOWOKX-PANEL/release/schema/channels.schema.json",
+  "title": "Shadowokx Panel release channels",
+  "type": "object",
+  "required": ["schema_version", "generated_at", "channels", "revoked"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "channels": {"type": "object"},
+    "revoked": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+  },
+  "additionalProperties": true
+}

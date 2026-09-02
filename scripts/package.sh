@@ -23,6 +23,8 @@ gnome-extensions pack \
   --extra-source="$shadow_project_dir/README.md" \
   --extra-source="$shadow_project_dir/NOTICE.md" \
   --extra-source="$shadow_project_dir/LICENSE" \
+  --extra-source="$shadow_project_dir/VERSION" \
+  --extra-source="$shadow_project_dir/update-helper.py" \
   "$shadow_project_dir"
 
 printf 'Package created in %s\n' "$shadow_output_dir"

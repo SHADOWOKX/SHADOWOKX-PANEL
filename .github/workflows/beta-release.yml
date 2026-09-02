@@ -1,0 +1,96 @@
+name: Publish Beta release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Prerelease version, for example 2.6.0-beta.1
+        required: true
+      linux_ref:
+        description: Exact Linux ref
+        required: true
+        default: main
+      windows_ref:
+        description: Exact Windows ref
+        required: true
+        default: windows-port
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    uses: ./.github/workflows/_cross-platform-build.yml
+    with:
+      version: ${{ inputs.version }}
+      channel: beta
+      linux_ref: ${{ inputs.linux_ref }}
+      windows_ref: ${{ inputs.windows_ref }}
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: release-tools
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-release-${{ inputs.version }}'
+          path: bundle
+          merge-multiple: true
+      - name: Generate and validate immutable release metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          published=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          node release-tools/scripts/release/generate-manifest.mjs \
+            --directory bundle --version '${{ inputs.version }}' --channel beta \
+            --repository '$GITHUB_REPOSITORY' --tag 'v${{ inputs.version }}' \
+            --published-at "$published" --built-at "$published" \
+            --linux-commit '${{ needs.build.outputs.linux_commit }}' \
+            --windows-commit '${{ needs.build.outputs.windows_commit }}' \
+            --workflow-run-id '$GITHUB_RUN_ID'
+          node release-tools/scripts/release/validate-bundle.mjs bundle
+          printf '%s\n\n%s\n%s\n\n%s\n%s\n%s\n' \
+            'PRE-RELEASE / BETA' \
+            'This build is for opt-in Beta testing.' \
+            'Stable users will not receive it.' \
+            'Build provenance:' \
+            'Linux commit: ${{ needs.build.outputs.linux_commit }}' \
+            'Windows commit: ${{ needs.build.outputs.windows_commit }}' > bundle/release-notes.md
+          echo "published=$published" >> "$GITHUB_ENV"
+      - name: Publish GitHub prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create 'v${{ inputs.version }}' \
+            bundle/ShadowokxPanel-Linux.zip \
+            bundle/ShadowokxPanel-Setup-x64.exe \
+            bundle/ShadowokxPanel-Portable-x64.zip \
+            bundle/update.json \
+            bundle/checksums.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --target '${{ needs.build.outputs.linux_commit }}' \
+            --title 'Shadowokx Panel ${{ inputs.version }}' \
+            --notes-file bundle/release-notes.md \
+            --prerelease
+      - name: Publish Beta channel pointer
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh auth setup-git
+          git clone --depth=1 --branch release-metadata \
+            "https://github.com/$GITHUB_REPOSITORY.git" metadata
+          node release-tools/scripts/release/update-channel-index.mjs \
+            metadata/channels.json publish beta '${{ inputs.version }}' \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/v${{ inputs.version }}/update.json" \
+            "$published"
+          git -C metadata config user.name github-actions[bot]
+          git -C metadata config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C metadata add channels.json
+          git -C metadata commit -m 'Publish Beta ${{ inputs.version }}'
+          git -C metadata push origin release-metadata

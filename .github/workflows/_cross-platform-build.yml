@@ -1,0 +1,122 @@
+name: Reusable cross-platform release build
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      channel:
+        required: true
+        type: string
+      linux_ref:
+        required: true
+        type: string
+      windows_ref:
+        required: true
+        type: string
+    outputs:
+      linux_commit:
+        value: ${{ jobs.linux.outputs.commit }}
+      windows_commit:
+        value: ${{ jobs.windows.outputs.commit }}
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    container: ubuntu:26.04
+    outputs:
+      commit: ${{ steps.source.outputs.commit }}
+    steps:
+      - name: Install Linux build dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates dbus-daemon git gjs gnome-shell gnome-shell-extension-prefs \
+            libadwaita-1-0 libglib2.0-bin libxml2-utils nodejs python3 ripgrep unzip zip
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.linux_ref }}
+          path: source
+          fetch-depth: 1
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: release-tools
+          fetch-depth: 1
+      - id: source
+        name: Resolve Linux source and version
+        shell: bash
+        run: |
+          set -euo pipefail
+          commit=$(git -C source rev-parse HEAD)
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          node release-tools/scripts/release/version.mjs assert source \
+            '${{ inputs.version }}' '${{ inputs.channel }}'
+          node release-tools/scripts/release/version.mjs set source '${{ inputs.version }}'
+      - name: Test Linux implementation
+        working-directory: source
+        run: |
+          ./scripts/check.sh
+          ./scripts/ui-smoke.sh
+      - name: Build deterministic Linux package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          source/scripts/package.sh output
+          package=$(find output -maxdepth 1 -type f -name '*.shell-extension.zip' -print -quit)
+          test -n "$package"
+          cp "$package" output/ShadowokxPanel-Linux.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-release-${{ inputs.version }}
+          path: output/ShadowokxPanel-Linux.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  windows:
+    runs-on: windows-2025
+    outputs:
+      commit: ${{ steps.source.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.windows_ref }}
+          path: source
+          fetch-depth: 1
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: release-tools
+          fetch-depth: 1
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - id: source
+        name: Resolve Windows source and version
+        shell: pwsh
+        run: |
+          $commit = git -C source rev-parse HEAD
+          "commit=$commit" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          node release-tools/scripts/release/version.mjs assert source `
+            '${{ inputs.version }}' '${{ inputs.channel }}'
+          node release-tools/scripts/release/version.mjs set source '${{ inputs.version }}'
+      - name: Native WinUI test and release build
+        shell: pwsh
+        working-directory: source/windows
+        run: .\scripts\release.ps1 -Configuration Release -Runtime win-x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-${{ inputs.version }}
+          path: |
+            source/windows/artifacts/release/ShadowokxPanel-Setup-x64.exe
+            source/windows/artifacts/release/ShadowokxPanel-Portable-x64.zip
+          if-no-files-found: error
+          retention-days: 14

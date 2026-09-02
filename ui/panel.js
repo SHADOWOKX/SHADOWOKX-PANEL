@@ -185,6 +185,28 @@ class ShadowIndicator extends PanelMenu.Button {
             this._tabs = null;
         }
 
+        this._updateBanner = new St.BoxLayout({
+            style_class: 'shadow-update-banner',
+            x_expand: true,
+            visible: false,
+        });
+        this._updateIcon = new St.Icon({
+            icon_name: 'software-update-available-symbolic',
+            icon_size: 15,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._updateLabel = new St.Label({
+            style_class: 'shadow-update-label',
+            x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._updateButton = textButton('Update', () =>
+            this._updateProvider?.installAvailable());
+        this._updateBanner.add_child(this._updateIcon);
+        this._updateBanner.add_child(this._updateLabel);
+        this._updateBanner.add_child(this._updateButton);
+        this._root.add_child(this._updateBanner);
+
         this._pageStack = new St.Widget({
             style_class: 'shadow-page-stack',
             layout_manager: new Clutter.BinLayout(),
@@ -205,6 +227,7 @@ class ShadowIndicator extends PanelMenu.Button {
     _createPages() {
         const services = this._extension.getRuntimeServices();
         this._codexProvider = services.codexProvider;
+        this._updateProvider = services.updateProvider;
         const context = {
             extension: this._extension,
             settings: this._settings,
@@ -230,6 +253,12 @@ class ShadowIndicator extends PanelMenu.Button {
                     return;
                 this._weatherState = state;
                 this._syncIndicator();
+            }));
+        }
+        if (services.updateProvider) {
+            this._subscriptions.push(services.updateProvider.subscribe(state => {
+                if (!this._destroyed)
+                    this._syncUpdate(state);
             }));
         }
 
@@ -420,6 +449,61 @@ class ShadowIndicator extends PanelMenu.Button {
         this.accessible_name = descriptions.join(', ') || 'Shadowokx Panel';
     }
 
+    _syncUpdate(state) {
+        if (!this._updateBanner)
+            return;
+        if (state.status === 'installed' &&
+            this._extension._lastUpdateResultNotification !== state.installedVersion) {
+            this._extension._lastUpdateResultNotification = state.installedVersion;
+            this._notify(
+                'Update installed',
+                state.signOutRecommended
+                    ? 'Sign out once to finish loading the new Shadowokx Panel version.'
+                    : `Shadowokx Panel ${state.installedVersion} is installed.`
+            );
+        } else if (state.status === 'failed' &&
+            this._extension._lastUpdateResultNotification !== 'failed') {
+            this._extension._lastUpdateResultNotification = 'failed';
+            this._notify('Update not installed', state.error);
+        }
+        const version = state.available?.version;
+        const visible = Boolean(version && [
+            'available',
+            'downloading',
+            'verifying',
+            'installing',
+        ].includes(state.status));
+        this._updateBanner.visible = visible;
+        if (!visible)
+            return;
+        const progress = Number.isFinite(state.progress)
+            ? ` · ${Math.round(state.progress * 100)}%`
+            : '';
+        this._updateLabel.text = state.important
+            ? `Important update ${version}`
+            : `Update ${version} available`;
+        this._updateButton.label = {
+            downloading: `Downloading${progress}`,
+            verifying: 'Verifying…',
+            installing: 'Installing…',
+        }[state.status] ?? 'Update';
+        const ready = state.status === 'available';
+        this._updateButton.reactive = ready;
+        this._updateButton.can_focus = ready;
+        this._updateButton.accessible_name = ready
+            ? `Install Shadowokx Panel ${version}`
+            : this._updateButton.label;
+        if (ready && this._extension._lastUpdateNotification !== version) {
+            this._extension._lastUpdateNotification = version;
+            this._notify(
+                state.important ? 'Important update available' : 'Update available',
+                `Shadowokx Panel ${version} is ready to install.`,
+                {actionLabel: 'Open', action: () => this.menu.open()}
+            );
+        }
+        this._pages.get(this._activeId)?.fit?.();
+    }
+
     _syncUsageState() {
         const enabled = this._settings.get_boolean('show-codex-usage-state') &&
             this._settings.get_boolean('show-codex-remaining') &&
@@ -557,6 +641,7 @@ class ShadowIndicator extends PanelMenu.Button {
         this._destroyed = true;
         this._codexProvider?.setViewVisible(false, false);
         this._codexProvider = null;
+        this._updateProvider = null;
         this._mounted = false;
         if (this._mountSignalId) {
             this.disconnect(this._mountSignalId);
@@ -574,6 +659,10 @@ class ShadowIndicator extends PanelMenu.Button {
         this._codexPaceIcon = null;
         this._usageHighIcon = null;
         this._fallbackIcon = null;
+        this._updateBanner = null;
+        this._updateIcon = null;
+        this._updateLabel = null;
+        this._updateButton = null;
         this._notificationSource?.destroy();
         this._notificationSource = null;
         super.destroy();

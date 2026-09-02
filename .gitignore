@@ -19,6 +19,8 @@ weather.json
 # Generated release outputs
 dist/
 schemas/gschemas.compiled
+__pycache__/
+*.pyc
 
 # Editor and OS metadata
 .idea/

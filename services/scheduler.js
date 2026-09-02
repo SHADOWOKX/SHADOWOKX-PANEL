@@ -22,6 +22,19 @@ export class Scheduler {
             this._invoke(name, callback);
     }
 
+    once(name, seconds, callback) {
+        if (this._destroyed)
+            return;
+        this.cancel(name);
+        const delay = Math.max(1, Math.round(seconds));
+        const sourceId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, delay, () => {
+            this._sources.delete(name);
+            this._invoke(name, callback);
+            return GLib.SOURCE_REMOVE;
+        });
+        this._sources.set(name, sourceId);
+    }
+
     _invoke(name, callback) {
         if (this._destroyed || this._running.has(name))
             return;

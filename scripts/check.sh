@@ -17,6 +17,8 @@ XDG_DATA_HOME="$shadow_test_dir/data" \
 XDG_CACHE_HOME="$shadow_test_dir/cache" \
 gjs -m tests/run-tests.mjs
 
+python3 -m unittest tests/test_update_helper.py
+
 for shadow_scenario in authenticated unauthenticated missing existing-history; do
   shadow_case_dir="$shadow_test_dir/first-run-$shadow_scenario"
   mkdir -p "$shadow_case_dir/home" "$shadow_case_dir/data" "$shadow_case_dir/cache"

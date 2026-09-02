@@ -1,0 +1,140 @@
+name: Promote Stable release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable semantic version, for example 2.6.0
+        required: true
+      linux_ref:
+        description: Exact Linux ref (ignored when source_beta is supplied)
+        required: true
+        default: main
+      windows_ref:
+        description: Exact Windows ref (ignored when source_beta is supplied)
+        required: true
+        default: windows-port
+      source_beta:
+        description: Optional tested Beta version whose exact source SHAs must be rebuilt
+        required: false
+      confirmation:
+        description: Type PROMOTE TO STABLE
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      linux_ref: ${{ steps.refs.outputs.linux_ref }}
+      windows_ref: ${{ steps.refs.outputs.windows_ref }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test '${{ inputs.confirmation }}' = 'PROMOTE TO STABLE'
+          node scripts/release/version.mjs assert . '${{ inputs.version }}' stable
+          linux_ref='${{ inputs.linux_ref }}'
+          windows_ref='${{ inputs.windows_ref }}'
+          if test -n '${{ inputs.source_beta }}'; then
+            mkdir beta
+            gh release download 'v${{ inputs.source_beta }}' \
+              --repo "$GITHUB_REPOSITORY" --pattern update.json --dir beta
+            python3 - '${{ inputs.version }}' '${{ inputs.source_beta }}' <<'PY'
+          import json
+          import re
+          import sys
+
+          stable, beta = sys.argv[1:]
+          document = json.load(open('beta/update.json', encoding='utf-8'))
+          if document.get('channel') != 'beta' or document.get('version') != beta:
+              raise SystemExit('source_beta is not a matching Beta manifest')
+          if re.sub(r'-beta\.[0-9]+$', '', beta) != stable:
+              raise SystemExit('source_beta must belong to the requested Stable version')
+          PY
+            linux_ref=$(python3 -c 'import json; print(json.load(open("beta/update.json"))["source"]["linux_commit"])')
+            windows_ref=$(python3 -c 'import json; print(json.load(open("beta/update.json"))["source"]["windows_commit"])')
+          fi
+          echo "linux_ref=$linux_ref" >> "$GITHUB_OUTPUT"
+          echo "windows_ref=$windows_ref" >> "$GITHUB_OUTPUT"
+  build:
+    needs: prepare
+    uses: ./.github/workflows/_cross-platform-build.yml
+    with:
+      version: ${{ inputs.version }}
+      channel: stable
+      linux_ref: ${{ needs.prepare.outputs.linux_ref }}
+      windows_ref: ${{ needs.prepare.outputs.windows_ref }}
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    environment: production
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: release-tools
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-release-${{ inputs.version }}'
+          path: bundle
+          merge-multiple: true
+      - name: Generate and validate Stable release bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          published=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          node release-tools/scripts/release/generate-manifest.mjs \
+            --directory bundle --version '${{ inputs.version }}' --channel stable \
+            --repository '$GITHUB_REPOSITORY' --tag 'v${{ inputs.version }}' \
+            --published-at "$published" --built-at "$published" \
+            --linux-commit '${{ needs.build.outputs.linux_commit }}' \
+            --windows-commit '${{ needs.build.outputs.windows_commit }}' \
+            --workflow-run-id '$GITHUB_RUN_ID'
+          node release-tools/scripts/release/validate-bundle.mjs bundle
+          printf '%s\n\n%s\n\n%s\n%s\n%s\n' \
+            'Shadowokx Panel ${{ inputs.version }}' \
+            'Production Stable release for Linux/GNOME and Windows 11.' \
+            'Build provenance:' \
+            'Linux commit: ${{ needs.build.outputs.linux_commit }}' \
+            'Windows commit: ${{ needs.build.outputs.windows_commit }}' > bundle/release-notes.md
+          echo "published=$published" >> "$GITHUB_ENV"
+      - name: Publish Stable GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create 'v${{ inputs.version }}' \
+            bundle/ShadowokxPanel-Linux.zip \
+            bundle/ShadowokxPanel-Setup-x64.exe \
+            bundle/ShadowokxPanel-Portable-x64.zip \
+            bundle/update.json \
+            bundle/checksums.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --target '${{ needs.build.outputs.linux_commit }}' \
+            --title 'Shadowokx Panel ${{ inputs.version }}' \
+            --notes-file bundle/release-notes.md
+      - name: Move Stable channel pointer only after release succeeds
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh auth setup-git
+          git clone --depth=1 --branch release-metadata \
+            "https://github.com/$GITHUB_REPOSITORY.git" metadata
+          node release-tools/scripts/release/update-channel-index.mjs \
+            metadata/channels.json publish stable '${{ inputs.version }}' \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/v${{ inputs.version }}/update.json" \
+            "$published"
+          git -C metadata config user.name github-actions[bot]
+          git -C metadata config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C metadata add channels.json
+          git -C metadata commit -m 'Publish Stable ${{ inputs.version }}'
+          git -C metadata push origin release-metadata

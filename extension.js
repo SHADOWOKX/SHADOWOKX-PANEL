@@ -8,6 +8,7 @@ import {CodexProvider} from './modules/codex/provider.js';
 import {WeatherProvider} from './modules/weather/provider.js';
 import {Logger} from './services/logger.js';
 import {Scheduler} from './services/scheduler.js';
+import {UpdateProvider} from './services/update/provider.js';
 import {ShadowIndicator} from './ui/panel.js';
 
 const REBUILD_KEYS = Object.freeze([
@@ -154,6 +155,17 @@ export default class ShadowPanelExtension extends Extension {
     }
 
     _ensureServices() {
+        if (!this._services.updateProvider) {
+            const provider = new UpdateProvider(
+                this.path,
+                this._settings,
+                this._scheduler,
+                this._logger
+            );
+            this._services.updateProvider = provider;
+            provider.start().catch(error =>
+                this._logger.warn('Could not start update provider', error));
+        }
         if (!this._services.codexProvider) {
             const provider = new CodexProvider(this._settings, this._scheduler, this._logger);
             this._services.codexProvider = provider;

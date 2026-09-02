@@ -1,0 +1,40 @@
+name: Revoke released version
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Released semantic version to revoke
+        required: true
+      confirmation:
+        description: Type REVOKE
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  revoke:
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: release-tools
+      - name: Remove version from active channels and add kill switch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test '${{ inputs.confirmation }}' = 'REVOKE'
+          gh auth setup-git
+          git clone --depth=1 --branch release-metadata \
+            "https://github.com/$GITHUB_REPOSITORY.git" metadata
+          node release-tools/scripts/release/update-channel-index.mjs \
+            metadata/channels.json revoke none '${{ inputs.version }}' none none
+          git -C metadata config user.name github-actions[bot]
+          git -C metadata config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C metadata add channels.json
+          git -C metadata commit -m 'Revoke ${{ inputs.version }}'
+          git -C metadata push origin release-metadata

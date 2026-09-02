@@ -36,6 +36,11 @@ try {
     }
     const metadata = readJson('metadata.json');
     const packageMetadata = readJson('package.json');
+    const canonicalVersion = readText('VERSION').trim();
+    if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(canonicalVersion))
+        throw new Error('VERSION must contain a semantic version');
+    if (canonicalVersion !== APP_VERSION)
+        throw new Error('runtime version does not match VERSION');
     if (metadata.uuid !== UUID || metadata['settings-schema'] !==
         'org.gnome.shell.extensions.shadow-panel') {
         throw new Error('extension identity is inconsistent');
@@ -46,7 +51,8 @@ try {
     }
     if (!Number.isInteger(metadata.version) || metadata.version < 1)
         throw new Error('extension revision is invalid');
-    if (packageMetadata.version !== APP_VERSION)
+    if (packageMetadata.version !== canonicalVersion ||
+        metadata['version-name'] !== canonicalVersion)
         throw new Error('semantic version declarations are inconsistent');
     if (!readText('README.md').includes(`Release \`${APP_VERSION}\``))
         throw new Error('README release version is inconsistent');

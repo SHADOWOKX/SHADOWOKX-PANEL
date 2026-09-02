@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SHADOWOKX/SHADOWOKX-PANEL/release/schema/update.schema.json",
+  "title": "Shadowokx Panel update manifest",
+  "type": "object",
+  "required": ["schema_version", "product", "version", "channel", "published_at", "revoked", "minimum_updater_version", "source", "platforms"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "product": {"const": "shadowokx-panel"},
+    "version": {"type": "string"},
+    "channel": {"enum": ["stable", "beta", "developer"]},
+    "published_at": {"type": "string", "format": "date-time"},
+    "revoked": {"type": "boolean"},
+    "minimum_updater_version": {"type": "string"},
+    "rollout": {"type": "integer", "minimum": 0, "maximum": 100},
+    "source": {"type": "object"},
+    "platforms": {"type": "object"},
+    "manifest_signing": {"type": "object"}
+  },
+  "additionalProperties": true
+}
