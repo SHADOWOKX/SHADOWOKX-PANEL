@@ -878,7 +878,7 @@ public sealed partial class MainWindow : Window, IDisposable
         bool ShowUv,
         bool ShowPrecipitation,
         ProviderStatus EmptyStatus,
-        string? ErrorCode)
+        string? ErrorMessage)
     {
         public static WeatherLayoutKey Create(
             WeatherState state,
@@ -888,6 +888,6 @@ public sealed partial class MainWindow : Window, IDisposable
                 settings.ShowUv,
                 settings.ShowHourlyPrecipitation,
                 state.HasData ? ProviderStatus.Success : state.Status,
-                state.HasData ? null : state.ErrorCode);
+                state.HasData ? null : state.ErrorMessage);
     }
 }
