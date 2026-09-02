@@ -6,5 +6,12 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <Deterministic>true</Deterministic>
+    <VersionPrefix>1.0.0</VersionPrefix>
+    <Product>Shadowokx Panel</Product>
+    <AssemblyTitle>Shadowokx Panel</AssemblyTitle>
+    <Company>Shadowokx</Company>
+    <Authors>Shadowokx</Authors>
+    <Description>A lightweight Codex usage and weather panel.</Description>
+    <Copyright>Copyright © Shadowokx 2026</Copyright>
   </PropertyGroup>
 </Project>

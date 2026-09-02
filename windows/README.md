@@ -1,66 +1,54 @@
 # Shadowokx Panel for Windows
 
-Shadowokx Panel for Windows is the native Windows companion to the GNOME extension. It is a C#/.NET 8 and WinUI 3 notification-area application using the Windows App SDK. It does not embed a browser, inject into Explorer, or require administrator privileges.
+Shadowokx Panel is a native Windows 11 notification-area companion for Codex usage and Weather. It uses C#/.NET 8, WinUI 3, and the Windows App SDK—without embedding a browser, injecting into Explorer, or requiring administrator privileges.
 
-> Release status: the Windows source, tests, portable publishing workflow, and per-user installer definition are implemented. A real Windows 11 build and manual QA pass are still required before publishing the first Windows binary. The Linux release remains independent.
+## Install on Windows 11
 
-## Experience
+Recommended:
 
-- One notification-area icon; left click toggles the panel.
-- Native right-click menu: Open, Refresh, Settings, Start with Windows, and Exit.
-- Compact popup placed within the current monitor's taskbar work area.
-- Equal-width ChatGPT Codex and Weather navigation.
-- Weekly remaining capacity, reset information, five-hour availability, reset credits, account-side lifetime total, and local token history.
-- Truthful seven-day graph with real date spacing, a zero baseline, rounded curves, restrained fill, point tooltips, and no redraw timer.
-- Current weather, feels-like temperature, humidity, wind, rain, UV, high/low, hourly forecast, sunrise, and sunset.
-- Shadow, Midnight, Graphite, Nord, AMOLED, Light, and Follow Windows themes.
-- Rose, Orange, Emerald, Cyan, Blue, Violet, Amber, Monochrome, and custom accents.
-- Compact and Comfortable density.
+1. Download `ShadowokxPanel-Setup-x64.exe`.
+2. Open it.
+3. Click **Install**.
+4. Launch Shadowokx Panel.
+
+The only file a normal user needs is:
+
+```text
+ShadowokxPanel-Setup-x64.exe
+```
+
+The installer:
+
+- installs for the current user under `%LOCALAPPDATA%\Programs\Shadowokx Panel`;
+- adds Shadowokx Panel to the Start menu;
+- can launch the app when setup finishes;
+- requires no administrator approval; and
+- includes .NET and Windows App SDK runtime files, so no separate runtime, SDK, or Visual Studio installation is needed.
+
+Windows may show an **Unknown publisher** or Microsoft Defender SmartScreen message for an unsigned community build. Verify the file against `checksums.txt` and download releases only from the project’s official GitHub release page. A signed build will display the certificate publisher instead.
+
+For an advanced no-installer workflow, download `ShadowokxPanel-Portable-x64.zip`, extract the entire archive to a user-writable directory, and run `ShadowokxPanel.exe`. Do not run the executable from inside the ZIP.
+
+To uninstall, use **Settings → Apps → Installed apps → Shadowokx Panel → Uninstall**. Uninstall removes the application and its shortcuts but intentionally preserves settings, cache, and history in `%LOCALAPPDATA%\ShadowokxPanel`.
 
 ## Requirements
 
-- Windows 11, version 22H2 or newer recommended.
-- x64 or ARM64.
-- Codex installed and signed in to show account usage.
+- Windows 11 22H2 or newer recommended.
+- x64 for the recommended installer; ARM64 portable builds may be produced separately.
+- Codex installed and signed in to display account usage.
 - Internet access for Open-Meteo Weather.
 
-Published builds are self-contained and do not require Visual Studio or a separately installed .NET runtime.
+## Experience
 
-## Installation
+- Native notification-area icon; left click toggles the compact panel.
+- Right-click menu: Open, Refresh, Settings, Start with Windows, and Exit.
+- Equal-width ChatGPT Codex and Weather navigation.
+- Weekly capacity, reset information, five-hour availability, reset credits, lifetime token total, and privacy-safe local history.
+- Seven-day graph with real date spacing, a zero baseline, point tooltips, and no redraw timer.
+- Current Weather, hourly forecast, rain, UV, high/low, sunrise, and sunset.
+- Multiple native themes, accent choices, and compact/comfortable density.
 
-When release artifacts are available, use either:
-
-1. `ShadowokxPanel-1.0.0-win-x64-setup.exe` for a per-user installation, or
-2. the portable ZIP, extracted to a user-writable directory.
-
-The installer uses `%LOCALAPPDATA%\Programs\Shadowokx Panel` and requests no elevation. Start Shadowokx Panel from the Start menu; it remains in the notification area when the popup is closed.
-
-To uninstall an installed build, use **Settings → Apps → Installed apps → Shadowokx Panel → Uninstall**. Runtime data is intentionally preserved so upgrades do not erase history. It can be removed manually from `%LOCALAPPDATA%\ShadowokxPanel` after exiting the app.
-
-## Codex auto-detection
-
-The app checks the effective Windows `PATH` first, followed by current-user and established package-manager locations derived from environment variables:
-
-- `%APPDATA%\npm`
-- `%LOCALAPPDATA%\pnpm` and `%PNPM_HOME%`
-- `%USERPROFILE%\.bun\bin` and `%BUN_INSTALL%\bin`
-- `%USERPROFILE%\.volta\bin` and `%VOLTA_HOME%\bin`
-- `%NVM_SYMLINK%` and the nvm-windows directory
-- `%USERPROFILE%\scoop\shims`
-- `%ChocolateyInstall%\bin`
-- `%LOCALAPPDATA%\Microsoft\WindowsApps`
-- user-local Programs directories and standard Program Files locations
-
-Both native `codex.exe` and npm-style `codex.cmd`/`codex.bat` shims are supported. Native executables are launched directly. Command shims are accepted only at absolute, metacharacter-safe paths and are invoked through the system `cmd.exe` with a fixed argument sequence. No user-entered command is evaluated.
-
-Shadowokx Panel starts `codex app-server --stdio` and requests only:
-
-```text
-account/usage/read
-account/rateLimits/read
-```
-
-It never searches for, reads, copies, or stores Codex authentication files.
+Closing the popup leaves Shadowokx Panel running in the notification area. Use **Exit** from the tray menu to stop it completely.
 
 ## Privacy and storage
 
@@ -74,95 +62,116 @@ Runtime state is isolated to the current Windows profile:
 %LOCALAPPDATA%\ShadowokxPanel\logs\shadowokx-panel.log   (debug only)
 ```
 
-- Current limits and reset times come from the current user's local Codex app-server.
-- Graph history belongs to Shadowokx Panel and accumulates one real current-day sample at a time.
-- Earlier account-side daily buckets are not imported into a fresh local history.
-- New installations show **Not enough history yet** until at least two real days exist.
-- Authentication tokens, account email, profile, session IDs, and cookies are neither requested nor stored.
+- The installer never writes user data into its installation directory.
+- Upgrades and normal uninstall preserve runtime data.
+- Codex limits come from the current user’s local Codex app-server.
+- Shadowokx Panel never searches for or stores Codex credentials, tokens, account email, cookies, or session IDs.
+- The configured location is sent to Open-Meteo for geocoding and forecast data; no Weather API key is used.
 - Debug logging is disabled by default and redacts credential-shaped values.
-- The configured location is sent to Open-Meteo's geocoding service, followed by latitude/longitude sent to its forecast service. No Weather API key is used.
+
+## Codex detection
+
+The app checks the effective Windows `PATH` and established current-user package-manager locations for native `codex.exe` and npm-style `codex.cmd`/`codex.bat` shims. It invokes the fixed `codex app-server --stdio` command and requests only:
+
+```text
+account/usage/read
+account/rateLimits/read
+```
+
+No user-entered command is evaluated.
 
 ## Start with Windows
 
-The optional startup switch creates a value under the current user's standard `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` key. It starts the application with `--startup`, which creates the tray icon without opening the popup. Disabling the switch removes only Shadowokx Panel's value.
+The optional setting uses the current user’s standard `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` key. It starts Shadowokx Panel with `--startup`, creating the tray icon without opening the popup. Disabling the setting removes only Shadowokx Panel’s own value.
 
 ## Architecture
 
 ```text
 windows/
 ├── src/ShadowokxPanel.Core/     providers, normalization, history, storage
-├── src/ShadowokxPanel/          WinUI popup, tray, settings, themes, platform APIs
+├── src/ShadowokxPanel/          WinUI popup, tray, settings, platform APIs
 ├── tests/                       xUnit pure-logic and provider tests
 ├── packaging/                   per-user Inno Setup definition
-└── scripts/                     build, test, package, and isolation checks
+├── docs/                        Windows release QA
+└── scripts/                     build, release, validation, and isolation checks
 ```
 
-The core library has no WinUI dependency. Provider state is structured and the UI does not parse raw Codex or Open-Meteo responses.
+The core library has no WinUI dependency. Provider state is structured, storage uses bounded atomic writes, and the UI does not parse raw service responses.
 
-## Development
+## Developer build
 
-Install a current Visual Studio release with the .NET desktop/Windows App SDK workload, or an equivalent Windows environment with .NET 8 and Windows App SDK build support. The project pins Windows App SDK 2.4.0.
+Use Windows 11 with the .NET 8 SDK and Windows App SDK build support. Inno Setup 6 is also required to create the recommended x64 installer.
 
 ```powershell
 cd windows
 .\scripts\test.ps1
 .\scripts\build.ps1 -Configuration Release -Runtime win-x64
-.\scripts\package.ps1 -Runtime win-x64
 ```
 
-`package.ps1` always creates a portable ZIP. If Inno Setup 6 is installed and `ISCC.exe` is available, it also creates the per-user installer.
+`build.ps1` restores packages, runs strict tests/analyzers, creates a self-contained unpackaged WinUI publish, and validates its executable, application PRI, every project XBF, assets, and native runtimes. A successful publish is written to `artifacts\win-x64`.
 
-## Feature parity
+## Create release artifacts
 
-| Feature | Linux / GNOME | Windows |
-|---|---:|---:|
-| Codex weekly limit and reset | ✅ | ✅ Implemented |
-| Five-hour window | ✅ | ✅ Implemented when reported |
-| Reset credits | ✅ | ✅ Implemented |
-| Lifetime token total | ✅ | ✅ Implemented |
-| Privacy-safe local history | ✅ | ✅ Implemented per Windows user |
-| Seven-day graph and point tooltips | ✅ | ✅ Implemented with WinUI shapes |
-| Idle / Steady / Peak pace | ✅ | ✅ Same thresholds |
-| Open-Meteo Weather | ✅ | ✅ Implemented |
-| Hourly rain, UV, sunrise/sunset | ✅ | ✅ Implemented |
-| Cached/stale provider states | ✅ | ✅ Implemented |
-| GNOME top bar | ✅ | ⚠ Native notification-area tooltip/icon |
-| GNOME popup | ✅ | ⚠ Native taskbar-adjacent WinUI popup |
-| GNOME preferences | ✅ | ⚠ Native Windows settings window |
-| Start at login | N/A | ✅ Current-user startup value |
-| Per-monitor DPI | GNOME-managed | ✅ PerMonitorV2 manifest and WinUI scaling |
-| System theme | ✅ | ✅ Follow Windows |
-| Linux summary PNG sharing | ✅ | ❌ Not included in Windows 1.0 source |
+From the `windows` directory, run:
+
+```powershell
+.\scripts\release.ps1 -Configuration Release -Runtime win-x64
+```
+
+The command fails if tests, publishing, resource validation, ZIP validation, or installer compilation fails. It creates:
+
+```text
+artifacts\release\ShadowokxPanel-Setup-x64.exe
+artifacts\release\ShadowokxPanel-Portable-x64.zip
+artifacts\release\checksums.txt
+```
+
+`package.ps1` remains as a compatibility wrapper around the same release pipeline.
+
+### Optional Authenticode signing
+
+No certificate or private key is stored in this repository. To sign with a certificate already installed in the Windows certificate store, set its thumbprint and optionally the SignTool path:
+
+```powershell
+$env:SHADOWOKX_SIGN_CERT_THUMBPRINT = 'CERTIFICATE_THUMBPRINT'
+$env:SHADOWOKX_SIGNTOOL = 'C:\Program Files (x86)\Windows Kits\10\bin\<version>\x64\signtool.exe'
+.\scripts\release.ps1 -Configuration Release -Runtime win-x64
+```
+
+When signing is configured, the pipeline signs and verifies both the application executable and installer with SHA-256 and a timestamp. Without a certificate it produces truthful unsigned artifacts and prints a warning; it never creates or trusts a fake certificate.
+
+Before publishing, complete [the Windows release QA checklist](docs/RELEASE-QA.md) on a normal Windows 11 account and test the installed copy, not only the build output.
 
 ## Performance and lifecycle
 
-- Only one application instance is registered per Windows user; later launches redirect to it.
-- Concurrent manual refreshes are coalesced.
-- Provider requests are asynchronous, cancellable, size-bounded, and time-bounded.
-- The graph redraws only when data or layout size changes.
-- The minute display timer runs only while the popup is visible.
-- Weather makes no requests while disabled.
-- Suspend/resume rechecks stale providers without creating new timers or tray icons.
-- Tray hooks, timers, requests, providers, and event subscriptions are removed during exit.
+- A single primary instance remains alive in the notification area; later launches redirect to it.
+- Concurrent refreshes are coalesced and provider work is asynchronous, cancellable, size-bounded, and time-bounded.
+- The graph redraws only when its data or layout changes.
+- The display timer runs only while the popup is visible, and Weather makes no requests while disabled.
+- Tray hooks, timers, requests, providers, and event subscriptions are disposed exactly once during Exit.
 
 ## Troubleshooting
 
 ### Codex not detected
 
-Confirm that `codex --version` works for the same Windows user. If it is installed in an unusual location, expose it through that user's `PATH` or a supported package-manager location, then restart Shadowokx Panel.
+Confirm `codex --version` works for the same Windows user, then restart Shadowokx Panel. Installations exposed through `PATH`, npm, pnpm, Bun, Volta, nvm-windows, Scoop, Chocolatey, WindowsApps, and standard user/program directories are supported.
 
 ### Codex usage unavailable
 
-Open Codex and confirm that it is signed in. Shadowokx Panel does not accept or store an API key.
+Open Codex and confirm it is signed in. Shadowokx Panel does not accept or store an API key.
 
 ### Weather unavailable
 
-Check the network and use a location such as `Cairo, Egypt`. The last matching cached forecast remains visible during temporary failures.
+Check the network and try a location such as `Cairo, Egypt`. Cached forecast data remains visible during temporary failures.
+
+### App starts but no window appears
+
+Check the notification-area overflow. A tray-first launch intentionally keeps the popup closed. Development startup diagnostics are written to `%TEMP%\ShadowokxPanel-startup.log`.
 
 ## Known limitations
 
-- Windows runtime, installer, DPI, sleep/resume, and notification-area behavior still require validation on real Windows 11 hardware before the first binary release.
-- Exotic Codex installations outside `PATH` and the documented locations are not detected automatically.
-- Local history is scoped to the Windows login, not to a stored Codex account identifier. Switching Codex accounts under one Windows login retains that local history.
-- The first graph requires two daily samples; pace state requires four completed days.
-- Summary-image export is not part of the initial Windows implementation.
+- Unsigned builds can trigger SmartScreen until the project establishes signed release reputation.
+- Exotic Codex installations outside `PATH` and documented package-manager locations are not detected automatically.
+- Local history belongs to the Windows login, not a stored Codex account identifier.
+- A new installation needs two real daily samples for a graph and four completed days for pace classification.
+- Summary-image export is not included in the initial Windows release.

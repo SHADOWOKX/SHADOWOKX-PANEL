@@ -5,6 +5,7 @@ artifacts/
 TestResults/
 *.user
 *.pfx
+*.p12
 *.cer
 *.msix
 *.msixbundle
