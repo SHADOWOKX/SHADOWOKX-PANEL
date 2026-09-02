@@ -18,8 +18,37 @@ public partial class App : Application, IAsyncDisposable
     {
         StartupDiagnostics.Write("App constructor entered");
         InitializeComponent();
+        LogFrameworkResourceState();
         _dispatcher = DispatcherQueue.GetForCurrentThread();
         StartupDiagnostics.Write("App constructed");
+    }
+
+    private static void LogFrameworkResourceState()
+    {
+        var tabViewResources = LogFrameworkResource("TabViewButtonBackground");
+        var buttonResources = LogFrameworkResource("ButtonBackground");
+        var progressResources = LogFrameworkResource("ProgressBarBackground");
+        StartupDiagnostics.Write(tabViewResources && buttonResources && progressResources
+            ? "WinUI framework resources initialized"
+            : "WinUI framework resources incomplete");
+    }
+
+    private static bool LogFrameworkResource(string key)
+    {
+        bool available;
+        try
+        {
+            available = Current.Resources.TryGetValue(key, out var value) && value is not null;
+        }
+        catch (Exception error) when (error is Microsoft.UI.Xaml.Markup.XamlParseException or
+            System.Runtime.InteropServices.COMException or InvalidOperationException)
+        {
+            available = false;
+        }
+
+        StartupDiagnostics.Write(
+            $"WinUI framework resource lookup {key}: {(available ? "success" : "failure")}");
+        return available;
     }
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)

@@ -4,6 +4,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Application.Resources>
         <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
             <Color x:Key="AppBackgroundColor">#FF252623</Color>
             <Color x:Key="CardColor">#FF30312F</Color>
             <Color x:Key="CardHoverColor">#FF383936</Color>

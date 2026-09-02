@@ -27,6 +27,7 @@ Record the Windows version, release commit, application version, installer SHA-2
 - [ ] **Launch Shadowokx Panel** is offered at completion and starts the app.
 - [ ] Installed Apps shows the correct product name, publisher, version, and icon.
 - [ ] The installation directory contains the app PRI and every XBF from the validated payload.
+- [ ] `%TEMP%\ShadowokxPanel-startup.log` records `WinUI framework resources initialized`, `MainWindow InitializeComponent successful`, `graph construction successful`, `tray initialization successful`, and `app entering steady-state` in that order.
 
 ## 3. Startup, tray, and single-instance lifecycle
 

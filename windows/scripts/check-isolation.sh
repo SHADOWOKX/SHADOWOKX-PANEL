@@ -13,6 +13,19 @@ xmllint --noout \
   "$windows_root/src/ShadowokxPanel.Core/ShadowokxPanel.Core.csproj" \
   "$windows_root/tests/ShadowokxPanel.Core.Tests/ShadowokxPanel.Core.Tests.csproj"
 
+first_merged_resource=$(xmllint --xpath \
+  'local-name((//*[local-name()="ResourceDictionary.MergedDictionaries"]/*)[1])' \
+  "$windows_root/src/ShadowokxPanel/App.xaml")
+if test "$first_merged_resource" != 'XamlControlsResources'; then
+  printf '%s\n' 'App.xaml must merge XamlControlsResources before custom resources.' >&2
+  exit 1
+fi
+
+if rg -n 'x:Key="TabViewButtonBackground"' "$windows_root/src/ShadowokxPanel"; then
+  printf '%s\n' 'Do not mask missing WinUI framework resources with a local TabView brush.' >&2
+  exit 1
+fi
+
 for required_file in \
   "$windows_root/scripts/release.ps1" \
   "$windows_root/scripts/validate-publish.ps1" \
