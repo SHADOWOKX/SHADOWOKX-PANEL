@@ -16,7 +16,6 @@
                     <ToggleSwitch x:Name="ShowWeatherToggle" Header="Show Weather" Toggled="SettingChanged" />
                     <ToggleSwitch x:Name="CodexStateToggle" Header="Show Codex usage state" Toggled="SettingChanged" />
                     <ToggleSwitch x:Name="WeatherTooltipToggle" Header="Weather in tray tooltip" Toggled="SettingChanged" />
-                    <ToggleSwitch x:Name="TrayStateToggle" Header="Color tray percentage by remaining capacity" Toggled="SettingChanged" />
                     <ToggleSwitch x:Name="RefreshOnOpenToggle" Header="Refresh stale Weather when opened" Toggled="SettingChanged" />
                 </StackPanel>
 

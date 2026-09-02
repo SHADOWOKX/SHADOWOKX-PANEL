@@ -36,7 +36,6 @@ public sealed record AppSettings
     public bool ShowWeather { get; init; } = true;
     public bool ShowCodexStateIndicator { get; init; }
     public bool ShowWeatherInTrayTooltip { get; init; } = true;
-    public bool ChangeTrayIconWithUsageState { get; init; } = true;
     public bool RefreshOnOpen { get; init; } = true;
     public bool RememberLastPage { get; init; } = true;
     public string LastPage { get; init; } = "codex";

@@ -25,7 +25,6 @@ public sealed class TrayIcon : IDisposable
     private nint _icon;
     private string _tooltip = "Shadowokx Panel";
     private int? _remainingPercent;
-    private bool _useCapacityColors = true;
     private IconKey? _iconKey;
     private bool _disposed;
 
@@ -63,7 +62,7 @@ public sealed class TrayIcon : IDisposable
         }
     }
 
-    public void Update(string tooltip, int? remainingPercent, bool useCapacityColors)
+    public void Update(string tooltip, int? remainingPercent)
     {
         if (_disposed)
             return;
@@ -71,11 +70,10 @@ public sealed class TrayIcon : IDisposable
         int? normalizedPercent = remainingPercent.HasValue
             ? Math.Clamp(remainingPercent.Value, 0, 100) : null;
         if (_tooltip == normalizedTooltip && _remainingPercent == normalizedPercent &&
-            _useCapacityColors == useCapacityColors && IconMatchesCurrentDpi())
+            IconMatchesCurrentDpi())
             return;
         _tooltip = normalizedTooltip;
         _remainingPercent = normalizedPercent;
-        _useCapacityColors = useCapacityColors;
         UpdateIconAndTooltip();
     }
 
@@ -184,11 +182,10 @@ public sealed class TrayIcon : IDisposable
 
     private void EnsureIcon()
     {
-        var key = new IconKey(CurrentIconSize(), _remainingPercent, _useCapacityColors);
+        var key = new IconKey(CurrentIconSize(), _remainingPercent);
         if (_icon != 0 && _iconKey == key)
             return;
-        var replacement = TrayIconRenderer.Create(
-            key.Size, key.RemainingPercent, key.UseCapacityColors);
+        var replacement = TrayIconRenderer.Create(key.Size, key.RemainingPercent);
         var previous = _icon;
         _icon = replacement;
         _iconKey = key;
@@ -200,14 +197,13 @@ public sealed class TrayIcon : IDisposable
     {
         if (_disposed)
             return;
-        var desired = new IconKey(CurrentIconSize(), _remainingPercent, _useCapacityColors);
+        var desired = new IconKey(CurrentIconSize(), _remainingPercent);
         var replace = forceIcon || _icon == 0 || _iconKey != desired;
         nint replacement;
         try
         {
             replacement = replace
-                ? TrayIconRenderer.Create(
-                    desired.Size, desired.RemainingPercent, desired.UseCapacityColors)
+                ? TrayIconRenderer.Create(desired.Size, desired.RemainingPercent)
                 : _icon;
         }
         catch (InvalidOperationException error)
@@ -248,8 +244,5 @@ public sealed class TrayIcon : IDisposable
         GC.KeepAlive(_windowProcedure);
     }
 
-    private readonly record struct IconKey(
-        int Size,
-        int? RemainingPercent,
-        bool UseCapacityColors);
+    private readonly record struct IconKey(int Size, int? RemainingPercent);
 }

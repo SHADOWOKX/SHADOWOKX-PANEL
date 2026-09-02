@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml.Media;
 using ShadowokxPanel.Controls;
 using ShadowokxPanel.Core.History;
 using ShadowokxPanel.Core.Models;
+using ShadowokxPanel.Core.Presentation;
 using ShadowokxPanel.Platform;
 using ShadowokxPanel.Services;
 using ShadowokxPanel.ViewModels;
@@ -74,6 +75,7 @@ public sealed partial class MainWindow : Window, IDisposable
             presenter.IsMaximizable = false;
             presenter.IsMinimizable = false;
         }
+        ApplyPanelFrameStyling();
         _appWindow.Title = "Shadowokx Panel";
         _appWindow.Closing += AppWindow_Closing;
         Activated += MainWindow_Activated;
@@ -196,21 +198,31 @@ public sealed partial class MainWindow : Window, IDisposable
                     NativeMethods.SwpFrameChanged))
                 throw new InvalidOperationException("The panel utility-window frame could not be updated.");
         }
-        if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000))
-        {
-            var borderColor = NativeMethods.DwmColorNone;
-            _ = NativeMethods.DwmSetWindowAttribute(
-                _hwnd,
-                NativeMethods.DwmwaBorderColor,
-                ref borderColor,
-                sizeof(int));
-            var cornerPreference = NativeMethods.DwmwcpRound;
-            _ = NativeMethods.DwmSetWindowAttribute(
-                _hwnd,
-                NativeMethods.DwmwaWindowCornerPreference,
-                ref cornerPreference,
-                sizeof(int));
-        }
+    }
+
+    private void ApplyPanelFrameStyling()
+    {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000))
+            return;
+
+        var borderColor = NativeMethods.DwmColorNone;
+        _ = NativeMethods.DwmSetWindowAttribute(
+            _hwnd,
+            NativeMethods.DwmwaBorderColor,
+            ref borderColor,
+            sizeof(int));
+        var cornerPreference = NativeMethods.DwmwcpRound;
+        _ = NativeMethods.DwmSetWindowAttribute(
+            _hwnd,
+            NativeMethods.DwmwaWindowCornerPreference,
+            ref cornerPreference,
+            sizeof(int));
+        var backdropType = NativeMethods.DwmSbtNone;
+        _ = NativeMethods.DwmSetWindowAttribute(
+            _hwnd,
+            NativeMethods.DwmwaSystemBackdropType,
+            ref backdropType,
+            sizeof(int));
     }
 
     private void PositionNearTray(bool captureAnchor = true)
@@ -249,6 +261,7 @@ public sealed partial class MainWindow : Window, IDisposable
         x = Math.Clamp(x, info.rcWork.Left + margin, info.rcWork.Right - width - margin);
         y = Math.Clamp(y, info.rcWork.Top + margin, info.rcWork.Bottom - height - margin);
         _appWindow.MoveAndResize(new RectInt32(x, y, width, height));
+        ApplyPanelFrameStyling();
         _positionedHeight = desiredHeight;
     }
 
@@ -475,10 +488,7 @@ public sealed partial class MainWindow : Window, IDisposable
             lines.Add($"Weather: {Math.Round(weather.Temperature):0}° · {weather.Condition.Label}");
         int? displayedPercent = remaining.HasValue
             ? (int)Math.Round(remaining.Value, MidpointRounding.AwayFromZero) : null;
-        _tray.Update(
-            string.Join('\n', lines),
-            displayedPercent,
-            _viewModel.Settings.ChangeTrayIconWithUsageState);
+        _tray.Update(string.Join('\n', lines), displayedPercent);
     }
 
     private void OpenSettings()
@@ -660,14 +670,9 @@ public sealed partial class MainWindow : Window, IDisposable
         return opacity >= 1 ? brush : new SolidColorBrush(brush.Color) { Opacity = opacity };
     }
 
-    private static string FormatTokens(long? value) => value switch
-    {
-        null => "Not reported",
-        >= 1_000_000_000 => value.Value.ToString("0.#,,,'B'", CultureInfo.CurrentCulture),
-        >= 1_000_000 => value.Value.ToString("0.#,,'M'", CultureInfo.CurrentCulture),
-        >= 1_000 => value.Value.ToString("0.#,'K'", CultureInfo.CurrentCulture),
-        _ => value.Value.ToString("N0", CultureInfo.CurrentCulture),
-    };
+    private static string FormatTokens(long? value) => value.HasValue
+        ? TokenCountFormatter.Format(value.Value, CultureInfo.CurrentCulture)
+        : "Not reported";
 
     private static string FormatCountdown(DateTimeOffset? reset)
     {

@@ -5,30 +5,22 @@ namespace ShadowokxPanel.Platform;
 
 internal static class TrayIconRenderer
 {
-    private static readonly IReadOnlyDictionary<TrayGlyphTone, int> Colors =
-        new Dictionary<TrayGlyphTone, int>
-        {
-            [TrayGlyphTone.Neutral] = unchecked((int)0xFFE7E9ED),
-            [TrayGlyphTone.Healthy] = unchecked((int)0xFF78D4B0),
-            [TrayGlyphTone.Balanced] = unchecked((int)0xFFF0C36E),
-            [TrayGlyphTone.Warning] = unchecked((int)0xFFFF7185),
-        };
+    private const int GlyphColor = unchecked((int)0xFFFFFFFF);
 
-    public static nint Create(int size, int? remainingPercent, bool useCapacityColors)
+    public static nint Create(int size, int? remainingPercent)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size);
 
-        var glyph = TrayPercentageGlyphFactory.Create(remainingPercent, useCapacityColors);
+        var glyph = TrayPercentageGlyphFactory.Create(remainingPercent);
         var pixels = new int[checked(size * size)];
         var padding = Math.Max(1, size / 16);
         var usable = Math.Max(1, size - padding * 2);
-        var scaleX = Math.Max(1, usable / glyph.Width);
-        var scaleY = Math.Max(1, Math.Min(usable / glyph.Height, scaleX * 3));
+        var scaleY = Math.Max(1, usable / glyph.Height);
+        var scaleX = Math.Max(1, Math.Min(usable / glyph.Width, scaleY));
         var renderedWidth = glyph.Width * scaleX;
         var renderedHeight = glyph.Height * scaleY;
         var left = Math.Max(0, (size - renderedWidth) / 2);
         var top = Math.Max(0, (size - renderedHeight) / 2);
-        var color = Colors[glyph.Tone];
 
         foreach (var point in glyph.Pixels)
         {
@@ -38,7 +30,7 @@ internal static class TrayIconRenderer
             {
                 var row = (startY + y) * size;
                 for (var x = 0; x < scaleX && startX + x < size; x++)
-                    pixels[row + startX + x] = color;
+                    pixels[row + startX + x] = GlyphColor;
             }
         }
 

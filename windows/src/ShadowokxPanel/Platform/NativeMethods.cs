@@ -42,7 +42,9 @@ internal static class NativeMethods
     internal const uint SwpFrameChanged = 0x0020;
     internal const int DwmwaWindowCornerPreference = 33;
     internal const int DwmwaBorderColor = 34;
+    internal const int DwmwaSystemBackdropType = 38;
     internal const int DwmwcpRound = 2;
+    internal const int DwmSbtNone = 1;
     internal const int DwmColorNone = unchecked((int)0xFFFFFFFE);
     internal const uint DibRgbColors = 0;
     internal const uint BiRgb = 0;

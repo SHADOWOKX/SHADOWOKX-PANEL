@@ -33,7 +33,6 @@ public sealed partial class SettingsWindow : Window
         ShowWeatherToggle.IsOn = settings.ShowWeather;
         CodexStateToggle.IsOn = settings.ShowCodexStateIndicator;
         WeatherTooltipToggle.IsOn = settings.ShowWeatherInTrayTooltip;
-        TrayStateToggle.IsOn = settings.ChangeTrayIconWithUsageState;
         RefreshOnOpenToggle.IsOn = settings.RefreshOnOpen;
         ThemeCombo.SelectedIndex = (int)settings.Theme;
         AccentCombo.SelectedIndex = (int)settings.Accent;
@@ -76,7 +75,6 @@ public sealed partial class SettingsWindow : Window
             ShowWeather = ShowWeatherToggle.IsOn,
             ShowCodexStateIndicator = CodexStateToggle.IsOn,
             ShowWeatherInTrayTooltip = WeatherTooltipToggle.IsOn,
-            ChangeTrayIconWithUsageState = TrayStateToggle.IsOn,
             RefreshOnOpen = RefreshOnOpenToggle.IsOn,
             Theme = theme,
             Accent = accent,

@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
 using ShadowokxPanel.Core.History;
 using ShadowokxPanel.Core.Models;
+using ShadowokxPanel.Core.Presentation;
 using ShadowokxPanel.Services;
 using Windows.Foundation;
 using XamlPath = Microsoft.UI.Xaml.Shapes.Path;
@@ -108,7 +109,7 @@ public sealed class TokenGraphControl : Canvas
             SetTop(marker, point.Y - marker.Height / 2);
             ToolTipService.SetToolTip(marker,
                 $"{point.Date.ToString("MMM d, yyyy", CultureInfo.CurrentCulture)}\n" +
-                $"{FormatTokens(point.Tokens)} tokens");
+                $"{TokenCountFormatter.Format(point.Tokens, CultureInfo.CurrentCulture)} tokens");
             Children.Add(marker);
 
             var sparse = points.Count <= 3;
@@ -150,11 +151,4 @@ public sealed class TokenGraphControl : Canvas
     private static Brush ResourceBrush(string name) =>
         (Brush)Application.Current.Resources[name];
 
-    private static string FormatTokens(long tokens) => tokens switch
-    {
-        >= 1_000_000_000 => tokens.ToString("0.#,,,'B'", CultureInfo.CurrentCulture),
-        >= 1_000_000 => tokens.ToString("0.#,,'M'", CultureInfo.CurrentCulture),
-        >= 1_000 => tokens.ToString("0.#,'K'", CultureInfo.CurrentCulture),
-        _ => tokens.ToString("N0", CultureInfo.CurrentCulture),
-    };
 }

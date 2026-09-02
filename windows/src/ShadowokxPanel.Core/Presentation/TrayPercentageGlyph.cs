@@ -1,20 +1,11 @@
 namespace ShadowokxPanel.Core.Presentation;
 
-public enum TrayGlyphTone
-{
-    Neutral,
-    Healthy,
-    Balanced,
-    Warning,
-}
-
 public readonly record struct TrayGlyphPixel(int X, int Y);
 
 public sealed record TrayPercentageGlyph(
     string AccessibleText,
     int Width,
     int Height,
-    TrayGlyphTone Tone,
     IReadOnlyList<TrayGlyphPixel> Pixels);
 
 public static class TrayPercentageGlyphFactory
@@ -33,39 +24,32 @@ public static class TrayPercentageGlyphFactory
             ['7'] = ["111", "001", "010", "010", "010"],
             ['8'] = ["111", "101", "111", "101", "111"],
             ['9'] = ["111", "101", "111", "001", "111"],
-            ['%'] = ["101", "001", "010", "100", "101"],
         };
 
     // A compact neutral mark used until Codex reports a real percentage.
     private static readonly string[] UnavailableGlyph =
         ["01110", "10001", "00110", "00000", "00100"];
 
-    public static TrayPercentageGlyph Create(int? remainingPercent, bool useCapacityColors)
+    public static TrayPercentageGlyph Create(int? remainingPercent)
     {
         if (!remainingPercent.HasValue)
-            return FromRows("Codex usage unavailable", UnavailableGlyph, TrayGlyphTone.Neutral);
+            return FromRows("Codex usage unavailable", UnavailableGlyph);
 
         var normalized = Math.Clamp(remainingPercent.Value, 0, 100);
-        var text = $"{normalized}%";
+        // The tray tooltip carries the percent sign. Rendering only the digits lets the
+        // percentage use the full 16 px notification-area canvas instead of becoming
+        // unreadably narrow at common DPI settings.
+        var text = normalized.ToString(System.Globalization.CultureInfo.InvariantCulture);
         var rows = new string[GlyphHeight];
         for (var row = 0; row < GlyphHeight; row++)
             rows[row] = string.Join('0', text.Select(character => Glyphs[character][row]));
 
-        var tone = useCapacityColors
-            ? normalized switch
-            {
-                >= 60 => TrayGlyphTone.Healthy,
-                >= 30 => TrayGlyphTone.Balanced,
-                _ => TrayGlyphTone.Warning,
-            }
-            : TrayGlyphTone.Neutral;
-        return FromRows($"{normalized}% remaining", rows, tone);
+        return FromRows($"{normalized}% remaining", rows);
     }
 
     private static TrayPercentageGlyph FromRows(
         string accessibleText,
-        IReadOnlyList<string> rows,
-        TrayGlyphTone tone)
+        IReadOnlyList<string> rows)
     {
         var pixels = new List<TrayGlyphPixel>();
         for (var y = 0; y < rows.Count; y++)
@@ -76,6 +60,6 @@ public static class TrayPercentageGlyphFactory
                     pixels.Add(new TrayGlyphPixel(x, y));
             }
         }
-        return new TrayPercentageGlyph(accessibleText, rows[0].Length, rows.Count, tone, pixels);
+        return new TrayPercentageGlyph(accessibleText, rows[0].Length, rows.Count, pixels);
     }
 }
