@@ -51,7 +51,7 @@ try {
         channel,
         published_at: publishedAt,
         revoked: false,
-        minimum_updater_version: '2.3.3',
+        minimum_updater_version: '1.0.0',
         release_notes_url: `https://github.com/${repository}/releases/tag/${encodeURIComponent(tag)}`,
         rollout: 100,
         source: {

@@ -7,6 +7,7 @@ import {
     UPDATE_INDEX_URL,
     UPDATE_REFRESH_INTERVAL_SECONDS,
     UPDATE_STARTUP_DELAY_SECONDS,
+    UPDATER_PROTOCOL_VERSION,
     UUID,
 } from '../../lib/constants.js';
 import {JsonStore} from '../jsonStore.js';
@@ -202,7 +203,7 @@ export class UpdateProvider extends Observable {
             manifests,
             currentVersion: APP_VERSION,
             selectedChannel,
-            updaterVersion: APP_VERSION,
+            updaterVersion: UPDATER_PROTOCOL_VERSION,
             platform: 'linux',
             compatibility: platform =>
                 platform.uuid === UUID &&

@@ -27,19 +27,9 @@ permissions:
 jobs:
   linux:
     runs-on: ubuntu-24.04
-    container: ubuntu:26.04
-    env:
-      SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
-      GIT_SSL_CAINFO: /etc/ssl/certs/ca-certificates.crt
     outputs:
       commit: ${{ steps.source.outputs.commit }}
     steps:
-      - name: Install Linux build dependencies
-        run: |
-          apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates dbus-daemon git gjs gnome-shell gnome-shell-extension-prefs \
-            libadwaita-1-0 libglib2.0-bin libxml2-utils nodejs python3 ripgrep unzip zip
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.linux_ref }}
@@ -60,17 +50,23 @@ jobs:
           node release-tools/scripts/release/version.mjs assert source \
             '${{ inputs.version }}' '${{ inputs.channel }}'
           node release-tools/scripts/release/version.mjs set source '${{ inputs.version }}'
-      - name: Test Linux implementation
-        working-directory: source
-        run: |
-          ./scripts/check.sh
-          ./scripts/ui-smoke.sh
-      - name: Build deterministic Linux package
+      - name: Test and package Linux implementation on Ubuntu 26.04
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p output
-          source/scripts/package.sh output
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/work" \
+            --workdir /work/source \
+            ubuntu:26.04 bash -lc '
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+                dbus-daemon git gjs gnome-shell gnome-shell-extension-prefs libadwaita-1-0 \
+                libglib2.0-bin libxml2-utils nodejs python3 ripgrep unzip zip
+              ./scripts/check.sh
+              SHADOW_UI_LIFECYCLE=true ./scripts/ui-smoke.sh
+              ./scripts/package.sh /work/output
+            '
           package=$(find output -maxdepth 1 -type f -name '*.shell-extension.zip' -print -quit)
           test -n "$package"
           cp "$package" output/ShadowokxPanel-Linux.zip

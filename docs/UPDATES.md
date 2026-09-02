@@ -39,6 +39,11 @@ size, and SHA-256. `rollout` is reserved for future phased rollout; clients
 currently accept only 100%. Signature fields are reserved but deliberately
 empty until a real signing key and protected signing service exist.
 
+`minimum_updater_version` is a separate updater-protocol capability version,
+not the product's prerelease version. This prevents a fully capable Beta or
+Developer build from being rejected merely because SemVer correctly ranks it
+below the final release with the same base version.
+
 SHA-256 detects corruption or an artifact that differs from the trusted
 manifest. It does not protect against an attacker who controls the GitHub
 repository and can replace both metadata and artifacts. Windows Authenticode

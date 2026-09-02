@@ -14,17 +14,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-24.04
-    container: ubuntu:26.04
-    env:
-      SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
-      GIT_SSL_CAINFO: /etc/ssl/certs/ca-certificates.crt
     steps:
-      - name: Install GNOME 50 test dependencies
-        run: |
-          apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            dbus-daemon git gjs gnome-shell gnome-shell-extension-prefs libadwaita-1-0 \
-            libglib2.0-bin libxml2-utils nodejs python3 ripgrep unzip zip
       - uses: actions/checkout@v4
       - name: Assign isolated Developer build version
         if: github.event_name == 'push'
@@ -37,12 +27,21 @@ jobs:
       - name: Validate version contract
         run: node scripts/release/version.mjs check .
       - name: Run Linux tests and package validation
-        run: ./scripts/check.sh
-      - name: Run GNOME Shell lifecycle smoke test
-        run: SHADOW_UI_LIFECYCLE=true ./scripts/ui-smoke.sh
-      - name: Build Developer Linux package
-        if: github.event_name == 'push'
-        run: ./scripts/package.sh dist
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/work" \
+            --workdir /work \
+            ubuntu:26.04 bash -lc '
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+                dbus-daemon git gjs gnome-shell gnome-shell-extension-prefs libadwaita-1-0 \
+                libglib2.0-bin libxml2-utils nodejs python3 ripgrep unzip zip
+              ./scripts/check.sh
+              SHADOW_UI_LIFECYCLE=true ./scripts/ui-smoke.sh
+              ./scripts/package.sh dist
+            '
       - name: Upload Developer Linux package
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
