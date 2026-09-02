@@ -2,7 +2,7 @@ import Clutter from 'gi://Clutter';
 import St from 'gi://St';
 
 import {MODULE_META} from '../lib/constants.js';
-import {accentRgba, animationsEnabled, moduleIcon, resolveAccent} from './components.js';
+import {animationsEnabled, moduleIcon} from './components.js';
 
 export class TabStrip {
     constructor(extension, settings, moduleIds, onSelected) {
@@ -35,7 +35,7 @@ export class TabStrip {
                     child: content,
                     x_align: Clutter.ActorAlign.CENTER,
                 }),
-                style_class: 'shadow-tab shadow-segment',
+                style_class: 'shadow-tab shadow-tab-inactive shadow-segment',
                 can_focus: true,
                 reactive: true,
                 track_hover: true,
@@ -58,36 +58,31 @@ export class TabStrip {
         if (!this._buttons.has(id))
             return;
         const previousId = this._activeId;
-        const accent = resolveAccent(this._settings);
-        const tint = accentRgba(this._settings, 0.16);
 
-        for (const [buttonId, {button, content, icon, label}] of this._buttons) {
+        for (const [buttonId, {button, content}] of this._buttons) {
             const active = buttonId === id;
             button.checked = active;
             button.accessible_name = active
                 ? `${MODULE_META[buttonId].name}, selected`
                 : MODULE_META[buttonId].name;
             button.remove_style_class_name('shadow-tab-active');
-            button.style = null;
+            button.remove_style_class_name('shadow-tab-inactive');
             if (active) {
                 button.add_style_class_name('shadow-tab-active');
-                button.style = `background-color: ${tint};`;
-                icon.style = `color: ${accent};`;
                 if (previousId && previousId !== id && animationsEnabled(this._settings)) {
                     content.remove_all_transitions();
-                    content.opacity = 210;
+                    content.opacity = 220;
                     content.ease({
                         opacity: 255,
-                        duration: 120,
+                        duration: 110,
                         mode: Clutter.AnimationMode.EASE_OUT_QUAD,
                     });
                 }
             } else {
+                button.add_style_class_name('shadow-tab-inactive');
                 content.remove_all_transitions();
                 content.opacity = 255;
-                icon.style = null;
             }
-            label.style = active ? `color: ${accent};` : null;
         }
         this._activeId = id;
     }
