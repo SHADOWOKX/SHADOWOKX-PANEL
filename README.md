@@ -14,16 +14,32 @@ A lightweight cross-platform panel for checking **ChatGPT Codex usage** and **lo
 
 Download the Setup, open it, and install. It is self-contained and does not require the .NET SDK, Visual Studio, or administrator privileges.
 
-<p align="center">
-  <img src="assets/windows-codex.png" alt="Shadowokx Panel Codex view on Windows" width="562">
-</p>
+### Screenshots
+
+Click any screenshot to open the original-resolution PNG.
+
+#### Codex usage
 
 <p align="center">
-  <img src="assets/windows-weather.png" alt="Shadowokx Panel Weather view on Windows" width="548">
+  <a href="assets/windows-codex.png">
+    <img src="assets/windows-codex.png" alt="Shadowokx Panel Codex view on Windows" width="562">
+  </a>
 </p>
 
+#### Weather
+
 <p align="center">
-  <img src="assets/windows-tray.png" alt="Shadowokx Panel Windows tray icon" width="250">
+  <a href="assets/windows-weather.png">
+    <img src="assets/windows-weather.png" alt="Shadowokx Panel Weather view on Windows" width="548">
+  </a>
+</p>
+
+#### Windows system tray
+
+<p align="center">
+  <a href="assets/windows-tray.png">
+    <img src="assets/windows-tray.png" alt="Shadowokx Panel Windows system tray icon" width="250">
+  </a>
 </p>
 
 > The current Windows build is unsigned, so SmartScreen may show an **Unknown publisher** warning.
@@ -45,6 +61,34 @@ Log out and back in once, then enable the extension:
 ```bash
 gnome-extensions enable shadow-panel@shadowokx
 ```
+
+### Screenshots
+
+Click any screenshot to open the original-resolution PNG.
+
+#### Codex usage
+
+<p align="center">
+  <a href="assets/linux-codex.png">
+    <img src="assets/linux-codex.png" alt="Shadowokx Panel Codex usage view on Linux GNOME" width="444">
+  </a>
+</p>
+
+#### Weather
+
+<p align="center">
+  <a href="assets/linux-weather.png">
+    <img src="assets/linux-weather.png" alt="Shadowokx Panel weather view on Linux GNOME" width="443">
+  </a>
+</p>
+
+#### GNOME top bar
+
+<p align="center">
+  <a href="assets/linux-tray.png">
+    <img src="assets/linux-tray.png" alt="Shadowokx Panel indicators in the Linux GNOME top bar" width="137">
+  </a>
+</p>
 
 ## Privacy
 
