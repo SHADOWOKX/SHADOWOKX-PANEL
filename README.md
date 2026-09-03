@@ -15,12 +15,15 @@ A lightweight cross-platform panel for checking **ChatGPT Codex usage** and **lo
 Download the Setup, open it, and install. It is self-contained and does not require the .NET SDK, Visual Studio, or administrator privileges.
 
 <p align="center">
-  <img src="assets/windows-codex.webp" alt="Shadowokx Panel Codex view on Windows" width="300">
-  <img src="assets/windows-weather.webp" alt="Shadowokx Panel Weather view on Windows" width="300">
+  <img src="assets/windows-codex.webp" alt="Shadowokx Panel Codex view on Windows" width="500">
 </p>
 
 <p align="center">
-  <img src="assets/windows-tray.png" alt="Shadowokx Panel Windows tray icon" width="42">
+  <img src="assets/windows-weather.webp" alt="Shadowokx Panel Weather view on Windows" width="500">
+</p>
+
+<p align="center">
+  <img src="assets/windows-tray.png" alt="Shadowokx Panel Windows tray icon" width="45">
 </p>
 
 > The current Windows build is unsigned, so SmartScreen may show an **Unknown publisher** warning.
