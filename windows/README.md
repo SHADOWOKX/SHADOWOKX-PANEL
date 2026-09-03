@@ -4,7 +4,11 @@ Shadowokx Panel is a native Windows 11 notification-area companion for Codex usa
 
 ## Install on Windows 11
 
-Recommended:
+### [Download the latest Windows Setup (x64)](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/latest/download/ShadowokxPanel-Setup-x64.exe)
+
+[View all releases and checksums](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases) · [Download the latest portable ZIP](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/latest/download/ShadowokxPanel-Portable-x64.zip)
+
+Recommended installation:
 
 1. Download `ShadowokxPanel-Setup-x64.exe`.
 2. Open it.
