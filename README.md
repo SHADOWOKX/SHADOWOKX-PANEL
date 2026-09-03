@@ -4,6 +4,17 @@ A lightweight GNOME Shell panel for checking Codex usage and local weather from 
 
 Release `2.3.3`.
 
+## Download for Windows 11
+
+### [Download the latest Windows Setup (x64)](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/latest/download/ShadowokxPanel-Setup-x64.exe)
+
+The Windows installer is self-contained, installs for the current user, and does not require Visual Studio, the .NET SDK, or administrator privileges. Windows may show an **Unknown publisher** or Microsoft Defender SmartScreen warning while community releases are unsigned.
+
+- [View all releases and checksums](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases)
+- [Windows source and documentation](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/tree/windows-port)
+
+The `main` branch remains the Linux/GNOME implementation. The native Windows implementation is maintained separately on `windows-port`.
+
 ## Screenshots
 
 <p align="center">
@@ -28,7 +39,7 @@ Release `2.3.3`.
 - GJS 1.88 or newer
 - Git
 
-## Installation
+## Install on Linux
 
 ### Quick install
 
