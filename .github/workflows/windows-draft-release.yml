@@ -1,0 +1,178 @@
+name: Prepare Windows draft release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Windows version in X.Y.Z format, for example 1.0.0
+        required: true
+        type: string
+      confirmation:
+        description: Type PREPARE WINDOWS DRAFT
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-draft-release
+  cancel-in-progress: false
+
+jobs:
+  build-and-draft:
+    name: Build installer and create review draft
+    runs-on: windows-2025
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_VERSION: ${{ inputs.version }}
+      RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
+    steps:
+      - name: Validate release request
+        shell: pwsh
+        run: |
+          if ($env:RELEASE_CONFIRMATION -cne 'PREPARE WINDOWS DRAFT') {
+            throw 'Confirmation text does not match PREPARE WINDOWS DRAFT.'
+          }
+          if ($env:RELEASE_VERSION -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+            throw 'Version must be a stable semantic version in X.Y.Z format.'
+          }
+
+      - name: Check out reviewed Windows source
+        uses: actions/checkout@v7
+        with:
+          ref: windows-port
+          path: source
+          fetch-depth: 1
+
+      - name: Record exact Windows source
+        id: source
+        shell: pwsh
+        working-directory: source
+        run: |
+          $commit = (git rev-parse HEAD).Trim()
+          "commit=$commit" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install Inno Setup 6
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+
+      - name: Apply requested build version
+        shell: pwsh
+        run: |
+          $propsPath = Join-Path $env:GITHUB_WORKSPACE 'source/windows/Directory.Build.props'
+          $content = [IO.File]::ReadAllText($propsPath)
+          if ($content -notmatch '<VersionPrefix>[^<]+</VersionPrefix>') {
+            throw 'Could not find VersionPrefix in windows/Directory.Build.props.'
+          }
+          $updated = $content -replace '<VersionPrefix>[^<]+</VersionPrefix>', "<VersionPrefix>$env:RELEASE_VERSION</VersionPrefix>"
+          [IO.File]::WriteAllText($propsPath, $updated, [Text.UTF8Encoding]::new($false))
+
+      - name: Run tests and build release artifacts
+        shell: pwsh
+        working-directory: source/windows
+        run: .\scripts\release.ps1 -Configuration Release -Runtime win-x64
+
+      - name: Verify release files
+        shell: pwsh
+        run: |
+          $release = Join-Path $env:GITHUB_WORKSPACE 'source/windows/artifacts/release'
+          $required = @(
+            'ShadowokxPanel-Setup-x64.exe',
+            'ShadowokxPanel-Portable-x64.zip',
+            'checksums.txt'
+          )
+          foreach ($name in $required) {
+            $path = Join-Path $release $name
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Missing release file: $name"
+            }
+          }
+
+          $checksumLines = Get-Content -LiteralPath (Join-Path $release 'checksums.txt')
+          foreach ($name in $required[0..1]) {
+            $expectedLine = $checksumLines | Where-Object { $_ -match "  $([regex]::Escape($name))$" }
+            if (-not $expectedLine) {
+              throw "checksums.txt does not include $name"
+            }
+            $expected = ($expectedLine -split '\s+', 2)[0]
+            $actual = (Get-FileHash -LiteralPath (Join-Path $release $name) -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -cne $expected) {
+              throw "SHA-256 verification failed for $name"
+            }
+          }
+
+      - name: Upload review artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ShadowokxPanel-Windows-${{ inputs.version }}-review
+          path: |
+            source/windows/artifacts/release/ShadowokxPanel-Setup-x64.exe
+            source/windows/artifacts/release/ShadowokxPanel-Portable-x64.zip
+            source/windows/artifacts/release/checksums.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Write public release notes
+        shell: pwsh
+        env:
+          SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
+        run: |
+          $notesPath = Join-Path $env:RUNNER_TEMP 'windows-release-notes.md'
+          $notes = @'
+          ## Windows 11 download
+
+          Download **ShadowokxPanel-Setup-x64.exe** and open it. The installer is self-contained, installs for the current user, and does not require the .NET SDK, Visual Studio, or administrator privileges.
+
+          A portable ZIP and `checksums.txt` are included for advanced use and SHA-256 verification.
+
+          ### Windows security notice
+
+          This community build is currently unsigned. Windows may show an **Unknown publisher** or Microsoft Defender SmartScreen warning. Download only from this official repository and verify the SHA-256 checksum before running it.
+
+          ### Source
+
+          Built from the `windows-port` branch at commit [`__SOURCE_COMMIT__`](https://github.com/__REPOSITORY__/commit/__SOURCE_COMMIT__).
+          '@
+          $notes = $notes.Replace('__SOURCE_COMMIT__', $env:SOURCE_COMMIT).Replace('__REPOSITORY__', $env:GITHUB_REPOSITORY)
+          $notes | Set-Content -LiteralPath $notesPath -Encoding utf8
+
+      - name: Create or refresh draft release
+        shell: pwsh
+        env:
+          SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
+        run: |
+          $tag = "windows-v$env:RELEASE_VERSION"
+          $title = "Shadowokx Panel for Windows v$env:RELEASE_VERSION"
+          $releaseDir = Join-Path $env:GITHUB_WORKSPACE 'source/windows/artifacts/release'
+          $notesPath = Join-Path $env:RUNNER_TEMP 'windows-release-notes.md'
+          $assets = @(
+            (Join-Path $releaseDir 'ShadowokxPanel-Setup-x64.exe'),
+            (Join-Path $releaseDir 'ShadowokxPanel-Portable-x64.zip'),
+            (Join-Path $releaseDir 'checksums.txt')
+          )
+
+          $existingJson = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            $existing = $existingJson | ConvertFrom-Json
+            if (-not $existing.draft) {
+              throw "Refusing to modify published release $tag. Choose a new version."
+            }
+            gh release upload $tag @assets --clobber
+            if ($LASTEXITCODE -ne 0) { throw 'Could not refresh draft release assets.' }
+            gh release edit $tag --title $title --notes-file $notesPath --target $env:SOURCE_COMMIT
+            if ($LASTEXITCODE -ne 0) { throw 'Could not refresh draft release metadata.' }
+          }
+          else {
+            gh release create $tag @assets --draft --target $env:SOURCE_COMMIT --title $title --notes-file $notesPath
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create the draft release.' }
+          }
+
+          "### Draft ready for review`n[$title](https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag)`n`nNo release was published by this workflow." |
+            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
