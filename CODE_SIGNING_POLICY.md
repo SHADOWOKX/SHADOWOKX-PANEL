@@ -44,4 +44,4 @@ If the optional weather feature is enabled, the configured location is sent over
 
 Shadowokx Panel does not send Codex credentials, passwords, authentication tokens, or Codex usage information to Open-Meteo or to the project maintainer.
 
-Open-Meteo is an external service and is subject to its own privacy policy.
+Open-Meteo is an external service. Its service terms and privacy information are available at [Open-Meteo Terms & Privacy](https://open-meteo.com/en/terms). Weather data is provided under the terms described in the [Open-Meteo licence](https://open-meteo.com/en/license), including attribution requirements.
