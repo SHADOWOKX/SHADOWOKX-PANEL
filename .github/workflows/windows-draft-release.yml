@@ -136,6 +136,12 @@ jobs:
 
           This community build is currently unsigned. Windows may show an **Unknown publisher** or Microsoft Defender SmartScreen warning. Download only from this official repository and verify the SHA-256 checksum before running it.
 
+          ### Code signing policy
+
+          Windows releases follow the project's [Code signing policy](https://github.com/__REPOSITORY__/blob/main/CODE_SIGNING_POLICY.md).
+
+          Free code signing provided by SignPath.io, certificate by SignPath Foundation.
+
           ### Source
 
           Built from the `windows-port` branch at commit [`__SOURCE_COMMIT__`](https://github.com/__REPOSITORY__/commit/__SOURCE_COMMIT__).
