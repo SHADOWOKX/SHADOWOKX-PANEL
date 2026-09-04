@@ -94,6 +94,8 @@ Click any screenshot to open the original-resolution PNG.
 
 Shadowokx Panel uses the signed-in local Codex client for usage data and Open-Meteo for weather. It does not read Codex credentials or include telemetry.
 
+[Weather data by Open-Meteo.com](https://open-meteo.com/) is used under its [CC BY 4.0 data licence](https://open-meteo.com/en/license). Open-Meteo service terms and privacy information are available [here](https://open-meteo.com/en/terms).
+
 ## Code signing policy
 
 Windows releases follow the project's documented code-signing process.
