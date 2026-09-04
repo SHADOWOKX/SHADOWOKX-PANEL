@@ -94,6 +94,14 @@ Click any screenshot to open the original-resolution PNG.
 
 Shadowokx Panel uses the signed-in local Codex client for usage data and Open-Meteo for weather. It does not read Codex credentials or include telemetry.
 
+## Code signing policy
+
+Windows releases follow the project's documented code-signing process.
+
+See [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md).
+
+Free code signing provided by SignPath.io, certificate by SignPath Foundation.
+
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).
