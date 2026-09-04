@@ -10,6 +10,9 @@ For most users, `ShadowokxPanel-Setup-x64.exe` is the only file needed. It insta
 
 - [View all releases and SHA-256 checksums](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases)
 - [Download the latest portable ZIP](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/latest/download/ShadowokxPanel-Portable-x64.zip)
+- [Code signing policy](CODE_SIGNING_POLICY.md)
+
+Free code signing provided by SignPath.io, certificate by SignPath Foundation.
 
 Windows may show an **Unknown publisher** or Microsoft Defender SmartScreen warning while community releases are unsigned. Download only from the official release page and verify the file against `checksums.txt`.
 
@@ -37,6 +40,12 @@ The app stays in the notification area when its popup is closed. Use **Exit** fr
 - Native notification-area icon and compact taskbar-free popup
 - Multiple native themes, accent choices, and density options
 - No telemetry or analytics
+
+## Privacy and weather attribution
+
+Shadowokx Panel does not operate a developer-controlled backend and does not collect telemetry or analytics. Codex usage is read through the current user's locally installed and signed-in Codex client.
+
+When Weather is enabled, the configured location is sent to Open-Meteo over HTTPS for geocoding and forecast data. [Weather data by Open-Meteo.com](https://open-meteo.com/) is used under its [CC BY 4.0 data licence](https://open-meteo.com/en/license). Open-Meteo service terms and privacy information are available [here](https://open-meteo.com/en/terms).
 
 ## Source layout
 
