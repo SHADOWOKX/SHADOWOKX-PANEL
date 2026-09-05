@@ -19,9 +19,28 @@ Tested on Ubuntu 26.04.1 LTS, GNOME Shell 50.x and Wayland.
 
 ### Screenshots
 
+#### Codex usage
+
 <p align="center">
-  <img src="assets/codex.webp" alt="Shadowokx Panel Codex usage view" width="360">
-  <img src="assets/weather.webp" alt="Shadowokx Panel weather view" width="360">
+  <a href="assets/linux-codex.png">
+    <img src="assets/linux-codex.png" alt="Shadowokx Panel Codex usage view on Linux GNOME" width="445">
+  </a>
+</p>
+
+#### Weather
+
+<p align="center">
+  <a href="assets/linux-weather.png">
+    <img src="assets/linux-weather.png" alt="Shadowokx Panel weather view on Linux GNOME" width="444">
+  </a>
+</p>
+
+#### GNOME top bar
+
+<p align="center">
+  <a href="assets/linux-tray.png">
+    <img src="assets/linux-tray.png" alt="Shadowokx Panel indicators in the Linux GNOME top bar" width="155">
+  </a>
 </p>
 
 ### Requirements
