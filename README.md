@@ -1,27 +1,30 @@
 # Shadowokx Panel
 
-A lightweight GNOME Shell panel for checking Codex usage and local weather from one place.
+A lightweight cross-platform panel for checking **ChatGPT Codex usage** and **local weather** from one place.
 
 Release `2.3.3`.
 
-## Screenshots
+- Weekly and 5-hour Codex limits
+- Original Shadowokx mascot with idle, awake, and active states
+- Token activity and seven-day history
+- Local weather, UV, hourly forecast, and sunrise/sunset
+- Native Linux and Windows interfaces
+- Custom themes, colors, density, and panel width
+- Cached data during temporary connection failures
+- No telemetry or analytics
+
+## Linux (GNOME)
+
+Tested on Ubuntu 26.04.1 LTS, GNOME Shell 50.x and Wayland.
+
+### Screenshots
 
 <p align="center">
   <img src="assets/codex.webp" alt="Shadowokx Panel Codex usage view" width="360">
   <img src="assets/weather.webp" alt="Shadowokx Panel weather view" width="360">
 </p>
 
-## Features
-
-- Codex weekly and five-hour limits
-- Original Shadowokx mascot that sleeps when idle, wakes with the panel, and reacts to Codex work
-- Token activity and seven-day history
-- Local weather, UV, hourly forecast, and sunrise/sunset
-- Custom themes, colors, density, and panel width
-- Cached data during temporary connection failures
-- No telemetry or analytics
-
-## Requirements
+### Requirements
 
 - Ubuntu 26.04.1 LTS
 - GNOME Shell 50.x
@@ -29,11 +32,7 @@ Release `2.3.3`.
 - GJS 1.88 or newer
 - Git
 
-## Installation
-
 ### Quick install
-
-Copy and paste this into a terminal:
 
 ```bash
 git clone https://github.com/SHADOWOKX/SHADOWOKX-PANEL.git && cd SHADOWOKX-PANEL && ./install.sh
@@ -47,17 +46,13 @@ Then enable it:
 gnome-extensions enable shadow-panel@shadowokx
 ```
 
-That's it. Shadowokx Panel should now appear in the GNOME top bar.
-
 ### Open preferences
 
 ```bash
 gnome-extensions prefs shadow-panel@shadowokx
 ```
 
-## Update
-
-If you installed the panel with the command above, update it with:
+### Update
 
 ```bash
 cd SHADOWOKX-PANEL
@@ -71,13 +66,63 @@ Then log out and back in once to load the updated version. If needed, enable it 
 gnome-extensions enable shadow-panel@shadowokx
 ```
 
-## Uninstall
-
-From the cloned `SHADOWOKX-PANEL` directory:
+### Uninstall
 
 ```bash
 ./uninstall.sh
 ```
+
+## Windows 11
+
+### [Download the latest Windows Setup (x64)](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/latest/download/ShadowokxPanel-Setup-x64.exe)
+
+Download the Setup, open it, and install. It is self-contained and does not require the .NET SDK, Visual Studio, or administrator privileges.
+
+### Screenshots
+
+#### Codex usage
+
+<p align="center">
+  <a href="assets/windows-codex.png">
+    <img src="assets/windows-codex.png" alt="Shadowokx Panel Codex view on Windows" width="562">
+  </a>
+</p>
+
+#### Weather
+
+<p align="center">
+  <a href="assets/windows-weather.png">
+    <img src="assets/windows-weather.png" alt="Shadowokx Panel Weather view on Windows" width="548">
+  </a>
+</p>
+
+#### Windows system tray
+
+<p align="center">
+  <a href="assets/windows-tray.png">
+    <img src="assets/windows-tray.png" alt="Shadowokx Panel Windows system tray icon" width="250">
+  </a>
+</p>
+
+> The current Windows build is unsigned, so SmartScreen may show an **Unknown publisher** warning.
+
+[Windows source and documentation](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/tree/windows-port)
+
+## Privacy
+
+Shadowokx Panel uses the signed-in local Codex client for usage data and Open-Meteo for weather. The extension does not read Codex credentials and does not include telemetry or analytics.
+
+The mascot watches local Codex session-file notifications and reads only appended event records to identify work activity; it does not retain prompt or response content.
+
+Weather data is provided by [Open-Meteo.com](https://open-meteo.com/) under its [CC BY 4.0 data licence](https://open-meteo.com/en/license). Open-Meteo service terms and privacy information are available [here](https://open-meteo.com/en/terms).
+
+## Code signing policy
+
+Windows releases follow the project's documented code-signing process.
+
+See [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md).
+
+Free code signing provided by SignPath.io, certificate by SignPath Foundation.
 
 ## Development
 
@@ -92,12 +137,6 @@ Build the installable package:
 ```bash
 ./scripts/package.sh
 ```
-
-## Privacy
-
-Shadowokx Panel uses the signed-in local Codex client for usage data and Open-Meteo for weather. The mascot watches local Codex session-file notifications and reads only appended event records to identify work activity; it does not retain prompt or response content. The extension does not read Codex credentials or include telemetry.
-
-The mascot sleeps with closed eyes while Codex is idle, wakes when the popup opens, and returns to sleep three seconds after the popup closes or a Codex turn ends. Sleeping motion is sparse (one subtle breath or antenna twitch every 8–15 seconds); active motion uses varied coding, happy, and thinking sequences. Disabling animations or GNOME reduced motion preserves the correct static sleeping, awake, or active expression.
 
 ## Contributors
 
