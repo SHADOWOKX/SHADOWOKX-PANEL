@@ -2,7 +2,7 @@
 
 A lightweight cross-platform panel for checking **ChatGPT Codex usage** and **local weather** from one place.
 
-Release `2.3.3`.
+Linux `2.3.3` · Windows `1.0.0`.
 
 - Weekly and 5-hour Codex limits
 - Original Shadowokx mascot with idle, awake, and active states
