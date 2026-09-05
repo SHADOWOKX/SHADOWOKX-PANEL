@@ -22,16 +22,16 @@ Tested on Ubuntu 26.04.1 LTS, GNOME Shell 50.x and Wayland.
 #### Codex usage
 
 <p align="center">
-  <a href="assets/linux-codex.png">
-    <img src="assets/linux-codex.png" alt="Shadowokx Panel Codex usage view on Linux GNOME" width="445">
+  <a href="assets/linux-codex-v2.png">
+    <img src="assets/linux-codex-v2.png" alt="Shadowokx Panel Codex usage view on Linux GNOME" width="445">
   </a>
 </p>
 
 #### Weather
 
 <p align="center">
-  <a href="assets/linux-weather.png">
-    <img src="assets/linux-weather.png" alt="Shadowokx Panel weather view on Linux GNOME" width="444">
+  <a href="assets/linux-weather-v2.png">
+    <img src="assets/linux-weather-v2.png" alt="Shadowokx Panel weather view on Linux GNOME" width="444">
   </a>
 </p>
 
