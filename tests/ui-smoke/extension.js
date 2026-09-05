@@ -135,12 +135,12 @@ export default class UiSmokeExtension extends Extension {
         const reportPath = GLib.getenv('SHADOW_UI_REPORT');
         const codexState = services?.codexProvider?.getState();
         if (codexState?.tokenUsage && codexState.tokenUsage.dailyBuckets.length < 2) {
-            const dailyBuckets = Array.from({length: 2}, (_value, index) => {
-                const date = new Date(Date.now() - (1 - index) * 86_400_000);
+            const dailyBuckets = Array.from({length: 7}, (_value, index) => {
+                const date = new Date(Date.now() - (6 - index) * 86_400_000);
                 const year = date.getFullYear();
                 const month = String(date.getMonth() + 1).padStart(2, '0');
                 const day = String(date.getDate()).padStart(2, '0');
-                return {date: `${year}-${month}-${day}`, tokens: (index + 1) * 100};
+                return {date: `${year}-${month}-${day}`, tokens: [42000000, 26000000, 31000000, 18000000, 12000000, 17000000, 25000000][index]};
             });
             services.codexProvider._setState({
                 ...codexState,
@@ -148,8 +148,8 @@ export default class UiSmokeExtension extends Extension {
                     ...codexState.tokenUsage,
                     dailyBuckets,
                     todayTokens: dailyBuckets.at(-1).tokens,
-                    peakDailyTokens: dailyBuckets.at(-1).tokens,
-                    peakDate: dailyBuckets.at(-1).date,
+                    peakDailyTokens: dailyBuckets[0].tokens,
+                    peakDate: dailyBuckets[0].date,
                     sevenDayTokens: dailyBuckets.reduce((sum, bucket) => sum + bucket.tokens, 0),
                 },
             });
@@ -175,6 +175,122 @@ export default class UiSmokeExtension extends Extension {
             expectedTimerCount: services?.weatherProvider ? 2 : 1,
         };
 
+        const originalMascotSetting = indicator._settings.get_boolean('animated-mascot');
+        const originalAnimationsSetting = indicator._settings.get_boolean('animations');
+        services.codexActivityMonitor.stop();
+        indicator._settings.set_boolean('animated-mascot', true);
+        indicator._settings.set_boolean('animations', true);
+        indicator._mascot.setState('idle');
+        indicator._mascot._clearPostCloseTimer();
+        indicator._mascot._reconcileSemanticState();
+        await settle(30);
+        report.mascotSleepingIdle = indicator._mascot._state === 'sleeping' &&
+            indicator._mascot._currentFrame === 'robot-sleep.svg' &&
+            indicator._mascot._activeId === 0;
+        report.mascotSleepDelayMs = indicator._mascot._sleepDelayMs;
+        report.mascotPostCloseDelayMs = indicator._mascot._postCloseDelayMs;
+        const originalPostCloseDelay = indicator._mascot._postCloseDelayMs;
+        const originalMascotRefresh = services.codexProvider.refresh;
+        services.codexProvider.refresh = () => Promise.resolve(
+            services.codexProvider.getState()
+        );
+        indicator._mascot._postCloseDelayMs = 80;
+        indicator.menu.open();
+        await settle(40);
+        report.mascotWakingTransition = indicator._mascot._state === 'waking';
+        await settle(340);
+        report.mascotPopupAwake = indicator._mascot._state === 'awake' &&
+            indicator._mascot._currentFrame === 'robot-awake.svg';
+        indicator.menu.close();
+        await settle(30);
+        report.mascotAwakeDuringCloseDelay = indicator._mascot._state === 'awake';
+        await settle(80);
+        report.mascotGoingToSleepTransition =
+            indicator._mascot._state === 'going-to-sleep';
+        await settle(340);
+        report.mascotSleepsAfterClose = indicator._mascot._state === 'sleeping' &&
+            indicator._mascot._currentFrame === 'robot-sleep.svg';
+        indicator._mascot._postCloseDelayMs = originalPostCloseDelay;
+
+        const mascotLabelX = indicator._codexSummary.label.x;
+        report.mascotLabelGap = indicator._codexSummary.label.x -
+            (indicator._mascot.actor.x + indicator._mascot.actor.width);
+        indicator._mascot.setState('active');
+        report.mascotSleepingToActive = indicator._mascot._state === 'active';
+        const startingMascotFrame = indicator._mascot._activeFrame;
+        await settle(220);
+        report.mascotActiveLoop = indicator._mascot._state === 'active' &&
+            indicator._mascot._activeId !== 0 &&
+            indicator._mascot._activeFrame !== startingMascotFrame;
+        indicator.menu.open();
+        await settle(40);
+        report.mascotActivePriority = indicator._mascot._state === 'active';
+        indicator._mascot.setState('idle');
+        report.mascotActiveToAwake = indicator._mascot._state === 'awake';
+        indicator._mascot.setState('active');
+        report.mascotAwakeToActive = indicator._mascot._state === 'active';
+        indicator.menu.close();
+        report.mascotLabelStable = indicator._codexSummary.label.x === mascotLabelX;
+        report.mascotSize = {
+            width: indicator._mascot.actor.width,
+            height: indicator._mascot.actor.height,
+            indicatorHeight: indicator.height,
+            panelHeight: Main.panel.height,
+        };
+        indicator._settings.set_boolean('animated-mascot', false);
+        indicator._mascot.setState('idle');
+        indicator._mascot._clearPostCloseTimer();
+        indicator._mascot._reconcileSemanticState();
+        await settle(40);
+        report.mascotSettingStopsAnimation = !indicator._mascot._animationAllowed &&
+            indicator._mascot._activeId === 0 &&
+            indicator._mascot._state === 'sleeping' &&
+            indicator._mascot._currentFrame === 'robot-sleep.svg';
+        indicator.menu.open();
+        await settle(20);
+        const disabledPopupAwake = indicator._mascot._state === 'awake' &&
+            indicator._mascot._currentFrame === 'robot-awake.svg';
+        indicator._mascot.setState('active');
+        const disabledActiveStatic = indicator._mascot._state === 'active' &&
+            indicator._mascot._currentFrame === 'robot-active-11.svg' &&
+            indicator._mascot._activeId === 0;
+        indicator._mascot.setState('idle');
+        indicator._mascot._postCloseDelayMs = 20;
+        indicator.menu.close();
+        await settle(30);
+        report.mascotAnimationsDisabledSemantic = disabledPopupAwake &&
+            disabledActiveStatic && indicator._mascot._state === 'sleeping';
+        indicator._settings.set_boolean('animated-mascot', true);
+        const interfaceSettings = new Gio.Settings({
+            schema_id: 'org.gnome.desktop.interface',
+        });
+        const originalSystemAnimations = interfaceSettings.get_boolean('enable-animations');
+        interfaceSettings.set_boolean('enable-animations', false);
+        await settle(80);
+        indicator.menu.open();
+        await settle(20);
+        const reducedPopupAwake = indicator._mascot._state === 'awake' &&
+            indicator._mascot._currentFrame === 'robot-awake.svg';
+        indicator._mascot.setState('active');
+        const reducedActiveStatic = indicator._mascot._state === 'active' &&
+            indicator._mascot._currentFrame === 'robot-active-11.svg' &&
+            indicator._mascot._activeId === 0;
+        indicator._mascot.setState('idle');
+        indicator.menu.close();
+        await settle(30);
+        report.mascotReducedMotion = !indicator._mascot._animationAllowed &&
+            indicator._mascot._activeId === 0 && reducedPopupAwake &&
+            reducedActiveStatic && indicator._mascot._state === 'sleeping' &&
+            indicator._mascot._currentFrame === 'robot-sleep.svg';
+        indicator._mascot._postCloseDelayMs = originalPostCloseDelay;
+        interfaceSettings.set_boolean('enable-animations', originalSystemAnimations);
+        indicator._settings.set_boolean('animated-mascot', originalMascotSetting);
+        indicator._settings.set_boolean('animations', originalAnimationsSetting);
+        services.codexActivityMonitor.stop();
+        services.codexActivityMonitor.start();
+        await settle(80);
+        services.codexProvider.refresh = originalMascotRefresh;
+
         indicator.menu.open();
         await settle();
         report.tabWidths = [...(indicator._tabs?._buttons?.values?.() ?? [])]
@@ -194,12 +310,13 @@ export default class UiSmokeExtension extends Extension {
                 scroll: scrollState(page),
                 childCount: page.actor.get_children().length,
                 hasExpectedContent: id === 'codex'
-                    ? labels.includes('Weekly capacity')
+                    ? labels.includes('Weekly allowance')
                     : labels.includes('Next hours') &&
                         labels.includes(services?.weatherProvider?.getState()?.current?.condition?.label),
             });
             if (id === 'codex') {
                 report.graph = allocation(findStyle(page.actor, 'shadow-token-sparkline'));
+                await captureScreenshot(GLib.getenv('SHADOW_UI_GRAPH_SCREENSHOT'));
                 const dayLabels = findStyle(page.actor, 'shadow-spark-days');
                 report.graphDayLabels = {
                     ...allocation(dayLabels),

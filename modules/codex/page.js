@@ -239,7 +239,7 @@ export class CodexPage extends BasePage {
             x_expand: true,
         });
         const heading = new St.BoxLayout({style_class: 'shadow-usage-heading', x_expand: true});
-        heading.add_child(sectionTitle('Weekly capacity'));
+        heading.add_child(sectionTitle('Weekly allowance'));
         if (window) {
             const status = codexUsageStatus(window.remainingPercent);
             const tone = window.remainingPercent >= 60
@@ -276,7 +276,21 @@ export class CodexPage extends BasePage {
             style_class: 'shadow-weekly-unit',
             y_align: Clutter.ActorAlign.END,
         }));
-        card.add_child(value);
+        const summary = new St.BoxLayout({
+            style_class: 'shadow-limit-summary', x_expand: true,
+        });
+        value.x_expand = true;
+        summary.add_child(value);
+        const consumed = new St.BoxLayout({
+            vertical: true, style_class: 'shadow-limit-consumed',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        consumed.add_child(new St.Label({
+            text: `${100 - window.remainingPercent}%`, style_class: 'shadow-limit-used-value',
+        }));
+        consumed.add_child(new St.Label({text: 'used', style_class: 'shadow-metric-label'}));
+        summary.add_child(consumed);
+        card.add_child(summary);
 
         const animate = this._popupOpen && this._lastWeeklyPercent !== null &&
             this._lastWeeklyPercent !== window.remainingPercent &&
@@ -295,12 +309,12 @@ export class CodexPage extends BasePage {
             y_align: Clutter.ActorAlign.CENTER,
         });
         legend.add_child(new St.Label({
-            text: `${100 - window.remainingPercent}% used`,
+            text: 'Remaining allowance',
             style_class: 'shadow-muted',
             x_expand: true,
         }));
         legend.add_child(new St.Label({
-            text: `${window.remainingPercent}% available`,
+            text: '100% total',
             style_class: 'shadow-progress-available',
         }));
         card.add_child(legend);
@@ -316,7 +330,7 @@ export class CodexPage extends BasePage {
             ));
             reset.add_child(new St.Label({
                 text: formatResetDate(window.resetsAt),
-                style_class: 'shadow-muted',
+                style_class: 'shadow-reset-date shadow-muted',
             }));
             card.add_child(reset);
         }
@@ -447,6 +461,15 @@ export class CodexPage extends BasePage {
             style_class: 'shadow-token-sparkline-wrap',
             x_expand: true,
         });
+        const scale = new St.BoxLayout({style_class: 'shadow-chart-scale', x_expand: true});
+        scale.add_child(new St.Label({
+            text: 'DAILY TOKENS', style_class: 'shadow-chart-caption shadow-muted', x_expand: true,
+        }));
+        scale.add_child(new St.Label({
+            text: `0 – ${this._formatCompactTokens(Math.max(...normalized.map(point => point.tokens)))}`,
+            style_class: 'shadow-chart-caption shadow-muted',
+        }));
+        sparkline.add_child(scale);
         const shouldAnimate = this._popupOpen && !this._graphHasAppeared &&
             animationsEnabled(this.context.settings);
         const chart = tokenSparkline(

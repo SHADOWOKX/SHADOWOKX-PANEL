@@ -5,6 +5,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {CodexProvider} from './modules/codex/provider.js';
+import {CodexActivityMonitor} from './modules/codex/activityMonitor.js';
 import {WeatherProvider} from './modules/weather/provider.js';
 import {Logger} from './services/logger.js';
 import {Scheduler} from './services/scheduler.js';
@@ -37,6 +38,7 @@ const REBUILD_KEYS = Object.freeze([
 ]);
 
 const LIVE_INDICATOR_KEYS = Object.freeze([
+    'animated-mascot',
     'show-codex-icon',
     'show-codex-remaining',
     'show-codex-reset-countdown',
@@ -159,6 +161,14 @@ export default class ShadowPanelExtension extends Extension {
             this._services.codexProvider = provider;
             provider.start().catch(error =>
                 this._logger.warn('Could not start Codex provider', error));
+        }
+        if (!this._services.codexActivityMonitor) {
+            const monitor = new CodexActivityMonitor(
+                this._services.codexProvider,
+                this._logger
+            );
+            this._services.codexActivityMonitor = monitor;
+            monitor.start();
         }
         const needsWeather = this._settings.get_boolean('show-weather-panel') ||
             this._settings.get_boolean('show-weather-top-bar');

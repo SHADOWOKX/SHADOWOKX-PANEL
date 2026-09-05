@@ -1,3 +1,5 @@
+import {temperatureGIcon, weatherGIcon} from '../../ui/weatherIcon.js';
+
 import Clutter from 'gi://Clutter';
 import Pango from 'gi://Pango';
 import St from 'gi://St';
@@ -28,21 +30,30 @@ export class WeatherPage extends BasePage {
         this._hasRendered = false;
         this._stateDirty = true;
         this._refreshButton = null;
+        this._renderedSignature = null;
         this.track(this._provider.subscribe(state => {
-            this._stateDirty = true;
-            if (this._hasRendered && this._popupOpen &&
-                state.status === 'refreshing' && state.lastSuccessfulRefresh) {
-                this._setRefreshState(true);
-            } else if (!this._hasRendered || this._popupOpen) {
+            const signature = this._contentSignature(state);
+            this._stateDirty = signature !== this._renderedSignature;
+            if (!this._hasRendered || this._popupOpen && this._stateDirty)
                 this._render();
-            }
+            else if (this._popupOpen)
+                this._setRefreshState(state.status === 'refreshing' || state.status === 'loading');
         }));
+    }
+
+    _contentSignature(state) {
+        const {lastSuccessfulRefresh, status, ...content} = state;
+        return JSON.stringify({...content,
+            status: lastSuccessfulRefresh && (status === 'refreshing' || status === 'success')
+                ? 'success' : status});
     }
 
     onPopupOpened() {
         this._popupOpen = true;
         if (this._stateDirty)
             this._render();
+        const state = this._provider.getState();
+        this._setRefreshState(state.status === 'refreshing' || state.status === 'loading');
         if (this.context.settings.get_boolean('refresh-on-open') && this._provider.isStale())
             this._provider.refresh(false);
     }
@@ -138,6 +149,7 @@ export class WeatherPage extends BasePage {
             if (!nextScroll)
                 this._hourlyScroll = null;
             this._hasRendered = true;
+            this._renderedSignature = this._contentSignature(state);
             this._stateDirty = false;
             this._refreshButton = nextRefreshButton;
         }
@@ -193,9 +205,9 @@ export class WeatherPage extends BasePage {
             style_class: 'shadow-weather-icon-tile',
             y_align: Clutter.ActorAlign.CENTER,
             child: new St.Icon({
-                icon_name: state.current.condition.icon,
-                icon_size: 38,
-                style: `color: ${resolveAccent(this.context.settings)};`,
+                gicon: weatherGIcon(this.context.extension.path, state.current.condition),
+                icon_size: 64,
+                style_class: 'shadow-weather-artwork',
             }),
         }));
         hero.add_child(primary);
@@ -215,6 +227,10 @@ export class WeatherPage extends BasePage {
         location.accessible_name = state.location;
         location.y_align = Clutter.ActorAlign.CENTER;
         attachTooltip(location, state.location);
+        locationRow.add_child(new St.Icon({
+            icon_name: 'find-location-symbolic', icon_size: 12,
+            style_class: 'shadow-muted', y_align: Clutter.ActorAlign.CENTER,
+        }));
         locationRow.add_child(location);
         locationRow.add_child(new St.Label({
             text: `H ${Math.round(state.today.high)}°  ·  L ${Math.round(state.today.low)}°`,
@@ -254,6 +270,7 @@ export class WeatherPage extends BasePage {
         const regular = metrics.filter(([label]) => label !== 'UV Index');
         for (let index = 0; index < regular.length; index += 2) {
             const row = new St.BoxLayout({style_class: 'shadow-weather-metric-row', x_expand: true});
+            row.layout_manager.homogeneous = true;
             row.add_child(this._metric(...regular[index]));
             if (regular[index + 1])
                 row.add_child(this._metric(...regular[index + 1]));
@@ -283,13 +300,28 @@ export class WeatherPage extends BasePage {
     }
 
     _metric(label, value) {
+        const symbols = {
+            'Feels like': ['temperature-symbolic', '#f3b66c'],
+            'Humidity': ['weather-showers-symbolic', '#7dbce9'],
+            'Wind': ['weather-windy-symbolic', '#8accc0'],
+            'Rain': ['weather-showers-scattered-symbolic', '#91b9f4'],
+        };
+        const [icon, color] = symbols[label] ?? ['weather-clear-symbolic', '#f3b66c'];
         const metric = new St.BoxLayout({
-            vertical: true,
-            style_class: 'shadow-weather-metric',
-            x_expand: true,
+            style_class: 'shadow-weather-metric', x_expand: true,
         });
-        metric.add_child(new St.Label({text: label, style_class: 'shadow-metric-label'}));
-        metric.add_child(new St.Label({text: value, style_class: 'shadow-metric-value'}));
+        metric.add_child(new St.Icon({
+            ...(label === 'Feels like'
+                ? {gicon: temperatureGIcon(this.context.extension.path)}
+                : {icon_name: icon}),
+            icon_size: 18, style: `color: ${color};`,
+            y_align: Clutter.ActorAlign.CENTER,
+        }));
+        const copy = new St.BoxLayout({vertical: true, x_expand: true,
+            style_class: 'shadow-weather-metric-copy'});
+        copy.add_child(new St.Label({text: label, style_class: 'shadow-metric-label'}));
+        copy.add_child(new St.Label({text: value, style_class: 'shadow-metric-value'}));
+        metric.add_child(copy);
         return metric;
     }
 
@@ -342,8 +374,8 @@ export class WeatherPage extends BasePage {
             style_class: 'shadow-hourly-time',
         }));
         item.add_child(new St.Icon({
-            icon_name: hour.condition.icon,
-            icon_size: 17,
+            gicon: weatherGIcon(this.context.extension.path, hour.condition),
+            icon_size: 28,
             style_class: 'shadow-hourly-icon',
         }));
         item.add_child(new St.Label({
@@ -427,9 +459,17 @@ export class WeatherPage extends BasePage {
     }
 
     _sunMetric(label, value) {
-        const metric = new St.BoxLayout({vertical: true, x_expand: true});
-        metric.add_child(new St.Label({text: label, style_class: 'shadow-metric-label'}));
-        metric.add_child(new St.Label({text: value, style_class: 'shadow-metric-value'}));
+        const metric = new St.BoxLayout({x_expand: true, style_class: 'shadow-sun-metric'});
+        metric.add_child(new St.Icon({
+            icon_name: label === 'Sunrise' ? 'weather-clear-symbolic' : 'weather-clear-night-symbolic',
+            icon_size: 21,
+            style: `color: ${label === 'Sunrise' ? '#eab66c' : '#a3b7e8'};`,
+            y_align: Clutter.ActorAlign.CENTER,
+        }));
+        const copy = new St.BoxLayout({vertical: true, style_class: 'shadow-weather-metric-copy'});
+        copy.add_child(new St.Label({text: label, style_class: 'shadow-metric-label'}));
+        copy.add_child(new St.Label({text: value, style_class: 'shadow-metric-value'}));
+        metric.add_child(copy);
         return metric;
     }
 

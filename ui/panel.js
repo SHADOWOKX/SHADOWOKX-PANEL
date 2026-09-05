@@ -1,3 +1,4 @@
+import {weatherGIcon} from './weatherIcon.js';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GObject from 'gi://GObject';
@@ -28,6 +29,7 @@ import {
     textButton,
 } from './components.js';
 import {TabStrip} from './tabs.js';
+import {MascotController, sleepingMascotIcon} from './mascot.js';
 
 function effectiveTheme(settings) {
     const configured = settings.get_string('theme');
@@ -95,14 +97,18 @@ class ShadowIndicator extends PanelMenu.Button {
             style_class: 'shadow-panel-indicator',
             y_align: Clutter.ActorAlign.CENTER,
         });
-        this._fallbackIcon = moduleIcon(
+        this._fallbackIcon = sleepingMascotIcon(
             this._extension,
-            'codex',
-            15,
-            'shadow-panel-fallback-icon'
+            20,
+            'shadow-panel-fallback-icon shadow-panel-mascot'
         );
         this._indicatorBox.add_child(this._fallbackIcon);
-        this._codexSummary = this._summaryItem('codex', 'Codex usage');
+        this._mascot = new MascotController(this._extension, this._settings, 20);
+        this._codexSummary = this._summaryItem(
+            'codex',
+            'Codex usage',
+            this._mascot.actor
+        );
         this._codexPaceIcon = new St.Icon({
             icon_size: 12,
             style_class: 'shadow-panel-usage-state',
@@ -129,12 +135,17 @@ class ShadowIndicator extends PanelMenu.Button {
         this._syncIndicator();
     }
 
-    _summaryItem(id, accessibleName) {
+    _summaryItem(id, accessibleName, iconOverride = null) {
         const item = new St.BoxLayout({
             style_class: `shadow-panel-summary shadow-panel-summary-${id}`,
             y_align: Clutter.ActorAlign.CENTER,
         });
-        const icon = moduleIcon(this._extension, id, 15, 'shadow-panel-summary-icon');
+        const icon = iconOverride ?? moduleIcon(
+            this._extension,
+            id,
+            id === 'weather' ? 18 : 15,
+            'shadow-panel-summary-icon'
+        );
         const label = new St.Label({
             style_class: 'shadow-panel-summary-value',
             y_align: Clutter.ActorAlign.CENTER,
@@ -223,6 +234,10 @@ class ShadowIndicator extends PanelMenu.Button {
                 return;
             this._codexState = state;
             this._syncIndicator();
+        }));
+        this._subscriptions.push(services.codexActivityMonitor.subscribe(state => {
+            if (!this._destroyed)
+                this._mascot?.setState(state.active ? 'active' : 'idle');
         }));
         if (services.weatherProvider) {
             this._subscriptions.push(services.weatherProvider.subscribe(state => {
@@ -381,6 +396,7 @@ class ShadowIndicator extends PanelMenu.Button {
                 codexParts.push(countdown);
         }
         const codexIcon = this._settings.get_boolean('show-codex-icon');
+        this._mascot?.setDisplayEnabled(codexIcon);
         this._codexSummary.icon.visible = codexIcon;
         this._codexSummary.label.text = codexParts.join('  ');
         this._codexSummary.label.visible = codexParts.length > 0;
@@ -401,7 +417,8 @@ class ShadowIndicator extends PanelMenu.Button {
         const weatherIcon = this._settings.get_boolean('show-weather-icon');
         this._weatherSummary.icon.visible = weatherIcon;
         if (this._weatherState?.current?.condition?.icon)
-            this._weatherSummary.icon.icon_name = this._weatherState.current.condition.icon;
+            this._weatherSummary.icon.gicon = weatherGIcon(
+                this._extension.path, this._weatherState.current.condition);
         this._weatherSummary.label.text = weatherParts.join('  ');
         this._weatherSummary.label.visible = weatherParts.length > 0;
         const weatherConfigured = this._settings.get_boolean('show-weather-top-bar') &&
@@ -506,6 +523,7 @@ class ShadowIndicator extends PanelMenu.Button {
         if (this._destroyed)
             return;
         this._popupOpen = true;
+        this._mascot?.setPopupOpen(true);
         this._codexProvider?.setViewVisible(this._activeId === 'codex', true);
         try {
             this._pages.get(this._activeId)?.onPopupOpened();
@@ -518,6 +536,7 @@ class ShadowIndicator extends PanelMenu.Button {
         if (this._destroyed)
             return;
         this._popupOpen = false;
+        this._mascot?.setPopupOpen(false);
         this._codexProvider?.setViewVisible(false, false);
         try {
             this._pages.get(this._activeId)?.onPopupClosed();
@@ -557,6 +576,8 @@ class ShadowIndicator extends PanelMenu.Button {
         this._destroyed = true;
         this._codexProvider?.setViewVisible(false, false);
         this._codexProvider = null;
+        this._mascot?.destroy();
+        this._mascot = null;
         this._mounted = false;
         if (this._mountSignalId) {
             this.disconnect(this._mountSignalId);

@@ -2,7 +2,7 @@ import Clutter from 'gi://Clutter';
 import St from 'gi://St';
 
 import {MODULE_META} from '../lib/constants.js';
-import {animationsEnabled, moduleIcon} from './components.js';
+import {accentRgba, animationsEnabled, moduleIcon} from './components.js';
 
 export class TabStrip {
     constructor(extension, settings, moduleIds, onSelected) {
@@ -28,7 +28,11 @@ export class TabStrip {
                 style_class: 'shadow-tab-label',
                 y_align: Clutter.ActorAlign.CENTER,
             });
-            content.add_child(icon);
+            content.add_child(new St.Bin({
+                child: icon,
+                style_class: 'shadow-tab-icon-tile',
+                y_align: Clutter.ActorAlign.CENTER,
+            }));
             content.add_child(label);
             const button = new St.Button({
                 child: new St.Bin({
@@ -69,6 +73,8 @@ export class TabStrip {
             button.remove_style_class_name('shadow-tab-inactive');
             if (active) {
                 button.add_style_class_name('shadow-tab-active');
+                button.set_style(`border-color: ${accentRgba(this._settings, 0.36)}; ` +
+                    `background-color: ${accentRgba(this._settings, 0.12)};`);
                 if (previousId && previousId !== id && animationsEnabled(this._settings)) {
                     content.remove_all_transitions();
                     content.opacity = 220;
@@ -80,6 +86,7 @@ export class TabStrip {
                 }
             } else {
                 button.add_style_class_name('shadow-tab-inactive');
+                button.set_style(null);
                 content.remove_all_transitions();
                 content.opacity = 255;
             }

@@ -217,8 +217,8 @@ export class WeatherProvider extends Observable {
         const params = [
             `latitude=${location.latitude}`,
             `longitude=${location.longitude}`,
-            'current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m',
-            'hourly=temperature_2m,weather_code,precipitation_probability',
+            'current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,is_day',
+            'hourly=temperature_2m,weather_code,precipitation_probability,is_day',
             'daily=temperature_2m_max,temperature_2m_min,uv_index_max,sunrise,sunset',
             `temperature_unit=${temperatureUnit}`,
             'wind_speed_unit=kmh',

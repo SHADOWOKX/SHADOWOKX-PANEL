@@ -222,10 +222,11 @@ export class CodexProvider extends Observable {
                 error.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED)) {
                 return this.getState();
             }
-            const hasCache = Boolean(previous?.lastSuccessfulRefresh);
+            const latest = this.getState();
+            const hasCache = Boolean(latest?.lastSuccessfulRefresh);
             const details = this._friendlyError(error);
             const state = {
-                ...previous,
+                ...latest,
                 status: hasCache ? 'stale' : 'error',
                 connection: 'unavailable',
                 stale: hasCache,
@@ -236,6 +237,17 @@ export class CodexProvider extends Observable {
             this._logger?.debug('codex.refresh.failed', {message: error.message});
             return state;
         }
+    }
+
+    _publishRateLimits(response) {
+        if (this._destroyed)
+            return;
+        const limits = normalizeRateLimits(response, Date.now());
+        this._setState({
+            ...limits,
+            tokenUsage: this.getState().tokenUsage,
+            status: 'refreshing',
+        });
     }
 
     async _readAppServer() {
@@ -359,14 +371,14 @@ export class CodexProvider extends Observable {
                 {jsonrpc: '2.0', method: 'initialized'},
                 {
                     jsonrpc: '2.0',
-                    id: 2,
-                    method: 'account/usage/read',
-                    params: {},
+                    id: 3,
+                    method: 'account/rateLimits/read',
                 },
                 {
                     jsonrpc: '2.0',
-                    id: 3,
-                    method: 'account/rateLimits/read',
+                    id: 2,
+                    method: 'account/usage/read',
+                    params: {},
                 },
             ]);
 
@@ -383,6 +395,8 @@ export class CodexProvider extends Observable {
                     if (!message.result)
                         throw new Error('codex-invalid-response');
                     rateLimitsResponse = message.result;
+                    // Publish capacity immediately; optional token history may be slower.
+                    this._publishRateLimits(rateLimitsResponse);
                 }
                 // Account metadata is optional. Token activity is also optional,
                 // but wait for its response so out-of-order JSON-RPC messages do

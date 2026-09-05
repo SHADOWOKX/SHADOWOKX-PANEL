@@ -6,8 +6,8 @@
 
 .shadow-dashboard {
   width: 386px;
-  padding: 14px 16px 15px;
-  border-radius: 16px;
+  padding: 16px;
+  border-radius: 20px;
 }
 
 .shadow-dashboard.shadow-compact {
@@ -44,15 +44,15 @@
 
 /* Surface tokens */
 .shadow-card {
-  border: 1px solid rgba(255, 255, 255, 0.085);
-  background-color: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background-color: rgba(255, 255, 255, 0.045);
+  border-radius: 16px;
 }
 
 .shadow-secondary-surface {
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  background-color: rgba(255, 255, 255, 0.03);
-  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  background-color: rgba(255, 255, 255, 0.025);
+  border-radius: 16px;
 }
 
 .shadow-theme-light .shadow-card {
@@ -107,6 +107,10 @@
 
 .shadow-panel-summary {
   spacing: 5px;
+}
+
+.shadow-panel-summary-codex {
+  spacing: 7px;
 }
 
 .shadow-panel-summary-icon,
@@ -200,15 +204,13 @@
 
 /* Two-page segmented control — deliberately no ScrollView or separator. */
 .shadow-tab-strip {
-  min-height: 40px;
+  min-height: 46px;
   margin-bottom: 12px;
-  padding: 2px;
-  /* The even gap keeps the usable width divisible into exact 50/50 segments. */
-  spacing: 2px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.025);
-  background-color: rgba(0, 0, 0, 0.27);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.018);
+  padding: 4px;
+  spacing: 4px;
+  border-radius: 16px;
+  border: 1px solid rgba(128, 128, 128, 0.14);
+  background-color: rgba(0, 0, 0, 0.16);
 }
 
 .shadow-theme-light .shadow-tab-strip {
@@ -218,11 +220,11 @@
 }
 
 .shadow-tab {
-  min-height: 36px;
-  padding: 6px 11px;
-  border-radius: 4px;
+  min-height: 38px;
+  padding: 4px 9px;
+  border-radius: 12px;
   border: 1px solid transparent;
-  transition-duration: 130ms;
+  transition-duration: 160ms;
 }
 
 .shadow-tab-content {
@@ -239,7 +241,7 @@
 }
 
 .shadow-tab-inactive {
-  color: #aaa8a6;
+  color: #b9bcbf;
 }
 
 .shadow-tab-inactive .shadow-tab-icon {
@@ -252,11 +254,8 @@
 }
 
 .shadow-tab-active {
-  color: #f4f3f2;
-  border-color: rgba(255, 255, 255, 0.075);
-  background-color: rgba(255, 255, 255, 0.13);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.30),
-              inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  color: #fafafa;
+  box-shadow: none;
 }
 
 .shadow-tab-active:hover {
@@ -279,10 +278,7 @@
 
 .shadow-theme-light .shadow-tab-active {
   color: #252422;
-  border-color: rgba(0, 0, 0, 0.085);
-  background-color: rgba(255, 255, 255, 0.64);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.13),
-              inset 0 1px 0 rgba(255, 255, 255, 0.60);
+  box-shadow: none;
 }
 
 .shadow-theme-light .shadow-tab-active:hover {
@@ -414,7 +410,7 @@
 
 /* Codex */
 .shadow-weekly-hero {
-  padding: 15px;
+  padding: 14px 16px;
   spacing: 8px;
 }
 
@@ -427,15 +423,15 @@
 }
 
 .shadow-weekly-value {
-  font-size: 43px;
+  font-size: 40px;
   font-weight: 760;
   font-feature-settings: "tnum";
 }
 
 .shadow-weekly-unit {
-  padding-bottom: 5px;
-  font-size: 12px;
-  font-weight: 560;
+  padding-bottom: 7px;
+  font-size: 11px;
+  font-weight: 550;
 }
 
 .shadow-weekly-unavailable {
@@ -467,7 +463,9 @@
 }
 
 .shadow-weekly-reset {
-  margin-top: 1px;
+  margin-top: 2px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(128, 128, 128, 0.13);
   spacing: 8px;
 }
 
@@ -525,8 +523,8 @@
 }
 
 .shadow-token-activity {
-  padding: 12px 13px;
-  spacing: 8px;
+  padding: 12px 14px;
+  spacing: 6px;
 }
 
 .shadow-token-heading {
@@ -534,7 +532,9 @@
 }
 
 .shadow-token-row {
-  spacing: 12px;
+  spacing: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(128, 128, 128, 0.12);
 }
 
 .shadow-token-note {
@@ -543,7 +543,8 @@
 }
 
 .shadow-token-metric {
-  min-width: 80px;
+  min-width: 72px;
+  spacing: 3px;
 }
 
 .shadow-token-label {
@@ -556,13 +557,13 @@
 }
 
 .shadow-token-primary-value {
-  font-size: 28px;
-  font-weight: 740;
+  font-size: 25px;
+  font-weight: 720;
   font-feature-settings: "tnum";
 }
 
 .shadow-token-value {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 650;
   font-feature-settings: "tnum";
 }
@@ -576,9 +577,9 @@
 }
 
 .shadow-token-sparkline {
-  height: 48px;
-  border-radius: 9px;
-  background-color: rgba(128, 128, 128, 0.035);
+  height: 68px;
+  border-radius: 10px;
+  background-color: rgba(128, 128, 128, 0.025);
 }
 
 .shadow-spark-days {
@@ -636,7 +637,7 @@
 }
 
 .shadow-weather-temperature {
-  font-size: 41px;
+  font-size: 42px;
   font-weight: 740;
   font-feature-settings: "tnum";
 }
@@ -647,16 +648,18 @@
 }
 
 .shadow-weather-icon-tile {
-  min-width: 48px;
-  min-height: 48px;
-  padding: 9px;
-  border-radius: 14px;
-  background-color: rgba(128, 128, 128, 0.085);
+  min-width: 64px;
+  min-height: 64px;
+  padding: 5px;
+  border-radius: 22px;
+  background-color: rgba(135, 179, 214, 0.10);
 }
 
 .shadow-weather-location-row {
   min-height: 20px;
-  spacing: 8px;
+  spacing: 6px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(128, 128, 128, 0.12);
 }
 
 .shadow-weather-location,
@@ -680,22 +683,25 @@
 
 .shadow-weather-metrics {
   padding: 8px;
-  spacing: 4px;
+  spacing: 6px;
 }
 
 .shadow-weather-metric-row {
-  spacing: 3px;
+  spacing: 6px;
 }
 
 .shadow-weather-metric {
-  min-width: 132px;
+  min-width: 0;
   padding: 6px 8px;
+  spacing: 10px;
+  border-radius: 10px;
+  background-color: rgba(128, 128, 128, 0.065);
 }
 
 .shadow-weather-metric-wide {
-  min-height: 31px;
+  min-height: 25px;
   margin: 2px 3px 0;
-  padding: 7px 5px 4px;
+  padding: 4px 5px 2px;
   border-top: 1px solid rgba(128, 128, 128, 0.09);
 }
 
@@ -709,13 +715,14 @@
 
 .shadow-hourly-page {
   padding: 7px 6px;
-  spacing: 3px;
+  spacing: 4px;
 }
 
 .shadow-hourly-item {
   padding: 4px 3px;
-  spacing: 3px;
-  border-radius: 8px;
+  spacing: 5px;
+  border-radius: 11px;
+  background-color: rgba(128, 128, 128, 0.045);
   text-align: center;
 }
 
@@ -745,7 +752,7 @@
 
 .shadow-sun-row {
   min-height: 42px;
-  padding: 7px 10px;
+  padding: 8px 12px;
   spacing: 18px;
 }
 
@@ -796,11 +803,91 @@
 }
 
 .shadow-compact .shadow-weather-metric {
-  min-width: 118px;
-  padding: 4px 6px;
+  min-width: 0;
+  padding: 6px;
+  spacing: 8px;
 }
 
 .shadow-compact .shadow-weather-metric-wide {
   min-height: 27px;
   padding: 5px 3px 2px;
+}
+.shadow-panel-mascot {
+  padding: 0;
+  margin: 0;
+}
+
+/* Full-color local weather artwork keeps its natural palette in both themes. */
+.shadow-weather-artwork,
+.shadow-hourly-icon,
+.shadow-panel-summary-weather .shadow-panel-summary-icon {
+  -st-icon-style: regular;
+  icon-shadow: none;
+}
+
+
+
+.shadow-hourly-item {
+  spacing: 5px;
+}
+
+.shadow-theme-dark .shadow-weather-hero {
+  background-color: rgba(124, 169, 209, 0.065);
+  border-color: rgba(159, 195, 225, 0.14);
+}
+
+.shadow-theme-light .shadow-weather-hero {
+  background-color: rgba(100, 165, 218, 0.07);
+  border-color: rgba(65, 120, 164, 0.15);
+}
+
+.shadow-tab-icon-tile {
+  padding: 5px;
+  border-radius: 9px;
+  background-color: rgba(128, 128, 128, 0.09);
+}
+
+.shadow-tab-active .shadow-tab-icon-tile {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.shadow-tab:focus {
+  box-shadow: inset 0 0 0 2px rgba(150, 160, 175, 0.65);
+}
+
+.shadow-limit-summary {
+  spacing: 14px;
+}
+
+.shadow-limit-consumed {
+  spacing: 2px;
+  padding: 2px 0 2px 14px;
+  border-left: 1px solid rgba(128, 128, 128, 0.18);
+}
+
+.shadow-limit-used-value {
+  font-size: 21px;
+  font-weight: 650;
+  font-feature-settings: "tnum";
+}
+
+.shadow-reset-date {
+  font-size: 11px;
+}
+
+.shadow-chart-scale {
+  padding: 3px 1px 2px;
+}
+
+.shadow-chart-caption {
+  font-size: 9px;
+  letter-spacing: 0.4px;
+}
+
+.shadow-weather-metric-copy {
+  spacing: 3px;
+}
+
+.shadow-sun-metric {
+  spacing: 9px;
 }

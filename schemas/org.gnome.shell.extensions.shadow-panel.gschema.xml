@@ -16,7 +16,11 @@
     </key>
     <key name="show-codex-icon" type="b">
       <default>true</default>
-      <summary>Show the ChatGPT icon in the top bar</summary>
+      <summary>Show the Shadowokx mascot in the top bar</summary>
+    </key>
+    <key name="animated-mascot" type="b">
+      <default>true</default>
+      <summary>Animate the Shadowokx mascot while Codex is working</summary>
     </key>
     <key name="show-codex-remaining" type="b">
       <default>true</default>

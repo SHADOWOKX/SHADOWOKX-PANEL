@@ -10,7 +10,15 @@ cd "$shadow_project_dir"
 gjs -m scripts/validate-json.mjs metadata.json package.json
 gjs -m scripts/validate-release.mjs "$shadow_project_dir"
 xmllint --noout schemas/org.gnome.shell.extensions.shadow-panel.gschema.xml
+for shadow_mascot in icons/mascot/*.svg icons/weather/*.svg; do
+  xmllint --noout "$shadow_mascot"
+done
+if rg -n '<image|data:|href="https?://' icons/mascot/*.svg; then
+  printf '%s\n' 'Mascot SVGs must contain only local vector artwork.' >&2
+  exit 1
+fi
 glib-compile-schemas --strict --dry-run schemas
+gjs -m tests/validate-mascot.mjs "$shadow_project_dir"
 
 SHADOW_PANEL_TEST_ISOLATED=1 \
 XDG_DATA_HOME="$shadow_test_dir/data" \
@@ -41,7 +49,12 @@ unzip -t "$shadow_test_dir/package/shadow-panel@shadowokx.shell-extension.zip" >
 unzip -Z1 "$shadow_test_dir/package/shadow-panel@shadowokx.shell-extension.zip" | \
   grep -qx 'modules/codex/shareWorker.js'
 unzip -Z1 "$shadow_test_dir/package/shadow-panel@shadowokx.shell-extension.zip" | \
-  grep -qx 'icons/chatgpt.png'
+  grep -qx 'icons/mascot/robot-active-13.svg'
+if unzip -Z1 "$shadow_test_dir/package/shadow-panel@shadowokx.shell-extension.zip" | \
+  grep -q 'icons/chatgpt.png'; then
+  printf '%s\n' 'The retired third-party ChatGPT icon was found in the release archive.' >&2
+  exit 1
+fi
 unzip -Z1 "$shadow_test_dir/package/shadow-panel@shadowokx.shell-extension.zip" | \
   grep -qx 'icons/usage-high-symbolic.svg'
 if unzip -Z1 "$shadow_test_dir/package/shadow-panel@shadowokx.shell-extension.zip" | \

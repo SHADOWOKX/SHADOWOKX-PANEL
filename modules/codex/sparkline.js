@@ -48,20 +48,33 @@ export function tokenSparkline(buckets, accent, animate = false, tooltipForPoint
     const chart = new St.Widget({
         style_class: 'shadow-token-sparkline',
         x_expand: true,
-        height: 48,
+        height: 68,
         opacity: animate ? 0 : 255,
         layout_manager: new Clutter.FixedLayout(),
     });
-    const area = new St.DrawingArea({height: 48});
+    const area = new St.DrawingArea({height: 68});
     chart.add_child(area);
     const targets = normalizePointTargets(chart, buckets, tooltipForPoint);
+    let hoveredIndex = -1;
+    targets.forEach((target, index) => {
+        target.connect('enter-event', () => {
+            hoveredIndex = index;
+            area.queue_repaint();
+            return Clutter.EVENT_PROPAGATE;
+        });
+        target.connect('leave-event', () => {
+            hoveredIndex = -1;
+            area.queue_repaint();
+            return Clutter.EVENT_PROPAGATE;
+        });
+    });
     const syncAllocation = () => {
         const width = chart.width;
         const height = chart.height;
         if (width <= 0 || height <= 0)
             return;
         area.set_size(width, height);
-        const points = sparklineCoordinates(buckets, width, height, {x: 8, y: 6});
+        const points = sparklineCoordinates(buckets, width, height, {x: 8, y: 9});
         targets.forEach((target, index) => {
             const point = points[index];
             if (!point)
@@ -93,7 +106,7 @@ export function tokenSparkline(buckets, accent, animate = false, tooltipForPoint
     }
     area.connect('repaint', drawingArea => {
         const [width, height] = drawingArea.get_surface_size();
-        const padding = {x: 8, y: 6};
+        const padding = {x: 8, y: 9};
         const points = sparklineCoordinates(buckets, width, height, padding);
         if (points.length < 2)
             return;
@@ -101,9 +114,18 @@ export function tokenSparkline(buckets, accent, animate = false, tooltipForPoint
         const context = drawingArea.get_context();
         try {
             const bottom = height - padding.y;
+            // Three quiet reference lines retain the chart's absolute zero baseline.
+            context.setSourceRGBA(0.5, 0.55, 0.6, 0.18);
+            context.setLineWidth(1);
+            for (const fraction of [0, 0.5, 1]) {
+                const y = Math.round(padding.y + (bottom - padding.y) * fraction) + 0.5;
+                context.moveTo(padding.x, y);
+                context.lineTo(width - padding.x, y);
+            }
+            context.stroke();
             const fill = new Cairo.LinearGradient(0, padding.y, 0, bottom);
-            fill.addColorStopRGBA(0, red, green, blue, 0.17);
-            fill.addColorStopRGBA(0.55, red, green, blue, 0.065);
+            fill.addColorStopRGBA(0, red, green, blue, 0.26);
+            fill.addColorStopRGBA(0.55, red, green, blue, 0.10);
             fill.addColorStopRGBA(1, red, green, blue, 0);
             context.moveTo(points[0].x, bottom);
             context.lineTo(points[0].x, points[0].y);
@@ -115,7 +137,7 @@ export function tokenSparkline(buckets, accent, animate = false, tooltipForPoint
 
             traceSeries(context, points);
             context.setSourceRGBA(red, green, blue, 0.94);
-            context.setLineWidth(1.45);
+            context.setLineWidth(2.2);
             context.setLineJoin(Cairo.LineJoin.ROUND);
             context.setLineCap(Cairo.LineCap.ROUND);
             context.stroke();
@@ -126,6 +148,20 @@ export function tokenSparkline(buckets, accent, animate = false, tooltipForPoint
                 context.fill();
             }
 
+            const focused = points[hoveredIndex];
+            if (focused) {
+                context.moveTo(focused.x, padding.y);
+                context.lineTo(focused.x, bottom);
+                context.setSourceRGBA(red, green, blue, 0.35);
+                context.setLineWidth(1);
+                context.stroke();
+                context.arc(focused.x, focused.y, 5, 0, Math.PI * 2);
+                context.setSourceRGBA(red, green, blue, 0.25);
+                context.fill();
+                context.arc(focused.x, focused.y, 2.5, 0, Math.PI * 2);
+                context.setSourceRGBA(red, green, blue, 1);
+                context.fill();
+            }
             const last = points.at(-1);
             context.arc(last.x, last.y, 3.7, 0, Math.PI * 2);
             context.setSourceRGBA(red, green, blue, 0.18);

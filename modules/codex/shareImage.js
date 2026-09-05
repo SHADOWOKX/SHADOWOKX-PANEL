@@ -87,16 +87,38 @@ function drawText(context, text, x, y, width, size, color, weight = 'Normal', al
     PangoCairo.show_layout(context, layout);
 }
 
-function drawLogo(context, path, x, y, size) {
-    const image = Cairo.ImageSurface.createFromPNG(path);
+function drawMascot(context, x, y, size) {
     context.save();
     context.translate(x, y);
-    context.scale(size / image.getWidth(), size / image.getHeight());
-    context.setSourceSurface(image, 0, 0);
-    context.getSource().setFilter(Cairo.Filter.BEST);
-    context.paint();
+    context.scale(size / 24, size / 24);
+
+    context.setLineCap(Cairo.LineCap.ROUND);
+    context.setLineWidth(1.35);
+    setColor(context, '#b7bcc3');
+    context.moveTo(12, 6.4);
+    context.lineTo(12, 3.5);
+    context.stroke();
+    context.arc(12, 2.65, 1.35, 0, Math.PI * 2);
+    setColor(context, '#ff8a00');
+    context.fill();
+
+    fillRounded(context, 0.65, 10, 3, 6.7, 1.4, '#3c4048');
+    fillRounded(context, 20.35, 10, 3, 6.7, 1.4, '#3c4048');
+    fillRounded(context, 2.2, 6.2, 19.6, 13.4, 5.4, '#b7bcc3');
+    fillRounded(context, 4, 8.15, 16, 9.35, 3.8, '#0e1117');
+    for (const eyeX of [8.55, 15.45]) {
+        context.arc(eyeX, 12.85, 1.45, 0, Math.PI * 2);
+        setColor(context, '#ff8a00');
+        context.fill();
+    }
+    context.moveTo(8.5, 19.25);
+    context.lineTo(15.5, 19.25);
+    context.lineTo(14.85, 21.25);
+    context.lineTo(9.15, 21.25);
+    context.closePath();
+    setColor(context, '#3c4048');
+    context.fill();
     context.restore();
-    image.finish();
 }
 
 export function resolveSharePalette(backgroundTheme, interfaceTheme) {
@@ -120,7 +142,7 @@ export function renderSummary(path, state, options) {
     context.paint();
     fillRounded(context, 55, 45, 1090, 585, 34, palette.card);
 
-    drawLogo(context, options.logoPath, 92, 72, 62);
+    drawMascot(context, 92, 72, 62);
     drawText(context, 'Shadowokx Panel', 176, 72, 560, 25, palette.text, 'Bold');
     drawText(context, 'ChatGPT / Codex', 177, 110, 500, 14, palette.muted, 'Normal');
 
@@ -278,19 +300,11 @@ export async function exportCodexSummaryImage(state, options = {}) {
             fiveHour,
             lastSuccessfulRefresh: state.lastSuccessfulRefresh,
         };
-        const logoPath = Gio.File.new_for_uri(import.meta.url)
-            .get_parent()
-            .get_parent()
-            .get_parent()
-            .get_child('icons')
-            .get_child('chatgpt.png')
-            .get_path();
         const workerOptions = {
             nowMs,
             accent: options.accent,
             backgroundTheme: options.backgroundTheme,
             interfaceTheme: options.interfaceTheme,
-            logoPath,
         };
         await renderInWorker(
             temporary.get_path(),

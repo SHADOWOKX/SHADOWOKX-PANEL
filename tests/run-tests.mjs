@@ -1,3 +1,4 @@
+import {weatherArtwork} from '../ui/weatherIcon.js';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
@@ -41,6 +42,11 @@ import {
     withoutCodexHistory,
 } from '../modules/codex/history.js';
 import {CodexProvider} from '../modules/codex/provider.js';
+import {
+    CodexActivityMonitor,
+    codexUsageActivitySignature,
+    parseCodexSessionActivity,
+} from '../modules/codex/activityMonitor.js';
 import {exportCodexSummaryImage, resolveSharePalette} from '../modules/codex/shareImage.js';
 import {
     normalizeWeather,
@@ -168,6 +174,54 @@ function testFormatting() {
         'sub-minute refresh ages update without provider work');
     equal(formatRelativeAge(999_880_000, 1_000_000_000), '2m ago',
         'minute refresh ages are formatted');
+}
+
+function testCodexActivitySignals() {
+    const events = parseCodexSessionActivity([
+        JSON.stringify({
+            timestamp: '2026-09-04T10:00:00.000Z',
+            type: 'event_msg',
+            payload: {type: 'task_started', turn_id: 'turn-1'},
+        }),
+        JSON.stringify({
+            timestamp: '2026-09-04T10:00:01.000Z',
+            type: 'event_msg',
+            payload: {type: 'user_message'},
+        }),
+        '{invalid',
+        JSON.stringify({
+            timestamp: '2026-09-04T10:00:02.000Z',
+            type: 'response_item',
+            payload: {type: 'custom_tool_call'},
+        }),
+        JSON.stringify({
+            timestamp: '2026-09-04T10:00:03.000Z',
+            type: 'event_msg',
+            payload: {type: 'task_complete', turn_id: 'turn-1'},
+        }),
+    ].join('\n'));
+    equal(events.length, 3, 'Codex activity parser keeps work and terminal events only');
+    equal(events[0].type, 'task_started', 'Codex task start is a direct activity signal');
+    equal(events[1].type, 'custom_tool_call', 'Codex tool work refreshes live activity');
+    equal(events[2].kind, 'terminal', 'Codex task completion starts the idle grace period');
+
+    const baseline = {
+        status: 'success',
+        weekly: {usedPercent: 12},
+        fiveHour: {usedPercent: 3},
+        tokenUsage: {
+            lifetimeTokens: 400,
+            dailyBuckets: [{date: '2026-09-04', tokens: 40}],
+        },
+    };
+    const changed = {
+        ...baseline,
+        tokenUsage: {...baseline.tokenUsage, lifetimeTokens: 450},
+    };
+    ok(codexUsageActivitySignature(baseline) !== codexUsageActivitySignature(changed),
+        'completed token usage changes remain distinguishable for diagnostics');
+    equal(codexUsageActivitySignature({status: 'error'}), null,
+        'provider errors never cause mascot activity');
 }
 
 function testModuleConfiguration() {
@@ -967,6 +1021,75 @@ async function testPersistenceAndRefreshCoalescing() {
     provider.destroy();
 }
 
+async function testCodexActivityLifecycle() {
+    const sessionsRoot = GLib.build_filenamev([
+        GLib.get_tmp_dir(),
+        `shadow-panel-activity-${GLib.uuid_string_random()}`,
+    ]);
+    GLib.mkdir_with_parents(sessionsRoot, 0o700);
+    const sessionPath = GLib.build_filenamev([sessionsRoot, 'rollout.jsonl']);
+    const now = Date.now();
+    const startRecord = JSON.stringify({
+        timestamp: new Date(now).toISOString(),
+        type: 'event_msg',
+        payload: {type: 'task_started', turn_id: 'turn-test'},
+    }) + '\n';
+    GLib.file_set_contents(sessionPath, startRecord);
+    const provider = new Observable({status: 'loading'});
+    const monitor = new CodexActivityMonitor(provider, null, {
+        sessionsRoot,
+        graceMs: 40,
+        now: () => Date.now(),
+    });
+    monitor._readSession(sessionPath);
+    equal(monitor.getState().active, true,
+        'a local Codex session append activates the mascot without polling');
+    await waitMilliseconds(70);
+    equal(monitor.getState().active, true,
+        'an explicit running turn stays active until a terminal event');
+    const terminalRecord = JSON.stringify({
+        timestamp: new Date().toISOString(),
+        type: 'event_msg',
+        payload: {type: 'task_complete', turn_id: 'turn-test'},
+    }) + '\n';
+    GLib.file_set_contents(sessionPath, startRecord + terminalRecord);
+    monitor._readSession(sessionPath);
+    equal(monitor.getState().active, false,
+        'an explicit terminal event returns Codex activity to idle immediately');
+    const trailingNoise = JSON.stringify({
+        timestamp: new Date().toISOString(),
+        type: 'event_msg',
+        payload: {type: 'token_count', turn_id: 'turn-test'},
+    }) + '\n';
+    GLib.file_set_contents(sessionPath, startRecord + terminalRecord + trailingNoise);
+    monitor._readSession(sessionPath);
+    equal(monitor.getState().active, false,
+        'post-terminal token metadata cannot resurrect an idle mascot');
+    monitor.start();
+    provider._setState({
+        status: 'success',
+        weekly: {usedPercent: 10},
+        fiveHour: {usedPercent: 2},
+        tokenUsage: {lifetimeTokens: 100, dailyBuckets: []},
+    });
+    provider._setState({
+        status: 'success',
+        weekly: {usedPercent: 11},
+        fiveHour: {usedPercent: 3},
+        tokenUsage: {lifetimeTokens: 200, dailyBuckets: []},
+    });
+    equal(monitor.getState().active, false,
+        'quota and history refreshes cannot masquerade as live Codex work');
+    monitor.stop();
+    equal(monitor._monitors.size, 0,
+        'Codex activity stop releases every filesystem monitor');
+    equal(monitor._pendingReads.size, 0,
+        'Codex activity stop removes pending tail reads');
+    monitor.destroy();
+    GLib.unlink(sessionPath);
+    GLib.rmdir(sessionsRoot);
+}
+
 async function testAdaptiveCodexRefreshLifecycle() {
     const scheduler = new RecordingScheduler();
     const provider = new CodexProvider(new FakeSettings(), scheduler, null);
@@ -1132,10 +1255,10 @@ case "$initialize" in
 esac
 printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"userAgent":"codex-cli/9.9.9"}}'
 IFS= read -r initialized
-    IFS= read -r usage
     IFS= read -r limits
-    case "$initialized:$usage:$limits" in
-      *'"method":"initialized"'*':'*'"id":2'*':'*'"id":3'*) ;;
+    IFS= read -r usage
+    case "$initialized:$limits:$usage" in
+      *'"method":"initialized"'*':'*'"id":3'*':'*'"id":2'*) ;;
       *) exit 3 ;;
     esac
     printf '%s\n' '{"jsonrpc":"2.0","id":3,"result":{"rateLimits":{"primary":{"usedPercent":10,"windowDurationMins":10080,"resetsAt":2000000000}}}}'
@@ -1149,11 +1272,16 @@ sleep 5
         inertScheduler,
         null
     );
+    const samples = [];
+    provider.subscribe(state => samples.push(state));
     provider._findCodex = () => fakeServer;
     provider._cache.write = async () => {};
     try {
         const state = await provider.refresh(true);
         equal(state.status, 'success', 'Codex protocol follows the initialized request order');
+        ok(samples.some(sample => sample.status === 'refreshing' &&
+            sample.weekly?.remainingPercent === 90 && !sample.tokenUsage),
+        'limits are published before optional token statistics arrive');
         equal(state.weekly.remainingPercent, 90,
             'Codex accepts valid limits without waiting for optional account metadata');
         equal(state.tokenUsage.lifetimeTokens, 1234,
@@ -1191,6 +1319,7 @@ async function testWeatherTrailingRefresh() {
 }
 
 testFormatting();
+testCodexActivitySignals();
 testModuleConfiguration();
 testSparklineData();
 testProgressGeometry();
@@ -1206,9 +1335,22 @@ await testWeatherLocationFallback();
 await testCodexShareImage();
 await testProviderFailureIsolation();
 await testPersistenceAndRefreshCoalescing();
+await testCodexActivityLifecycle();
 await testAdaptiveCodexRefreshLifecycle();
 await testFrequentCodexRefreshIntegrity();
 await testCodexProtocolOrdering();
 await testWeatherTrailingRefresh();
+
+
+equal(weatherArtwork(weatherCondition(0, 0)), 'clear-night', 'clear night uses moon artwork');
+equal(weatherArtwork(weatherCondition(2, 0)), 'partly-cloudy-night', 'cloudy night uses moon artwork');
+equal(weatherArtwork(weatherCondition(0, 1)), 'clear', 'day uses sun artwork');
+for (const code of [0, 1, 2, 3, 45, 48, 51, 53, 55, 56, 57, 61, 63, 65, 66, 67,
+    71, 73, 75, 77, 80, 81, 82, 85, 86, 95, 96, 99, -1]) {
+    for (const isDay of [0, 1]) {
+        const asset = `icons/weather/${weatherArtwork(weatherCondition(code, isDay))}.svg`;
+        ok(GLib.file_test(asset, GLib.FileTest.IS_REGULAR), `weather artwork exists: ${asset}`);
+    }
+}
 
 print(`Shadowokx Panel tests passed (${assertions} assertions)`);

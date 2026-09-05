@@ -7,6 +7,7 @@ import St from 'gi://St';
 import {ACCENTS, MODULE_META} from '../lib/constants.js';
 import {isHexColor} from '../lib/format.js';
 import {progressFillGeometry} from '../lib/progress.js';
+import {staticMascotIcon} from './mascot.js';
 
 export function resolveAccent(settings) {
     const preset = settings.get_string('accent-color');
@@ -98,21 +99,13 @@ export function animateRefreshButton(button, settings, active) {
 }
 
 export function moduleIcon(extension, id, size = 16, styleClass = '') {
-    const properties = {
+    if (id === 'codex')
+        return staticMascotIcon(extension, size, styleClass);
+    return new St.Icon({
         icon_size: size,
         style_class: styleClass,
-    };
-    if (id === 'codex') {
-        const path = GLib.build_filenamev([
-            extension.path,
-            'icons',
-            'chatgpt.png',
-        ]);
-        properties.gicon = Gio.icon_new_for_string(path);
-    } else {
-        properties.icon_name = MODULE_META[id]?.icon ?? 'application-x-executable-symbolic';
-    }
-    return new St.Icon(properties);
+        icon_name: MODULE_META[id]?.icon ?? 'application-x-executable-symbolic',
+    });
 }
 
 export function iconButton(iconName, accessibleName, callback, styleClass = 'shadow-icon-button') {

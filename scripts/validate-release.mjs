@@ -66,11 +66,42 @@ try {
         if (GLib.file_test(GLib.build_filenamev([modules, removed]), GLib.FileTest.EXISTS))
             throw new Error(`removed module directory still exists: ${removed}`);
     }
-    if (!GLib.file_test(
+    for (const mascot of [
+        'robot-sleep.svg',
+        'robot-sleep-breathe.svg',
+        'robot-sleep-twitch.svg',
+        'robot-awake.svg',
+        'robot-wake-antenna.svg',
+        'robot-wake-half.svg',
+        'robot-sleepy.svg',
+        'robot-sleep-relax.svg',
+        'robot-blink.svg',
+        'robot-active-01.svg',
+        'robot-active-02.svg',
+        'robot-active-03.svg',
+        'robot-active-04.svg',
+        'robot-active-05.svg',
+        'robot-active-06.svg',
+        'robot-active-07.svg',
+        'robot-active-08.svg',
+        'robot-active-09.svg',
+        'robot-active-10.svg',
+        'robot-active-11.svg',
+        'robot-active-12.svg',
+        'robot-active-13.svg',
+    ]) {
+        if (!GLib.file_test(
+            GLib.build_filenamev([projectDirectory, 'icons', 'mascot', mascot]),
+            GLib.FileTest.IS_REGULAR
+        )) {
+            throw new Error(`the bundled mascot frame is missing: ${mascot}`);
+        }
+    }
+    if (GLib.file_test(
         GLib.build_filenamev([projectDirectory, 'icons', 'chatgpt.png']),
-        GLib.FileTest.IS_REGULAR
+        GLib.FileTest.EXISTS
     )) {
-        throw new Error('the bundled ChatGPT icon is missing');
+        throw new Error('the retired third-party ChatGPT icon is still bundled');
     }
 } catch (error) {
     printerr(`Release validation failed: ${error.message}`);

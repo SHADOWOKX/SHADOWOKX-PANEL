@@ -33,6 +33,19 @@ const badModules = report.moduleIds.includes('weather') !== expectWeatherPanel |
 const badWeatherTopBar = report.weatherTopBarVisible !== expectWeatherTopBar;
 const badUsageState = report.usageStateVisible !== Boolean(report.usageStateKey) ||
     (!report.usageStateSetting && report.usageStateVisible);
+const badMascot = !report.mascotSleepingIdle || !report.mascotWakingTransition ||
+    !report.mascotPopupAwake ||
+    !report.mascotAwakeDuringCloseDelay || !report.mascotSleepsAfterClose ||
+    !report.mascotGoingToSleepTransition || !report.mascotSleepingToActive ||
+    !report.mascotAwakeToActive || !report.mascotActiveToAwake ||
+    !report.mascotActiveLoop || !report.mascotActivePriority ||
+    !report.mascotSettingStopsAnimation || !report.mascotAnimationsDisabledSemantic ||
+    !report.mascotReducedMotion ||
+    !report.mascotLabelStable || report.mascotLabelGap < 6 || report.mascotLabelGap > 8 ||
+    report.mascotPostCloseDelayMs < 2000 || report.mascotPostCloseDelayMs > 4000 ||
+    report.mascotSleepDelayMs < 8000 || report.mascotSleepDelayMs > 15000 ||
+    report.mascotSize?.width !== 20 || report.mascotSize?.height !== 20 ||
+    report.mascotSize?.indicatorHeight > report.mascotSize?.panelHeight;
 const badHourly = expectWeatherPanel && (!report.hourly ||
     report.hourly.verticalPolicy !== 2 ||
     report.hourly.contentWidth <= report.hourly.pageWidth);
@@ -82,7 +95,8 @@ if (!report.reopened || !report.usageSettingUpdatedLive ||
     report.openCloseCycles !== 20 || report.scrollResetValue !== 0 ||
     !report.refreshStateExercised || pageWidths.size !== 1 ||
     scrolling !== expectScroll || badPolicy || badLifecycle || badModules ||
-    badWeatherTopBar || badUsageState || badHourly || badUv || badLocation || badCodexPolish ||
+    badWeatherTopBar || badUsageState || badMascot || badHourly || badUv || badLocation ||
+    badCodexPolish ||
     report.graph.width <= 0 || report.graph.height < 45 || badPage ||
     badCodexRefreshLifecycle) {
     throw new Error(JSON.stringify(report));

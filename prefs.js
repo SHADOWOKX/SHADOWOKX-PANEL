@@ -131,7 +131,13 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
         page.add(panel);
 
         const codex = new Adw.PreferencesGroup({title: 'Top bar · Codex'});
-        codex.add(switchRow(settings, 'show-codex-icon', 'Show ChatGPT icon'));
+        codex.add(switchRow(settings, 'show-codex-icon', 'Show Shadowokx mascot'));
+        codex.add(switchRow(
+            settings,
+            'animated-mascot',
+            'Animated mascot',
+            'Animates while Codex is working; follows the system reduced-motion setting.'
+        ));
         codex.add(switchRow(settings, 'show-codex-remaining', 'Show remaining percentage'));
         codex.add(switchRow(
             settings,

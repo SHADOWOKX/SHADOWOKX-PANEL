@@ -37,11 +37,11 @@ function finiteNumber(value) {
     return Number.isFinite(number) ? number : Number.NaN;
 }
 
-export function weatherCondition(code) {
+export function weatherCondition(code, isDay = true) {
     const [label, icon] = Object.hasOwn(CONDITIONS, code)
         ? CONDITIONS[code]
         : ['Unknown conditions', 'weather-severe-alert-symbolic'];
-    return {label, icon};
+    return {label, icon, isDay: isDay !== false && isDay !== 0};
 }
 
 export function normalizeWeatherQuery(value) {
@@ -163,7 +163,7 @@ export function normalizeWeather(payload, location, unit, nowMs = Date.now()) {
                 precipitationChance: Number.isFinite(precipitation)
                     ? Math.max(0, Math.min(100, Math.round(precipitation)))
                     : null,
-                condition: weatherCondition(hourly.weather_code?.[index]),
+                condition: weatherCondition(hourly.weather_code?.[index], hourly.is_day?.[index]),
             };
         })
         .filter(item => Number.isFinite(item.time) &&
@@ -192,7 +192,7 @@ export function normalizeWeather(payload, location, unit, nowMs = Date.now()) {
             humidity: requiredNumbers[2],
             wind: requiredNumbers[3],
             rainProbability: forecast[0]?.precipitationChance ?? null,
-            condition: weatherCondition(current.weather_code),
+            condition: weatherCondition(current.weather_code, current.is_day),
         },
         today: {
             high: requiredNumbers[4],
