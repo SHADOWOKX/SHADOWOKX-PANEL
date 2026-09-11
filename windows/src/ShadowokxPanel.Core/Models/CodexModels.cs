@@ -34,7 +34,10 @@ public sealed record TokenUsage(
     long? PeakDailyTokens,
     DateOnly? PeakDate,
     IReadOnlyList<UsageBucket> DailyBuckets,
-    long? SevenDayTokens);
+    long? SevenDayTokens)
+{
+    public IReadOnlyList<UsageBucket>? AccountDailyBuckets { get; init; }
+}
 
 public sealed record CodexState
 {

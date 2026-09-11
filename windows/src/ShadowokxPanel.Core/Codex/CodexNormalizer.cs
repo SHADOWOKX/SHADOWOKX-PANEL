@@ -98,7 +98,7 @@ public static class CodexNormalizer
             .TakeLast(7)
             .ToArray();
         var peak = recent.OrderByDescending(bucket => bucket.Tokens).FirstOrDefault();
-        if (!lifetime.HasValue && peak is null && !buckets.ContainsKey(today))
+        if (!lifetime.HasValue && !peakReported.HasValue && !buckets.Values.Any(b => today.DayNumber - b.Date.DayNumber is >= 0 and < 30))
             return null;
         var peakTokens = peakReported ?? peak?.Tokens;
         var peakDate = recent.FirstOrDefault(bucket => bucket.Tokens == peakTokens)?.Date;
@@ -108,7 +108,12 @@ public static class CodexNormalizer
             peakTokens,
             peakDate,
             recent,
-            recent.Length > 0 ? recent.Sum(bucket => bucket.Tokens) : null);
+            recent.Length > 0 ? recent.Sum(bucket => bucket.Tokens) : null)
+        {
+            AccountDailyBuckets = GetProperty(usage, "dailyUsageBuckets", out var reported) && reported.ValueKind == JsonValueKind.Array
+                ? buckets.Values.Where(b => today.DayNumber - b.Date.DayNumber is >= 0 and < 30).OrderBy(b => b.Date).ToArray()
+                : null,
+        };
     }
 
     private static JsonElement GetRequired(JsonElement parent, string name) =>

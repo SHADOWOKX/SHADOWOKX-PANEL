@@ -19,11 +19,11 @@ public sealed partial class MainWindow
         var day = DateOnly.FromDateTime(now.LocalDateTime);
         var usage = new TokenUsage(1_500_000_000, 742900, 46_900_000, day.AddDays(-5),
             Enumerable.Range(0, 7).Select(i => new UsageBucket(day.AddDays(i - 6), i < 2 ? 46_900_000 : 742900)).ToArray(), 95_000_000);
+        usage = usage with { AccountDailyBuckets = usage.DailyBuckets };
         var codex = new CodexState
         {
             Status = ProviderStatus.Success, Weekly = new(51, 49, now.AddDays(4), 10080), TokenUsage = usage,
             LastSuccessfulRefresh = now,
-            Cost = new(new(34.12m, 24_900_000, 0), new(0, 0, 0), new(412.97m, 615_500_000, 0), now, false),
         };
         var condition = new WeatherCondition("Mainly clear", "partly-cloudy-day");
         var weather = new WeatherState
@@ -54,6 +54,21 @@ public sealed partial class MainWindow
         await Task.Delay(100);
         var output = Path.Combine(Path.GetTempPath(), "ShadowokxPanel-ui-smoke");
         Directory.CreateDirectory(output);
+        if (TodayCost.Text != FormatAccountTokens(742900) || MonthCost.Text == "Not reported")
+            throw new InvalidOperationException("Account rows did not render remote tokens.");
+        var shared = await ShareUsageAsync(output, openFolder: false);
+        if (shared is null || !CopyUsageButton.IsEnabled)
+            throw new InvalidOperationException("Share export failed or button stayed disabled.");
+        var saved = await Windows.Storage.StorageFile.GetFileFromPathAsync(shared);
+        using (var image = await saved.OpenReadAsync())
+        {
+            var decoder = await BitmapDecoder.CreateAsync(image);
+            if (decoder.PixelWidth == 0 || decoder.PixelHeight == 0)
+                throw new InvalidOperationException("Shared PNG is empty.");
+        }
+        if (await ShareUsageAsync(shared, openFolder: false) is not null || !CopyUsageButton.IsEnabled)
+            throw new InvalidOperationException("Share did not recover from an invalid destination.");
+        UpdateRelativeTimeLabels();
         await CaptureAsync(Path.Combine(output, "codex.png"));
         var codexOverflow = CodexScroll.ScrollableHeight;
         await _viewModel.SelectPageAsync("weather");
@@ -72,7 +87,7 @@ public sealed partial class MainWindow
         await Task.Delay(3000);
         process.Refresh();
         await File.WriteAllTextAsync(Path.Combine(output, "report.json"), JsonSerializer.Serialize(new
-        { progress = rows, codexOverflow, weatherOverflow, reopenCycles = 20, hiddenClockStopped = true,
+        { accountRowsFromRemote = true, sharePngDecoded = true, shareErrorRecovered = true, progress = rows, codexOverflow, weatherOverflow, reopenCycles = 20, hiddenClockStopped = true,
             hiddenCpuMillisecondsOver3Seconds = (process.TotalProcessorTime - cpuBefore).TotalMilliseconds,
             privateBytes = process.PrivateMemorySize64, handles = process.HandleCount }));
     }

@@ -402,7 +402,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private void RenderCodex(CodexState state, Core.Settings.AppSettings settings)
     {
         var hasData = state.HasData;
-        CopyUsageButton.IsEnabled = hasData;
+        CopyUsageButton.IsEnabled = hasData && !_sharing;
         CodexErrorCard.Visibility = !hasData ? Visibility.Visible : Visibility.Collapsed;
         CodexContent.Visibility = hasData ? Visibility.Visible : Visibility.Collapsed;
         CodexErrorTitle.Text = state.Status == ProviderStatus.Loading ? "Loading Codex usage" :
@@ -461,14 +461,14 @@ public sealed partial class MainWindow : Window, IDisposable
                 "ddd h:mm tt", CultureInfo.CurrentCulture) ?? "Reset unavailable";
         }
 
-        TodayCost.Text = FormatCost(state.Cost?.Today);
-        YesterdayCost.Text = FormatCost(state.Cost?.Yesterday);
-        MonthCost.Text = FormatCost(state.Cost?.Last30Days);
-        ToolTipService.SetToolTip(CostRows, state.Cost is { } cost
-            ? $"{(cost.Partial ? "Partial API estimate" : "API estimate")} · local sessions · USD\n" +
-                $"Not your subscription bill. Prices: 2026-09-11.\nUnpriced tokens: {FormatTokens(cost.Last30Days.UnpricedTokens)}\n" +
-                FormatUpdated(cost.UpdatedAt, DateTimeOffset.Now - cost.UpdatedAt > TimeSpan.FromMinutes(5))
-            : "Local session cost estimate is loading. Unavailable values are not zero.");
+        var account = AccountUsageRows.Read(state.TokenUsage, DateTimeOffset.Now);
+        TodayCost.Text = FormatAccountTokens(account.Today);
+        YesterdayCost.Text = FormatAccountTokens(account.Yesterday);
+        MonthCost.Text = FormatAccountTokens(account.Reported30Days);
+        ToolTipService.SetToolTip(CostRows,
+            "Account token activity across devices. Missing days are not treated as zero.\n" +
+            "Last 30 Days sums the daily buckets returned by the account service.\n" +
+            "The account service does not provide daily USD costs. Linux API estimates use that device's local session logs.");
         var fiveHour = state.FiveHour;
         FiveHourCard.Visibility = fiveHour is null || state.Weekly is null ? Visibility.Collapsed : Visibility.Visible;
         FiveHourText.Text = fiveHour is null
@@ -769,24 +769,59 @@ public sealed partial class MainWindow : Window, IDisposable
         }
     }
 
+    private bool _sharing;
+
     private async void CopyUsage_Click(object sender, RoutedEventArgs e)
     {
+        await ShareUsageAsync();
+    }
+
+    private async Task<string?> ShareUsageAsync(string? exportDirectory = null, bool openFolder = true)
+    {
+        if (_sharing || _disposed) return null;
+        _sharing = true;
         CopyUsageButton.IsEnabled = false;
         try
         {
-            using var stream = await CreateImageAsync(Root);
-            if (_disposed) return;
-            var data = new Windows.ApplicationModel.DataTransfer.DataPackage();
-            data.SetBitmap(Windows.Storage.Streams.RandomAccessStreamReference.CreateFromStream(stream));
-            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(data);
-            Windows.ApplicationModel.DataTransfer.Clipboard.Flush();
-            ToolTipService.SetToolTip(CopyUsageButton, "Usage image copied");
+            var pictures = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+            var directory = exportDirectory ?? Path.Combine(string.IsNullOrWhiteSpace(pictures) ? _host.Paths.Root : pictures, "Shadowokx Panel");
+            Directory.CreateDirectory(directory);
+            var file = Path.Combine(directory, $"Codex-usage-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.png");
+            await CaptureAsync(file);
+            if (_disposed) return file;
+            CodexUpdated.Text = "Usage image saved";
+            ToolTipService.SetToolTip(CopyUsageButton, $"Saved to {file}");
+            if (openFolder)
+            {
+                try
+                {
+                    var folder = await Windows.Storage.StorageFolder.GetFolderFromPathAsync(directory);
+                    var options = new FolderLauncherOptions();
+                    options.ItemsToSelect.Add(await Windows.Storage.StorageFile.GetFileFromPathAsync(file));
+                    if (!await Launcher.LaunchFolderAsync(folder, options) && !_disposed)
+                        if (!_disposed) CodexUpdated.Text = "Image saved — open Pictures";
+                }
+                catch (Exception error) when (error is System.Runtime.InteropServices.COMException or IOException or UnauthorizedAccessException)
+                {
+                    if (!_disposed) CodexUpdated.Text = "Image saved — open Pictures";
+                }
+            }
+            return file;
         }
-        catch (Exception error) when (error is System.Runtime.InteropServices.COMException or InvalidOperationException)
+        catch (Exception error) when (error is System.Runtime.InteropServices.COMException or InvalidOperationException or IOException or UnauthorizedAccessException)
         {
-            ToolTipService.SetToolTip(CopyUsageButton, "Could not copy the image. Try again.");
+            if (!_disposed)
+            {
+                CodexUpdated.Text = "Could not save usage image";
+                ToolTipService.SetToolTip(CopyUsageButton, "Check access to your Pictures folder and try again.");
+            }
+            return null;
         }
-        finally { if (!_disposed) CopyUsageButton.IsEnabled = _viewModel.Codex.HasData; }
+        finally
+        {
+            _sharing = false;
+            if (!_disposed) CopyUsageButton.IsEnabled = _viewModel.Codex.HasData;
+        }
     }
 
     private void SettingsButton_Click(object sender, RoutedEventArgs e) => OpenSettings();
@@ -879,8 +914,7 @@ public sealed partial class MainWindow : Window, IDisposable
         return opacity >= 1 ? brush : new SolidColorBrush(brush.Color) { Opacity = opacity };
     }
 
-    private static string FormatCost(Core.Codex.CostAmount? amount) => amount is null ? "—" :
-        $"≈{(amount.Dollars is > 0 and < .01m ? "<$0.01" : amount.Dollars.ToString("$#,##0.00", CultureInfo.InvariantCulture))} · {FormatTokens(amount.Tokens)} tokens";
+    private static string FormatAccountTokens(long? tokens) => tokens.HasValue ? $"{FormatTokens(tokens)} tokens" : "Not reported";
 
     private static string FormatTokens(long? value) => value.HasValue
         ? TokenCountFormatter.Format(value.Value, CultureInfo.CurrentCulture)

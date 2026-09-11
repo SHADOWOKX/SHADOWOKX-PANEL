@@ -36,16 +36,12 @@ public sealed class TokenHistoryStore
         CancellationToken cancellationToken = default)
     {
         var normalized = Normalize(history, now);
-        var today = DateOnly.FromDateTime(now.LocalDateTime);
-        var current = liveUsage?.DailyBuckets.LastOrDefault(bucket => bucket.Date == today);
-        if (current is not null)
-        {
-            var merged = normalized.DailyBuckets
-                .Where(bucket => bucket.Date != today)
-                .Append(current)
-                .ToArray();
-            normalized = normalized with { DailyBuckets = Bounded(merged, now) };
-        }
+        // Account buckets are authoritative, including historical days from other devices.
+        if (liveUsage is not null)
+            normalized = normalized with
+            {
+                DailyBuckets = Bounded(normalized.DailyBuckets.Concat(liveUsage.DailyBuckets), now),
+            };
         if (!normalized.DailyBuckets.SequenceEqual(history.DailyBuckets) ||
             normalized.StartedAt != history.StartedAt || normalized.Version != history.Version)
             await _store.WriteAsync(normalized, cancellationToken).ConfigureAwait(false);
@@ -64,7 +60,7 @@ public sealed class TokenHistoryStore
 
     public static TokenUsage? Apply(TokenUsage? usage, TokenHistoryDocument history, DateTimeOffset now)
     {
-        var buckets = Bounded(history.DailyBuckets, now);
+        var buckets = Bounded(history.DailyBuckets.Concat(usage?.DailyBuckets ?? []), now);
         if (usage is null && buckets.Length == 0)
             return null;
         var peak = buckets.OrderByDescending(bucket => bucket.Tokens).FirstOrDefault();
@@ -72,14 +68,16 @@ public sealed class TokenHistoryStore
         return new TokenUsage(
             usage?.LifetimeTokens,
             buckets.FirstOrDefault(bucket => bucket.Date == today)?.Tokens ?? usage?.TodayTokens,
-            peak?.Tokens,
-            peak?.Date,
+            usage?.PeakDailyTokens ?? peak?.Tokens,
+            usage?.PeakDate ?? peak?.Date,
             buckets,
-            buckets.Length > 0 ? buckets.Sum(bucket => bucket.Tokens) : null);
+            buckets.Length > 0 ? buckets.Sum(bucket => bucket.Tokens) : null)
+        { AccountDailyBuckets = usage?.AccountDailyBuckets };
     }
 
     public static TokenUsage? WithoutHistory(TokenUsage? usage) => usage is null ? null :
-        new TokenUsage(usage.LifetimeTokens, usage.TodayTokens, null, null, [], null);
+        new TokenUsage(usage.LifetimeTokens, usage.TodayTokens, usage.PeakDailyTokens, usage.PeakDate, [], null)
+        { AccountDailyBuckets = usage.AccountDailyBuckets };
 
     private static UsageBucket[] Bounded(
         IEnumerable<UsageBucket>? values,
