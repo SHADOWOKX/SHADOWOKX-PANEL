@@ -19,6 +19,7 @@ public sealed class TrayIcon : IDisposable
     private readonly Action _toggleStartup;
     private readonly Action _exit;
     private readonly Action _resume;
+    private readonly Action _displayChanged;
     private readonly NativeMethods.WindowProcedure _windowProcedure;
     private readonly nint _previousProcedure;
     private readonly uint _taskbarCreated;
@@ -35,7 +36,8 @@ public sealed class TrayIcon : IDisposable
         Action settings,
         Action toggleStartup,
         Action exit,
-        Action resume)
+        Action resume,
+        Action displayChanged)
     {
         _hwnd = hwnd;
         _open = open;
@@ -44,6 +46,7 @@ public sealed class TrayIcon : IDisposable
         _toggleStartup = toggleStartup;
         _exit = exit;
         _resume = resume;
+        _displayChanged = displayChanged;
         _windowProcedure = WindowProc;
         var pointer = Marshal.GetFunctionPointerForDelegate(_windowProcedure);
         _previousProcedure = NativeMethods.SetWindowLongPtr(hwnd, NativeMethods.GwlpWndProc, pointer);
@@ -60,6 +63,26 @@ public sealed class TrayIcon : IDisposable
             Dispose();
             throw;
         }
+    }
+
+    internal bool TryGetAnchor(out NativeMethods.Point point)
+    {
+        var identifier = new NativeMethods.NotifyIconIdentifier
+        {
+            cbSize = (uint)Marshal.SizeOf<NativeMethods.NotifyIconIdentifier>(),
+            hWnd = _hwnd,
+            uID = IconId,
+        };
+        if (NativeMethods.ShellNotifyIconGetRect(ref identifier, out var rectangle) == 0)
+        {
+            point = new NativeMethods.Point
+            {
+                X = rectangle.Left + (rectangle.Right - rectangle.Left) / 2,
+                Y = rectangle.Top + (rectangle.Bottom - rectangle.Top) / 2,
+            };
+            return true;
+        }
+        return NativeMethods.GetCursorPos(out point);
     }
 
     public void Update(string tooltip, int? remainingPercent)
@@ -102,6 +125,17 @@ public sealed class TrayIcon : IDisposable
 
     private nint WindowProc(nint hwnd, uint message, nint wParam, nint lParam)
     {
+        try { return DispatchWindowMessage(hwnd, message, wParam, lParam); }
+        catch (Exception error)
+        {
+            // Exceptions must not escape a native window procedure and terminate WinUI.
+            StartupDiagnostics.WriteException("tray message failed", error);
+            return NativeMethods.CallWindowProc(_previousProcedure, hwnd, message, wParam, lParam);
+        }
+    }
+
+    private nint DispatchWindowMessage(nint hwnd, uint message, nint wParam, nint lParam)
+    {
         if (message == _taskbarCreated)
         {
             _ = Add();
@@ -110,7 +144,7 @@ public sealed class TrayIcon : IDisposable
         if (message == CallbackMessage)
         {
             var mouseMessage = (uint)(lParam.ToInt64() & 0xffff);
-            if (mouseMessage == NativeMethods.WmLButtonUp)
+            if (mouseMessage is 0x0400 or 0x0401) // NIN_SELECT / NIN_KEYSELECT (version 4)
                 _open();
             else if (mouseMessage == NativeMethods.WmContextMenu)
                 ShowMenu();
@@ -124,6 +158,8 @@ public sealed class TrayIcon : IDisposable
         }
         if (message == NativeMethods.WmDpiChanged)
             UpdateIconAndTooltip(forceIcon: true);
+        if (message is NativeMethods.WmDpiChanged or 0x007E or 0x001A)
+            _displayChanged();
         return NativeMethods.CallWindowProc(_previousProcedure, hwnd, message, wParam, lParam);
     }
 

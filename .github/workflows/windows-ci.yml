@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - windows-port
+      - codex/windows-major-performance
     paths:
       - windows/**
       - .github/workflows/windows-ci.yml
@@ -39,6 +40,19 @@ jobs:
         shell: pwsh
         working-directory: windows
         run: .\scripts\release.ps1 -Configuration Release -Runtime win-x64
+
+      - name: Exercise native UI and capture previews
+        shell: pwsh
+        run: .\windows\scripts\ui-smoke.ps1
+
+      - name: Upload UI diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Windows-UI-diagnostics
+          path: |
+            windows/artifacts/ui-smoke/
+          if-no-files-found: warn
 
       - name: Upload temporary review artifacts
         if: github.event_name != 'pull_request'

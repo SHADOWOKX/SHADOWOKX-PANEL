@@ -7,7 +7,7 @@
         Background="{ThemeResource AppBackgroundBrush}"
         BorderBrush="{ThemeResource CardBorderBrush}"
         BorderThickness="1"
-        CornerRadius="18"
+        CornerRadius="22"
         Padding="18"
         KeyDown="Root_KeyDown">
         <Grid RowSpacing="14">
@@ -41,7 +41,7 @@
                 Background="{ThemeResource CardBrush}"
                 BorderBrush="{ThemeResource CardBorderBrush}"
                 BorderThickness="1"
-                CornerRadius="6"
+                CornerRadius="16"
                 Padding="3">
                 <Grid x:Name="SegmentedGrid" ColumnSpacing="3" HorizontalAlignment="Stretch">
                     <Grid.ColumnDefinitions>
@@ -60,7 +60,7 @@
                         VerticalContentAlignment="Center"
                         Background="Transparent"
                         BorderThickness="0"
-                        CornerRadius="4"
+                        CornerRadius="12"
                         AutomationProperties.Name="ChatGPT Codex page"
                         Click="CodexTab_Click">
                         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -80,7 +80,7 @@
                         VerticalContentAlignment="Center"
                         Background="Transparent"
                         BorderThickness="0"
-                        CornerRadius="4"
+                        CornerRadius="12"
                         AutomationProperties.Name="Weather page"
                         Click="WeatherTab_Click">
                         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -137,27 +137,37 @@
                             <Border x:Name="WeeklyCard" Style="{StaticResource CardStyle}">
                                 <StackPanel Spacing="10">
                                     <Grid>
-                                        <TextBlock Text="Weekly capacity" Style="{StaticResource CardTitleStyle}" />
+                                        <TextBlock Text="Weekly allowance" Style="{StaticResource CardTitleStyle}" />
                                         <Border x:Name="CapacityPill" HorizontalAlignment="Right" Background="{ThemeResource CardHoverBrush}" CornerRadius="9" Padding="9,4">
                                             <StackPanel Orientation="Horizontal" Spacing="5">
-                                                <Ellipse Width="6" Height="6" Fill="{ThemeResource AccentBrush}" VerticalAlignment="Center" />
+                                                <Ellipse x:Name="CapacityDot" Width="6" Height="6" Fill="{ThemeResource AccentBrush}" VerticalAlignment="Center" />
                                                 <TextBlock x:Name="CapacityLabel" FontSize="11" FontWeight="SemiBold" />
                                             </StackPanel>
                                         </Border>
                                     </Grid>
-                                    <StackPanel Orientation="Horizontal" Spacing="7">
-                                        <TextBlock x:Name="WeeklyRemaining" Foreground="{ThemeResource AccentBrush}" FontSize="38" FontWeight="Bold" />
-                                        <TextBlock Text="remaining" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="13" VerticalAlignment="Bottom" Margin="0,0,0,7" />
-                                    </StackPanel>
-                                    <ProgressBar x:Name="WeeklyProgress" Height="9" MinHeight="9" Minimum="0" Maximum="100" Foreground="{ThemeResource AccentBrush}" Background="{ThemeResource TrackBrush}" CornerRadius="5" />
-                                    <Grid ColumnSpacing="12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="WeeklyUsed" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
-                                        <TextBlock x:Name="WeeklyAvailable" Grid.Column="1" HorizontalAlignment="Right" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="12" FontWeight="SemiBold" />
+                                    <Grid>
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <TextBlock x:Name="WeeklyRemaining" Foreground="{ThemeResource AccentBrush}" FontSize="34" FontWeight="Bold" />
+                                            <TextBlock Text="remaining" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="11" VerticalAlignment="Bottom" Margin="0,0,0,6" />
+                                        </StackPanel>
+                                        <StackPanel HorizontalAlignment="Right" Spacing="1">
+                                            <TextBlock x:Name="WeeklyUsed" HorizontalAlignment="Right" FontSize="23" FontWeight="SemiBold" />
+                                            <TextBlock x:Name="WeeklyAvailable" HorizontalAlignment="Right" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="10" />
+                                        </StackPanel>
                                     </Grid>
+                                    <Grid x:Name="WeeklyTrack" Height="9" Background="{ThemeResource TrackBrush}" CornerRadius="5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition x:Name="RemainingColumn" Width="0*" />
+                                            <ColumnDefinition x:Name="UsedColumn" Width="100*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="WeeklyFill" Background="{ThemeResource AccentBrush}" CornerRadius="5" />
+                                    </Grid>
+                                    <StackPanel x:Name="CostRows" Spacing="3" Margin="0,-4,0,0">
+                                        <Grid><TextBlock Text="Today" FontSize="11" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="TodayCost" Text="—" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" /></Grid>
+                                        <Grid><TextBlock Text="Yesterday" FontSize="11" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="YesterdayCost" Text="—" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" /></Grid>
+                                        <Grid><TextBlock Text="Last 30 Days" FontSize="11" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="MonthCost" Text="—" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" /></Grid>
+                                    </StackPanel>
+                                    <Border Height="1" Background="{ThemeResource CardBorderBrush}" Margin="0,-3,0,-3" />
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -241,7 +251,7 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                <StackPanel Orientation="Horizontal" Spacing="6" Visibility="Collapsed">
                                     <FontIcon Glyph="&#xE777;" FontSize="12" Foreground="{ThemeResource SecondaryTextBrush}" />
                                     <TextBlock x:Name="ResetCredits" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
                                 </StackPanel>
@@ -287,25 +297,27 @@
 
                         <StackPanel x:Name="WeatherContent" Spacing="10">
                             <Border Style="{StaticResource CardStyle}">
-                                <Grid ColumnSpacing="16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Spacing="2">
-                                        <TextBlock x:Name="WeatherTemperature" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="40" FontWeight="SemiBold" />
-                                        <TextBlock x:Name="WeatherCondition" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="15" FontWeight="SemiBold" />
-                                        <TextBlock x:Name="WeatherLocation" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" TextTrimming="CharacterEllipsis" MaxWidth="285" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="8">
-                                        <Image x:Name="WeatherHeroIcon" Source="Assets/Weather/unknown.svg" Width="42" Height="42" Stretch="Uniform" />
-                                        <TextBlock x:Name="WeatherHighLow" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
-                                    </StackPanel>
-                                </Grid>
+                                <StackPanel Spacing="12">
+                                    <Grid>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock x:Name="WeatherTemperature" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="42" FontWeight="SemiBold" />
+                                            <TextBlock x:Name="WeatherCondition" FontSize="14" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                        <Border HorizontalAlignment="Right" VerticalAlignment="Center" Background="{ThemeResource CardHoverBrush}" CornerRadius="20" Padding="9">
+                                            <Image x:Name="WeatherHeroIcon" Source="Assets/Weather/unknown.svg" Width="56" Height="56" Stretch="Uniform" />
+                                        </Border>
+                                    </Grid>
+                                    <Border Height="1" Background="{ThemeResource CardBorderBrush}" />
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="WeatherLocation" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock x:Name="WeatherHighLow" Grid.Column="1" FontSize="12" FontWeight="SemiBold" />
+                                    </Grid>
+                                </StackPanel>
                             </Border>
 
                             <Border Style="{StaticResource CardStyle}">
-                                <Grid RowSpacing="12" ColumnSpacing="24">
+                                <Grid RowSpacing="7" ColumnSpacing="7">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
@@ -315,10 +327,10 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel><TextBlock Text="Feels like" Style="{StaticResource MetricLabelStyle}" /><TextBlock x:Name="FeelsLike" Style="{StaticResource MetricValueStyle}" /></StackPanel>
-                                    <StackPanel Grid.Column="1"><TextBlock Text="Humidity" Style="{StaticResource MetricLabelStyle}" /><TextBlock x:Name="Humidity" Style="{StaticResource MetricValueStyle}" /></StackPanel>
-                                    <StackPanel Grid.Row="1"><TextBlock Text="Wind" Style="{StaticResource MetricLabelStyle}" /><TextBlock x:Name="Wind" Style="{StaticResource MetricValueStyle}" /></StackPanel>
-                                    <StackPanel Grid.Row="1" Grid.Column="1"><TextBlock Text="Rain" Style="{StaticResource MetricLabelStyle}" /><TextBlock x:Name="Rain" Style="{StaticResource MetricValueStyle}" /></StackPanel>
+                                    <Border Grid.Row="0" Grid.Column="0" Background="{ThemeResource CardHoverBrush}" CornerRadius="10" Padding="9,6"><StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE7B5;" FontSize="16" Foreground="{ThemeResource SecondaryTextBrush}" /><StackPanel><TextBlock Text="Feels like" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="FeelsLike" Style="{StaticResource MetricValueStyle}" /></StackPanel></StackPanel></Border>
+                                    <Border Grid.Row="0" Grid.Column="1" Background="{ThemeResource CardHoverBrush}" CornerRadius="10" Padding="9,6"><StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE9CA;" FontSize="16" Foreground="{ThemeResource SecondaryTextBrush}" /><StackPanel><TextBlock Text="Humidity" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="Humidity" Style="{StaticResource MetricValueStyle}" /></StackPanel></StackPanel></Border>
+                                    <Border Grid.Row="1" Grid.Column="0" Background="{ThemeResource CardHoverBrush}" CornerRadius="10" Padding="9,6"><StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE9DE;" FontSize="16" Foreground="{ThemeResource SecondaryTextBrush}" /><StackPanel><TextBlock Text="Wind" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="Wind" Style="{StaticResource MetricValueStyle}" /></StackPanel></StackPanel></Border>
+                                    <Border Grid.Row="1" Grid.Column="1" Background="{ThemeResource CardHoverBrush}" CornerRadius="10" Padding="9,6"><StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE9C4;" FontSize="16" Foreground="{ThemeResource SecondaryTextBrush}" /><StackPanel><TextBlock Text="Rain" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="Rain" Style="{StaticResource MetricValueStyle}" /></StackPanel></StackPanel></Border>
                                     <Grid x:Name="UvRow" Grid.Row="2" Grid.ColumnSpan="2" Margin="0,2,0,0">
                                         <TextBlock Text="UV Index" Style="{StaticResource MetricLabelStyle}" />
                                         <TextBlock x:Name="UvIndex" HorizontalAlignment="Right" Style="{StaticResource MetricValueStyle}" />
@@ -326,7 +338,7 @@
                                 </Grid>
                             </Border>
 
-                            <TextBlock Text="NEXT HOURS" Style="{StaticResource SectionLabelStyle}" Margin="2,2,0,-3" />
+                            <TextBlock Text="Next hours" Style="{StaticResource SectionLabelStyle}" Margin="2,2,0,-3" />
                             <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" HorizontalScrollMode="Enabled" VerticalScrollMode="Disabled">
                                 <Border Style="{StaticResource CardStyle}" Padding="10">
                                     <Grid>
@@ -336,7 +348,7 @@
                                 </Border>
                             </ScrollViewer>
 
-                            <Grid Margin="2,2,2,0">
+                            <Border Style="{StaticResource CardStyle}"><Grid Margin="2,2,2,0">
                                 <StackPanel Orientation="Horizontal" Spacing="7">
                                     <Image Source="Assets/Weather/clear-day.svg" Width="14" Height="14" Stretch="Uniform" />
                                     <TextBlock x:Name="Sunrise" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
@@ -346,6 +358,7 @@
                                     <TextBlock x:Name="Sunset" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
                                 </StackPanel>
                             </Grid>
+                            </Border>
                             <TextBlock x:Name="WeatherUpdated" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" Margin="2,2,0,0" />
                         </StackPanel>
                     </StackPanel>

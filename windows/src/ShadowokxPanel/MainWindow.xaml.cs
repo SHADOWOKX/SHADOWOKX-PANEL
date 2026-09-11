@@ -28,6 +28,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private readonly nint _hwnd;
     private readonly DispatcherTimer _clockTimer;
     private readonly TokenGraphControl _tokenGraph;
+    private readonly SolidColorBrush _capacityBrush = new();
     private readonly UISettings _uiSettings = new();
     private IReadOnlyList<ForecastHour> _renderedForecast = [];
     private string? _renderedForecastTimeZone;
@@ -41,6 +42,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private int? _codexNaturalHeight;
     private int? _weatherNaturalHeight;
     private bool _contentResizeQueued;
+    private bool _displayChangeQueued;
     private ThemePreset? _appliedTheme;
     private AccentPreset? _appliedAccent;
     private string? _appliedCustomAccent;
@@ -118,7 +120,8 @@ public sealed partial class MainWindow : Window, IDisposable
             {
                 if (_host.ProvidersReady)
                     _ = _host.ResumeAsync();
-            });
+            },
+            QueueDisplayChange);
         UpdateTray();
     }
 
@@ -136,9 +139,24 @@ public sealed partial class MainWindow : Window, IDisposable
         Activate();
         _clockTimer.Start();
         if (codexVisible && _host.ProvidersReady)
-            _ = _viewModel.RefreshCodexAsync();
+            _ = _viewModel.RefreshCodexAsync(false);
         else if (_host.ProvidersReady && _host.Settings.Current.RefreshOnOpen)
             _ = _host.Weather.RefreshAsync(false);
+    }
+
+    private void QueueDisplayChange()
+    {
+        if (_disposed || !_visible || _displayChangeQueued) return;
+        _displayChangeQueued = true;
+        if (!DispatcherQueue.TryEnqueue(() =>
+        {
+            _displayChangeQueued = false;
+            if (_disposed || !_visible) return;
+            _codexNaturalHeight = null;
+            _weatherNaturalHeight = null;
+            PositionNearTray();
+            QueueContentResize();
+        })) _displayChangeQueued = false;
     }
 
     private void TogglePanel()
@@ -156,6 +174,10 @@ public sealed partial class MainWindow : Window, IDisposable
         _visible = false;
         _host.Codex.SetVisible(false);
         _clockTimer.Stop();
+        CodexRefreshRing.IsActive = false;
+        WeatherRefreshRing.IsActive = false;
+        CodexInitialProgress.IsActive = false;
+        WeatherInitialProgress.IsActive = false;
         _appWindow.Hide();
     }
 
@@ -251,7 +273,9 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void PositionNearTray(bool captureAnchor = true)
     {
-        if ((captureAnchor || !_hasAnchorPoint) && NativeMethods.GetCursorPos(out var point))
+        var point = new NativeMethods.Point();
+        if ((captureAnchor || !_hasAnchorPoint) &&
+            (_tray is not null ? _tray.TryGetAnchor(out point) : NativeMethods.GetCursorPos(out point)))
         {
             _anchorPoint = point;
             _hasAnchorPoint = true;
@@ -267,24 +291,18 @@ public sealed partial class MainWindow : Window, IDisposable
         var dpi = NativeMethods.GetDpiForMonitor(monitor, 0, out var monitorDpi, out _) == 0
             ? monitorDpi : NativeMethods.GetDpiForWindow(_hwnd);
         var scale = Math.Max(96, dpi) / 96d;
-        var margin = (int)Math.Round(10 * scale);
-        var width = (int)Math.Round((_host.Settings.Current.Density ==
-            Core.Settings.LayoutDensity.Compact ? 400 : 430) * scale);
         var desiredHeight = DesiredPanelHeight();
-        var height = (int)Math.Round(desiredHeight * scale);
-        width = Math.Min(width, Math.Max(1, info.rcWork.Right - info.rcWork.Left - margin * 2));
-        height = Math.Min(height, Math.Max(1, info.rcWork.Bottom - info.rcWork.Top - margin * 2));
-        var taskbarBottom = info.rcWork.Bottom < info.rcMonitor.Bottom;
-        var taskbarTop = info.rcWork.Top > info.rcMonitor.Top;
-        var taskbarLeft = info.rcWork.Left > info.rcMonitor.Left;
-        var taskbarRight = info.rcWork.Right < info.rcMonitor.Right;
-        var x = taskbarLeft ? info.rcWork.Left + margin : taskbarRight
-            ? info.rcWork.Right - width - margin : cursor.X - width + margin;
-        var y = taskbarTop ? info.rcWork.Top + margin : taskbarBottom
-            ? info.rcWork.Bottom - height - margin : cursor.Y - height + margin;
-        x = Math.Clamp(x, info.rcWork.Left + margin, info.rcWork.Right - width - margin);
-        y = Math.Clamp(y, info.rcWork.Top + margin, info.rcWork.Bottom - height - margin);
-        _appWindow.MoveAndResize(new RectInt32(x, y, width, height));
+        var bounds = PopupPlacement.Calculate(
+            new ScreenRect(info.rcWork.Left, info.rcWork.Top,
+                info.rcWork.Right - info.rcWork.Left, info.rcWork.Bottom - info.rcWork.Top),
+            new ScreenRect(info.rcMonitor.Left, info.rcMonitor.Top,
+                info.rcMonitor.Right - info.rcMonitor.Left, info.rcMonitor.Bottom - info.rcMonitor.Top),
+            cursor.X, cursor.Y, scale,
+            _host.Settings.Current.Density == Core.Settings.LayoutDensity.Compact ? 400 : 430,
+            desiredHeight);
+        var width = bounds.Width;
+        var height = bounds.Height;
+        _appWindow.MoveAndResize(new RectInt32(bounds.X, bounds.Y, width, height));
         ApplyPanelFrameStyling();
         ApplyRoundedWindowRegion(width, height, scale);
         _positionedHeight = desiredHeight;
@@ -346,8 +364,18 @@ public sealed partial class MainWindow : Window, IDisposable
         WeatherScroll.Visibility = weatherSelected ? Visibility.Visible : Visibility.Collapsed;
         CodexTab.Background = weatherSelected ? Transparent() : ResourceBrush("AccentBrush", 0.22);
         WeatherTab.Background = weatherSelected ? ResourceBrush("AccentBrush", 0.22) : Transparent();
-        RenderCodex(_viewModel.Codex, settings);
-        RenderWeather(_viewModel.Weather, settings);
+        if (weatherSelected)
+        {
+            CodexRefreshRing.IsActive = false;
+            CodexInitialProgress.IsActive = false;
+            RenderWeather(_viewModel.Weather, settings);
+        }
+        else
+        {
+            WeatherRefreshRing.IsActive = false;
+            WeatherInitialProgress.IsActive = false;
+            RenderCodex(_viewModel.Codex, settings);
+        }
         _codexLayoutKey = CodexLayoutKey.Create(_viewModel.Codex, settings);
         _weatherLayoutKey = WeatherLayoutKey.Create(_viewModel.Weather, settings);
         _lastRenderedSettings = settings;
@@ -391,7 +419,7 @@ public sealed partial class MainWindow : Window, IDisposable
             ? "Checking this Windows user’s Codex installation…"
             : state.ErrorMessage ?? "No usage data has been reported yet.";
         var refreshing = state.Status is ProviderStatus.Loading or ProviderStatus.Refreshing;
-        var animateRefresh = refreshing && settings.Animations && _uiSettings.AnimationsEnabled;
+        var animateRefresh = _visible && refreshing && settings.Animations && _uiSettings.AnimationsEnabled;
         CodexRefreshRing.IsActive = animateRefresh;
         CodexRefreshRing.Visibility = animateRefresh ? Visibility.Visible : Visibility.Collapsed;
         CodexRefreshIcon.Visibility = animateRefresh ? Visibility.Collapsed : Visibility.Visible;
@@ -409,16 +437,38 @@ public sealed partial class MainWindow : Window, IDisposable
         if (weekly is not null)
         {
             WeeklyRemaining.Text = $"{Math.Round(weekly.RemainingPercent):0}%";
-            WeeklyProgress.Value = weekly.RemainingPercent;
-            WeeklyUsed.Text = $"{Math.Round(weekly.UsedPercent):0}% used";
-            WeeklyAvailable.Text = $"{Math.Round(weekly.RemainingPercent):0}% available";
+            var remaining = Math.Clamp(Math.Round(weekly.RemainingPercent), 0, 100);
+            RemainingColumn.Width = new GridLength(remaining, GridUnitType.Star);
+            UsedColumn.Width = new GridLength(100 - remaining, GridUnitType.Star);
+            WeeklyFill.Visibility = remaining > 0 ? Visibility.Visible : Visibility.Collapsed;
+            var color = remaining >= 60 ? Windows.UI.Color.FromArgb(255, 34, 197, 94) :
+                remaining >= 30 ? Windows.UI.Color.FromArgb(255, 234, 179, 8) :
+                Windows.UI.Color.FromArgb(255, 239, 68, 68);
+            _capacityBrush.Color = color;
+            WeeklyFill.Background = _capacityBrush;
+            WeeklyRemaining.Foreground = _capacityBrush;
+            CapacityDot.Fill = _capacityBrush;
+            WeeklyUsed.Text = $"{100 - remaining:0}%";
+            WeeklyAvailable.Text = "used · " + (_viewModel.UsagePace switch
+            {
+                UsagePace.Idle => "Quiet", UsagePace.Peak => "Peak", _ => "Steady",
+            });
             CapacityLabel.Text = UsageAnalytics.CapacityLabel(weekly.RemainingPercent);
             WeeklyCountdown.Text = FormatCountdown(weekly.ResetsAt);
             WeeklyResetDate.Text = weekly.ResetsAt?.LocalDateTime.ToString(
                 "ddd t", CultureInfo.CurrentCulture) ?? "Reset unavailable";
         }
 
+        TodayCost.Text = FormatCost(state.Cost?.Today);
+        YesterdayCost.Text = FormatCost(state.Cost?.Yesterday);
+        MonthCost.Text = FormatCost(state.Cost?.Last30Days);
+        ToolTipService.SetToolTip(CostRows, state.Cost is { } cost
+            ? $"{(cost.Partial ? "Partial API estimate" : "API estimate")} · local sessions · USD\n" +
+                $"Not your subscription bill. Prices: 2026-09-11.\nUnpriced tokens: {FormatTokens(cost.Last30Days.UnpricedTokens)}\n" +
+                FormatUpdated(cost.UpdatedAt, DateTimeOffset.Now - cost.UpdatedAt > TimeSpan.FromMinutes(5))
+            : "Local session cost estimate is loading. Unavailable values are not zero.");
         var fiveHour = state.FiveHour;
+        FiveHourCard.Visibility = fiveHour is null ? Visibility.Collapsed : Visibility.Visible;
         FiveHourText.Text = fiveHour is null
             ? "Not reported by this Codex session."
             : $"{Math.Round(fiveHour.RemainingPercent):0}% remaining";
@@ -447,9 +497,9 @@ public sealed partial class MainWindow : Window, IDisposable
             ? Visibility.Visible : Visibility.Collapsed;
         UsageStateText.Text = pace switch
         {
-            UsagePace.Idle => "Recent daily usage is below your normal pace.",
-            UsagePace.Peak => "Recent daily usage is above your normal pace.",
-            _ => "Recent daily usage is close to your normal pace.",
+            UsagePace.Idle => "Today is below your recent daily average.",
+            UsagePace.Peak => "Usage is above your recent daily average.",
+            _ => "Usage is close to your recent daily average.",
         };
         ResetCredits.Text = $"Reset credits: {state.ResetCreditsAvailable}";
         CodexUpdated.Text = FormatUpdated(state.LastSuccessfulRefresh, state.IsStale);
@@ -466,7 +516,7 @@ public sealed partial class MainWindow : Window, IDisposable
             ? "Contacting Open-Meteo…"
             : state.ErrorMessage ?? "No forecast has been received yet.";
         var refreshing = state.Status is ProviderStatus.Loading or ProviderStatus.Refreshing;
-        var animateRefresh = refreshing && settings.Animations && _uiSettings.AnimationsEnabled;
+        var animateRefresh = _visible && refreshing && settings.Animations && _uiSettings.AnimationsEnabled;
         WeatherRefreshRing.IsActive = animateRefresh;
         WeatherRefreshRing.Visibility = animateRefresh ? Visibility.Visible : Visibility.Collapsed;
         WeatherRefreshIcon.Visibility = animateRefresh ? Visibility.Collapsed : Visibility.Visible;
@@ -675,7 +725,7 @@ public sealed partial class MainWindow : Window, IDisposable
             await _viewModel.SelectPageAsync("codex");
             _host.Codex.SetVisible(_visible);
             if (_visible && _host.ProvidersReady)
-                await _viewModel.RefreshCodexAsync();
+                await _viewModel.RefreshCodexAsync(false);
         }
         catch (IOException) { }
     }
@@ -793,6 +843,9 @@ public sealed partial class MainWindow : Window, IDisposable
         var brush = (SolidColorBrush)Application.Current.Resources[name];
         return opacity >= 1 ? brush : new SolidColorBrush(brush.Color) { Opacity = opacity };
     }
+
+    private static string FormatCost(Core.Codex.CostAmount? amount) => amount is null ? "—" :
+        $"≈{(amount.Dollars is > 0 and < .01m ? "<$0.01" : amount.Dollars.ToString("$#,##0.00", CultureInfo.InvariantCulture))} · {FormatTokens(amount.Tokens)} tokens";
 
     private static string FormatTokens(long? value) => value.HasValue
         ? TokenCountFormatter.Format(value.Value, CultureInfo.CurrentCulture)

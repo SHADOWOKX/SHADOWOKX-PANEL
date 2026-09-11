@@ -6,7 +6,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <Deterministic>true</Deterministic>
-    <VersionPrefix>1.0.0</VersionPrefix>
+    <VersionPrefix>2.0.0</VersionPrefix>
     <Product>Shadowokx Panel</Product>
     <AssemblyTitle>Shadowokx Panel</AssemblyTitle>
     <Company>Shadowokx</Company>

@@ -226,6 +226,38 @@ public sealed class ProviderTests
         Assert.Equal(1, client.Count);
     }
 
+    [Fact]
+    public async Task RepeatedFreshPopupOpensDoNotSpawnMoreCodexProcesses()
+    {
+        using var temporary = TemporaryDirectory.Create();
+        var client = new CountingCodexClient(TimeSpan.Zero);
+        await using var provider = new CodexProvider(temporary.Paths, 15,
+            () => new CodexLaunchSpec("codex", false), client);
+        await provider.StartAsync();
+        await WaitForAsync(() => provider.State.Status == ProviderStatus.Success);
+        var count = client.Count;
+        for (var i = 0; i < 50; i++)
+        {
+            provider.SetVisible(true);
+            await provider.RefreshAsync(false);
+            provider.SetVisible(false);
+        }
+        Assert.Equal(count, client.Count);
+    }
+
+    [Fact]
+    public async Task DisabledWeatherRejectsEvenManualRefreshAndDuplicateStartup()
+    {
+        using var temporary = TemporaryDirectory.Create();
+        var client = new CountingWeatherClient();
+        await using var provider = new WeatherProvider(temporary.Paths, "Cairo", "celsius", 30,
+            enabled: false, client: client);
+        await provider.StartAsync();
+        await provider.StartAsync();
+        await provider.RefreshAsync(true);
+        Assert.Equal(0, client.Count);
+    }
+
     private static async Task WaitForAsync(Func<bool> condition)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));

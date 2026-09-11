@@ -14,7 +14,7 @@ public static class ThemeService
     private static readonly IReadOnlyDictionary<ThemePreset, Palette> Palettes =
         new Dictionary<ThemePreset, Palette>
         {
-            [ThemePreset.Shadow] = new("#252623", "#30312f", "#383936", "#464742", "#f5f3ed", "#b6b4ac", ElementTheme.Dark),
+            [ThemePreset.Shadow] = new("#202324", "#25292b", "#2d3234", "#393e40", "#f4f6f7", "#a5adb2", ElementTheme.Dark),
             [ThemePreset.Midnight] = new("#151820", "#1d222d", "#252b37", "#343b49", "#f4f7fb", "#9da8b8", ElementTheme.Dark),
             [ThemePreset.Graphite] = new("#15171a", "#1f2226", "#292d32", "#343941", "#f5f6f7", "#a5abb3", ElementTheme.Dark),
             [ThemePreset.Nord] = new("#242933", "#2e3440", "#3b4252", "#4c566a", "#eceff4", "#b6c0d1", ElementTheme.Dark),
@@ -52,7 +52,7 @@ public static class ThemeService
         Set("CardBorderBrush", palette.Border);
         Set("PrimaryTextBrush", palette.Primary);
         Set("SecondaryTextBrush", palette.Secondary);
-        Set("TrackBrush", preset == ThemePreset.Light ? "#d5d6d1" : "#4d4e49");
+        Set("TrackBrush", preset == ThemePreset.Light ? "#d5d6d1" : "#373c3e");
         var accent = settings.Accent == AccentPreset.Custom
             ? settings.CustomAccent
             : Accents.GetValueOrDefault(settings.Accent, "#f97316");

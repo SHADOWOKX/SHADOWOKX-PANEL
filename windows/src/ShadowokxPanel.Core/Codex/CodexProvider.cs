@@ -10,7 +10,7 @@ public sealed record CodexRefreshPolicy(TimeSpan VisibleInterval, TimeSpan Backg
 {
     public static CodexRefreshPolicy Default { get; } = new(
         TimeSpan.FromSeconds(30),
-        TimeSpan.FromSeconds(60));
+        TimeSpan.FromMinutes(3));
 }
 
 public sealed class CodexProvider : IAsyncDisposable
@@ -27,6 +27,9 @@ public sealed class CodexProvider : IAsyncDisposable
         SingleWriter = false,
         FullMode = BoundedChannelFullMode.DropOldest,
     });
+    private readonly TokenCostReader _costReader;
+    private Task? _costTask;
+    private DateTimeOffset _costAttempt;
     private readonly object _sync = new();
     private CancellationTokenSource _lifetime = new();
     private Task<CodexState>? _refreshTask;
@@ -52,6 +55,7 @@ public sealed class CodexProvider : IAsyncDisposable
         _historyStore = new TokenHistoryStore(paths);
         _cache = new JsonFileStore<CodexState>(paths.CodexCacheFile);
         _logger = logger;
+        _costReader = new TokenCostReader(paths);
         _refreshPolicy = refreshPolicy ?? CodexRefreshPolicy.Default;
         if (_refreshPolicy.VisibleInterval <= TimeSpan.Zero ||
             _refreshPolicy.BackgroundInterval <= TimeSpan.Zero)
@@ -103,7 +107,9 @@ public sealed class CodexProvider : IAsyncDisposable
                 return _refreshTask;
             if (!force && !IsStale())
                 return Task.FromResult(State);
-            var task = RefreshCoreAsync(cancellationToken);
+            if (_lifetime.IsCancellationRequested)
+                return Task.FromResult(State);
+            var task = Task.Run(() => RefreshCoreAsync(cancellationToken));
             _refreshTask = task;
             _ = task.ContinueWith(
                 _ =>
@@ -133,7 +139,10 @@ public sealed class CodexProvider : IAsyncDisposable
         }
         _scheduleChanges.Writer.TryWrite(true);
         if (refresh)
-            _ = RefreshAsync(true, _lifetime.Token);
+        {
+            _ = RefreshAsync(false, _lifetime.Token);
+            RefreshCostIfDue();
+        }
     }
 
     public async Task ClearHistoryAsync(CancellationToken cancellationToken = default)
@@ -150,6 +159,29 @@ public sealed class CodexProvider : IAsyncDisposable
             TokenUsage = TokenHistoryStore.Apply(State.TokenUsage, _history, DateTimeOffset.Now),
         });
         await RefreshAsync(true, cancellationToken).ConfigureAwait(false);
+    }
+
+    private void RefreshCostIfDue()
+    {
+        lock (_sync)
+        {
+            if (!_visible || _lifetime.IsCancellationRequested || _costTask is { IsCompleted: false } ||
+                DateTimeOffset.Now - _costAttempt < TimeSpan.FromMinutes(2)) return;
+            _costAttempt = DateTimeOffset.Now;
+            _costTask = Task.Run(async () =>
+            {
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+                timeout.CancelAfter(TimeSpan.FromSeconds(45));
+                try
+                {
+                    var cost = await _costReader.ReadAsync(timeout.Token).ConfigureAwait(false);
+                    if (!_lifetime.IsCancellationRequested)
+                        Publish(State with { Cost = cost });
+                }
+                catch (Exception error) when (error is OperationCanceledException or IOException or UnauthorizedAccessException)
+                { /* Preserve the last estimate; the next visible refresh retries. */ }
+            });
+        }
     }
 
     private bool IsStale() => State.LastSuccessfulRefresh is not { } refreshed ||
@@ -198,13 +230,14 @@ public sealed class CodexProvider : IAsyncDisposable
             {
                 await LogAsync("codex.history.write.failed").ConfigureAwait(false);
             }
-            var state = live with { TokenUsage = TokenHistoryStore.Apply(live.TokenUsage, _history, now) };
+            var state = live with { TokenUsage = TokenHistoryStore.Apply(live.TokenUsage, _history, now), Cost = State.Cost };
             try { await PersistCacheIfNeededAsync(state, now, linked.Token).ConfigureAwait(false); }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
                 await LogAsync("codex.cache.write.failed").ConfigureAwait(false);
             }
             Publish(state);
+            RefreshCostIfDue();
             return state;
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested || externalCancellation.IsCancellationRequested)
@@ -321,6 +354,8 @@ public sealed class CodexProvider : IAsyncDisposable
             refresh = _refreshTask;
         if (refresh is not null)
             await refresh.ConfigureAwait(false);
+        if (_costTask is not null)
+            await _costTask.ConfigureAwait(false);
         _lifetime.Dispose();
     }
 

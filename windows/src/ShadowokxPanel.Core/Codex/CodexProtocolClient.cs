@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using ShadowokxPanel.Core.IO;
 using System.ComponentModel;
 using System.Text.Json;
 using ShadowokxPanel.Core.Models;
@@ -35,7 +36,8 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
             throw new CodexClientException(CodexClientFailure.StartFailed,
                 "Codex could not be started.", error);
         }
-        var stderrDrain = process.StandardError.ReadToEndAsync(timeout.Token);
+        var stderrDrain = DrainAsync(process.StandardError, timeout.Token);
+        var output = new BoundedLineReader(process.StandardOutput, MaximumLineCharacters);
         JsonElement? rateLimits = null;
         JsonElement? usage = null;
         var usageSettled = false;
@@ -65,7 +67,7 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
             var initialized = false;
             for (var i = 0; i < 512 && !initialized; i++)
             {
-                using var message = await ReadMessageAsync(process, timeout.Token).ConfigureAwait(false);
+                using var message = await ReadMessageAsync(output, timeout.Token).ConfigureAwait(false);
                 if (ReadId(message.RootElement) != 1)
                     continue;
                 if (message.RootElement.TryGetProperty("error", out var initializationError) ||
@@ -91,7 +93,7 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
 
             for (var i = 0; i < 512; i++)
             {
-                using var message = await ReadMessageAsync(process, timeout.Token).ConfigureAwait(false);
+                using var message = await ReadMessageAsync(output, timeout.Token).ConfigureAwait(false);
                 var id = ReadId(message.RootElement);
                 if (id == 2)
                 {
@@ -131,9 +133,10 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
                 if (!process.HasExited)
                     process.Kill(true);
             }
-            catch (InvalidOperationException) { }
+            catch (Exception error) when (error is InvalidOperationException or Win32Exception) { }
+            timeout.Cancel();
             try { await stderrDrain.ConfigureAwait(false); }
-            catch (Exception error) when (error is InvalidOperationException or OperationCanceledException) { }
+            catch (Exception error) when (error is InvalidOperationException or OperationCanceledException or IOException) { }
         }
     }
 
@@ -188,12 +191,12 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
     }
 
     private static async Task<JsonDocument> ReadMessageAsync(
-        Process process,
+        BoundedLineReader output,
         CancellationToken cancellationToken)
     {
         for (var i = 0; i < 512; i++)
         {
-            var line = await process.StandardOutput.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+            var line = await output.ReadLineAsync(cancellationToken).ConfigureAwait(false);
             if (line is null)
                 throw new CodexClientException(CodexClientFailure.AppServerFailed,
                     "Codex app-server closed the protocol stream.");
@@ -207,8 +210,15 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
             "Codex returned too many non-JSON lines.");
     }
 
+    private static async Task DrainAsync(TextReader reader, CancellationToken cancellationToken)
+    {
+        var buffer = new char[4096];
+        while (await reader.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false) > 0) { }
+    }
+
     private static int? ReadId(JsonElement root) =>
-        root.TryGetProperty("id", out var id) && id.TryGetInt32(out var number) ? number : null;
+        root.ValueKind == JsonValueKind.Object && root.TryGetProperty("id", out var id) &&
+        id.ValueKind == JsonValueKind.Number && id.TryGetInt32(out var number) ? number : null;
 }
 
 
