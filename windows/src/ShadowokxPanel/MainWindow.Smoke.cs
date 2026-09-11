@@ -60,12 +60,21 @@ public sealed partial class MainWindow
         await Task.Delay(150);
         await CaptureAsync(Path.Combine(output, "weather.png"));
         var weatherOverflow = WeatherScroll.ScrollableHeight;
+        if (Root.ActualHeight >= 680 && (codexOverflow > 1 || weatherOverflow > 1))
+            throw new InvalidOperationException($"Normal content overflow: Codex {codexOverflow}, Weather {weatherOverflow}");
         for (var i = 0; i < 20; i++) { HidePanel(); ShowPanel(); await Task.Delay(10); }
         HidePanel();
         if (_clockTimer.IsEnabled || CodexRefreshRing.IsActive || WeatherRefreshRing.IsActive)
             throw new InvalidOperationException("Hidden UI still has active animation timers.");
+        using var process = System.Diagnostics.Process.GetCurrentProcess();
+        process.Refresh();
+        var cpuBefore = process.TotalProcessorTime;
+        await Task.Delay(3000);
+        process.Refresh();
         await File.WriteAllTextAsync(Path.Combine(output, "report.json"), JsonSerializer.Serialize(new
-        { progress = rows, codexOverflow, weatherOverflow, reopenCycles = 20, hiddenClockStopped = true }));
+        { progress = rows, codexOverflow, weatherOverflow, reopenCycles = 20, hiddenClockStopped = true,
+            hiddenCpuMillisecondsOver3Seconds = (process.TotalProcessorTime - cpuBefore).TotalMilliseconds,
+            privateBytes = process.PrivateMemorySize64, handles = process.HandleCount }));
     }
 
     private async Task CaptureAsync(string file)

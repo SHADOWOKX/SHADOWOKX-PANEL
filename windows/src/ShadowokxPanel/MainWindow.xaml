@@ -299,7 +299,7 @@
                             </StackPanel>
                         </Border>
 
-                        <StackPanel x:Name="WeatherContent" Spacing="10">
+                        <StackPanel x:Name="WeatherContent" Spacing="8">
                             <Border Style="{StaticResource CardStyle}">
                                 <StackPanel Spacing="12">
                                     <Grid>
