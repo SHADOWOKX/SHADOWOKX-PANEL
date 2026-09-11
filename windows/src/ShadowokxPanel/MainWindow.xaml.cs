@@ -456,7 +456,7 @@ public sealed partial class MainWindow : Window, IDisposable
             CapacityLabel.Text = UsageAnalytics.CapacityLabel(weekly.RemainingPercent);
             WeeklyCountdown.Text = FormatCountdown(weekly.ResetsAt);
             WeeklyResetDate.Text = weekly.ResetsAt?.LocalDateTime.ToString(
-                "ddd t", CultureInfo.CurrentCulture) ?? "Reset unavailable";
+                "ddd h:mm tt", CultureInfo.CurrentCulture) ?? "Reset unavailable";
         }
 
         TodayCost.Text = FormatCost(state.Cost?.Today);
@@ -484,7 +484,7 @@ public sealed partial class MainWindow : Window, IDisposable
         LifetimeTokens.Text = FormatTokens(usage?.LifetimeTokens);
         _tokenGraph.Visibility = settings.ShowTokenHistory ? Visibility.Visible : Visibility.Collapsed;
         TokenGraphHost.Visibility = _tokenGraph.Visibility;
-        var graphHeight = usage?.DailyBuckets.Count >= 2 ? 92 : 58;
+        var graphHeight = usage?.DailyBuckets.Count >= 2 ? 82 : 48;
         TokenGraphHost.Height = graphHeight;
         _tokenGraph.Height = graphHeight;
         _tokenGraph.SetData(usage?.DailyBuckets);
@@ -497,7 +497,7 @@ public sealed partial class MainWindow : Window, IDisposable
             ? Visibility.Visible : Visibility.Collapsed;
         UsageStateText.Text = pace switch
         {
-            UsagePace.Idle => "Today is below your recent daily average.",
+            UsagePace.Idle => "Usage is below your recent daily average.",
             UsagePace.Peak => "Usage is above your recent daily average.",
             _ => "Usage is close to your recent daily average.",
         };

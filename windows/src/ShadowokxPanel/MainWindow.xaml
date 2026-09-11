@@ -8,9 +8,9 @@
         BorderBrush="{ThemeResource CardBorderBrush}"
         BorderThickness="1"
         CornerRadius="22"
-        Padding="18"
+        Padding="14"
         KeyDown="Root_KeyDown">
-        <Grid RowSpacing="14">
+        <Grid RowSpacing="10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -21,7 +21,7 @@
                 <TextBlock
                     Text="Shadowokx Panel"
                     Foreground="{ThemeResource PrimaryTextBrush}"
-                    FontSize="18"
+                    FontSize="16"
                     FontWeight="SemiBold"
                     VerticalAlignment="Center" />
                 <Button
@@ -64,7 +64,7 @@
                         AutomationProperties.Name="ChatGPT Codex page"
                         Click="CodexTab_Click">
                         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <Image Source="Assets/chatgpt.png" Width="16" Height="16" Stretch="Uniform" />
+                            <Image Source="Assets/robot.svg" Width="16" Height="16" Stretch="Uniform" />
                             <TextBlock Text="ChatGPT Codex" FontWeight="SemiBold" />
                         </StackPanel>
                     </Button>
@@ -101,7 +101,7 @@
                     <StackPanel Spacing="10" Padding="0,0,0,3">
                         <Grid Margin="0,2,0,2">
                             <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                <Image Source="Assets/chatgpt.png" Width="16" Height="16" Stretch="Uniform" />
+                                <Image Source="Assets/robot.svg" Width="16" Height="16" Stretch="Uniform" />
                                 <TextBlock
                                     Text="Codex Usage"
                                     Foreground="{ThemeResource PrimaryTextBrush}"
@@ -135,7 +135,7 @@
 
                         <StackPanel x:Name="CodexContent" Spacing="10">
                             <Border x:Name="WeeklyCard" Style="{StaticResource CardStyle}">
-                                <StackPanel Spacing="10">
+                                <StackPanel Spacing="6">
                                     <Grid>
                                         <TextBlock Text="Weekly allowance" Style="{StaticResource CardTitleStyle}" />
                                         <Border x:Name="CapacityPill" HorizontalAlignment="Right" Background="{ThemeResource CardHoverBrush}" CornerRadius="9" Padding="9,4">
@@ -200,7 +200,7 @@
                             </Border>
 
                             <Border x:Name="TokenCard" Style="{StaticResource CardStyle}">
-                                <StackPanel Spacing="10">
+                                <StackPanel Spacing="8">
                                     <Grid>
                                         <TextBlock Text="Token activity" Style="{StaticResource CardTitleStyle}" />
                                         <Border HorizontalAlignment="Right" Background="{ThemeResource CardHoverBrush}" CornerRadius="9" Padding="9,4">
@@ -235,14 +235,14 @@
                                 </StackPanel>
                             </Border>
 
-                            <Border x:Name="UsageStateCard" Style="{StaticResource CardStyle}" Padding="12" Visibility="Collapsed">
+                            <Border x:Name="UsageStateCard" Style="{StaticResource CardStyle}" Padding="8" Visibility="Collapsed">
                                 <Grid ColumnSpacing="9">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <FontIcon Glyph="&#xE73E;" FontSize="14" Foreground="{ThemeResource AccentBrush}" VerticalAlignment="Center" />
-                                    <TextBlock x:Name="UsageStateText" Grid.Column="1" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="UsageStateText" Grid.Column="1" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="11" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
                                 </Grid>
                             </Border>
 
@@ -255,7 +255,7 @@
                                     <FontIcon Glyph="&#xE777;" FontSize="12" Foreground="{ThemeResource SecondaryTextBrush}" />
                                     <TextBlock x:Name="ResetCredits" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
                                 </StackPanel>
-                                <TextBlock x:Name="CodexUpdated" Grid.Column="1" HorizontalAlignment="Right" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
+                                <TextBlock x:Name="CodexUpdated" Grid.Column="1" HorizontalAlignment="Right" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="11" />
                             </Grid>
                         </StackPanel>
                     </StackPanel>
@@ -327,10 +327,10 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <Border Grid.Row="0" Grid.Column="0" Background="{ThemeResource CardHoverBrush}" CornerRadius="10" Padding="9,6"><StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE7B5;" FontSize="16" Foreground="{ThemeResource SecondaryTextBrush}" /><StackPanel><TextBlock Text="Feels like" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="FeelsLike" Style="{StaticResource MetricValueStyle}" /></StackPanel></StackPanel></Border>
-                                    <Border Grid.Row="0" Grid.Column="1" Background="{ThemeResource CardHoverBrush}" CornerRadius="10" Padding="9,6"><StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE9CA;" FontSize="16" Foreground="{ThemeResource SecondaryTextBrush}" /><StackPanel><TextBlock Text="Humidity" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="Humidity" Style="{StaticResource MetricValueStyle}" /></StackPanel></StackPanel></Border>
-                                    <Border Grid.Row="1" Grid.Column="0" Background="{ThemeResource CardHoverBrush}" CornerRadius="10" Padding="9,6"><StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE9DE;" FontSize="16" Foreground="{ThemeResource SecondaryTextBrush}" /><StackPanel><TextBlock Text="Wind" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="Wind" Style="{StaticResource MetricValueStyle}" /></StackPanel></StackPanel></Border>
-                                    <Border Grid.Row="1" Grid.Column="1" Background="{ThemeResource CardHoverBrush}" CornerRadius="10" Padding="9,6"><StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE9C4;" FontSize="16" Foreground="{ThemeResource SecondaryTextBrush}" /><StackPanel><TextBlock Text="Rain" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="Rain" Style="{StaticResource MetricValueStyle}" /></StackPanel></StackPanel></Border>
+                                    <Border Grid.Row="0" Grid.Column="0" Background="{ThemeResource CardHoverBrush}" CornerRadius="10" Padding="9,6"><StackPanel Orientation="Horizontal" Spacing="9"><Image Source="Assets/Metrics/temperature.svg" Width="18" Height="18" Stretch="Uniform" /><StackPanel><TextBlock Text="Feels like" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="FeelsLike" Style="{StaticResource MetricValueStyle}" /></StackPanel></StackPanel></Border>
+                                    <Border Grid.Row="0" Grid.Column="1" Background="{ThemeResource CardHoverBrush}" CornerRadius="10" Padding="9,6"><StackPanel Orientation="Horizontal" Spacing="9"><Image Source="Assets/Metrics/humidity.svg" Width="18" Height="18" Stretch="Uniform" /><StackPanel><TextBlock Text="Humidity" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="Humidity" Style="{StaticResource MetricValueStyle}" /></StackPanel></StackPanel></Border>
+                                    <Border Grid.Row="1" Grid.Column="0" Background="{ThemeResource CardHoverBrush}" CornerRadius="10" Padding="9,6"><StackPanel Orientation="Horizontal" Spacing="9"><Image Source="Assets/Metrics/wind.svg" Width="18" Height="18" Stretch="Uniform" /><StackPanel><TextBlock Text="Wind" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="Wind" Style="{StaticResource MetricValueStyle}" /></StackPanel></StackPanel></Border>
+                                    <Border Grid.Row="1" Grid.Column="1" Background="{ThemeResource CardHoverBrush}" CornerRadius="10" Padding="9,6"><StackPanel Orientation="Horizontal" Spacing="9"><Image Source="Assets/Metrics/rain.svg" Width="18" Height="18" Stretch="Uniform" /><StackPanel><TextBlock Text="Rain" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="Rain" Style="{StaticResource MetricValueStyle}" /></StackPanel></StackPanel></Border>
                                     <Grid x:Name="UvRow" Grid.Row="2" Grid.ColumnSpan="2" Margin="0,2,0,0">
                                         <TextBlock Text="UV Index" Style="{StaticResource MetricLabelStyle}" />
                                         <TextBlock x:Name="UvIndex" HorizontalAlignment="Right" Style="{StaticResource MetricValueStyle}" />
