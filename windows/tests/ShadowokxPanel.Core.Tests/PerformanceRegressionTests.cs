@@ -89,19 +89,23 @@ public sealed class PerformanceRegressionTests
             }
         }) + "\n";
         var file = Path.Combine(sessions, "one.jsonl");
-        await File.WriteAllTextAsync(file, context + Row(1) + Row(1));
+        var ignored = JsonSerializer.Serialize(new { type = "response_item", payload = new { text = new string('x', 10000) } }) + "\n";
+        await File.WriteAllTextAsync(file, context + string.Concat(Enumerable.Repeat(ignored, 300)) + Row(1) + Row(1));
         await File.WriteAllTextAsync(Path.Combine(sessions, "fork.jsonl"), context + Row(1));
         var reader = new TokenCostReader(temporary.Paths, temporary.Paths.Root);
         var first = await reader.ReadAsync();
+        Assert.True(reader.LastScanReadBytes > 3_000_000);
         Assert.Equal(1100, first.Today.Tokens);
         Assert.Equal(.0042m, first.Today.Dollars);
         var cacheFiles = Directory.GetFiles(Path.Combine(temporary.Paths.Cache, "cost-v1"));
         var modified = cacheFiles.Select(File.GetLastWriteTimeUtc).ToArray();
         var second = await reader.ReadAsync();
+        Assert.Equal(0, reader.LastScanReadBytes);
         Assert.Equal(first.Today, second.Today);
         Assert.Equal(modified, cacheFiles.Select(File.GetLastWriteTimeUtc));
         await File.AppendAllTextAsync(file, Row(2));
         Assert.Equal(2200, (await reader.ReadAsync()).Today.Tokens);
+        Assert.InRange(reader.LastScanReadBytes, 1, 8192);
         // A new reader reuses the persisted metadata; no conversation content is cached.
         Assert.Equal(2200, (await new TokenCostReader(temporary.Paths, temporary.Paths.Root).ReadAsync()).Today.Tokens);
     }

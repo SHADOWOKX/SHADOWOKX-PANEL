@@ -12,6 +12,7 @@ public sealed class WeatherProvider : IAsyncDisposable
     private readonly Channel<bool> _scheduleChanges = Channel.CreateBounded<bool>(new BoundedChannelOptions(1)
     { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true });
     private bool _started;
+    private bool _disposed;
     private readonly object _sync = new();
     private readonly CancellationTokenSource _lifetime = new();
     private CancellationTokenSource _configuration = new();
@@ -128,7 +129,7 @@ public sealed class WeatherProvider : IAsyncDisposable
     {
         lock (_sync)
         {
-            if (_enabled == enabled)
+            if (_disposed || _enabled == enabled)
                 return;
             _enabled = enabled;
             if (!enabled)
@@ -181,6 +182,7 @@ public sealed class WeatherProvider : IAsyncDisposable
             _lifetime.IsCancellationRequested || externalCancellation.IsCancellationRequested ||
             configurationToken.IsCancellationRequested)
         {
+            if (!_lifetime.IsCancellationRequested) Publish(previous);
             return State;
         }
         catch (Exception error)
@@ -227,6 +229,7 @@ public sealed class WeatherProvider : IAsyncDisposable
 
     private void Publish(WeatherState state)
     {
+        if (_disposed) return;
         State = state;
         StateChanged?.Invoke(this, state);
     }
@@ -236,6 +239,11 @@ public sealed class WeatherProvider : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        lock (_sync)
+        {
+            if (_disposed) return;
+            _disposed = true;
+        }
         _lifetime.Cancel();
         _configuration.Cancel();
         if (_timerTask is not null)

@@ -10,7 +10,8 @@ public sealed record CostAmount(decimal Dollars, long Tokens, long UnpricedToken
 public sealed record TokenCostSummary(CostAmount Today, CostAmount Yesterday, CostAmount Last30Days,
     DateTimeOffset UpdatedAt, bool Partial);
 public sealed record CostRecord(DateTimeOffset Time, string Key, string Model, long Input, long Cached, long Output, long Writes);
-public sealed record CostFileCache(long Length, long Modified, IReadOnlyList<CostRecord> Records, bool Partial);
+public sealed record CostFileCache(long Length, long Modified, IReadOnlyList<CostRecord> Records, bool Partial, long Offset = 0,
+    string Model = "unknown", string Provider = "openai", string? Previous = null);
 
 public sealed class TokenCostReader(ApplicationPaths paths, string? codexHome = null)
 {
@@ -23,6 +24,7 @@ public sealed class TokenCostReader(ApplicationPaths paths, string? codexHome = 
         ["gpt-5.6-terra"] = [2, .2m, 12, 2.5m],
         ["gpt-5.6-luna"] = [.2m, .02m, 1.2m, .25m],
     };
+    internal long LastScanReadBytes { get; private set; }
     private readonly string _home = codexHome ?? Environment.GetEnvironmentVariable("CODEX_HOME") ??
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex");
     private readonly Dictionary<string, CostFileCache> _files = new(StringComparer.OrdinalIgnoreCase);
@@ -41,6 +43,7 @@ public sealed class TokenCostReader(ApplicationPaths paths, string? codexHome = 
 
     private async Task<TokenCostSummary> ScanAsync(CancellationToken cancellationToken)
     {
+        LastScanReadBytes = 0;
         var today = DateOnly.FromDateTime(DateTime.Now);
         var first = today.AddDays(-29);
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -60,18 +63,18 @@ public sealed class TokenCostReader(ApplicationPaths paths, string? codexHome = 
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (visited.Count >= 4096 || retained >= 50_000) { partial = true; break; }
-                visited.Add(file);
                 try
                 {
                     var info = new FileInfo(file);
-                    if (DateOnly.FromDateTime(info.LastWriteTime) < first) continue;
+                    if (DateOnly.FromDateTime(info.LastWriteTime) < first) { _files.Remove(file); continue; }
+                    visited.Add(file);
                     var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(file)));
                     var store = new JsonFileStore<CostFileCache>(Path.Combine(paths.Cache, "cost-v1", key + ".json"));
                     if (!_files.TryGetValue(file, out var cached))
                         cached = await store.ReadAsync(cancellationToken).ConfigureAwait(false);
                     if (cached is null || cached.Length != info.Length || cached.Modified != info.LastWriteTimeUtc.Ticks)
                     {
-                        cached = await ParseAsync(file, info, cancellationToken).ConfigureAwait(false);
+                        cached = await ParseAsync(file, info, cached, cancellationToken).ConfigureAwait(false);
                         try { await store.WriteAsync(cached, cancellationToken).ConfigureAwait(false); }
                         catch (IOException) { }
                         catch (UnauthorizedAccessException) { }
@@ -102,21 +105,35 @@ public sealed class TokenCostReader(ApplicationPaths paths, string? codexHome = 
     private static CostAmount Add(CostAmount left, CostAmount right) =>
         new(left.Dollars + right.Dollars, left.Tokens + right.Tokens, left.UnpricedTokens + right.UnpricedTokens);
 
-    private static async Task<CostFileCache> ParseAsync(string path, FileInfo info, CancellationToken token)
+    private async Task<CostFileCache> ParseAsync(string path, FileInfo info, CostFileCache? previousFile, CancellationToken token)
     {
         await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
             FileShare.ReadWrite | FileShare.Delete, 32 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
+        var append = previousFile is { Offset: > 0 } && info.Length > previousFile.Length;
+        var offset = append ? previousFile!.Offset : 0;
+        if (offset > 0) stream.Seek(offset, SeekOrigin.Begin);
+        else
+        {
+            var bom = new byte[3];
+            var count = await stream.ReadAsync(bom, token).ConfigureAwait(false);
+            offset = count == 3 && bom[0] == 0xef && bom[1] == 0xbb && bom[2] == 0xbf ? 3 : 0;
+            stream.Seek(offset, SeekOrigin.Begin);
+        }
+        var readStart = stream.Position;
         using var text = new StreamReader(stream);
         var reader = new BoundedLineReader(text, skipOversized: true);
-        var model = "unknown";
-        var provider = "openai";
-        string? previous = null;
-        var records = new List<CostRecord>();
-        var partial = false;
+        var model = append ? previousFile!.Model : "unknown";
+        var provider = append ? previousFile!.Provider : "openai";
+        string? previous = append ? previousFile!.Previous : null;
+        var first = DateTime.Today.AddDays(-29);
+        var records = append ? previousFile!.Records.Where(r => r.Time.LocalDateTime.Date >= first).ToList() : [];
+        var partial = append && previousFile!.Partial;
         try
         {
             while (await reader.ReadLineAsync(token).ConfigureAwait(false) is { } line)
             {
+                if (!reader.LastLineTerminated) break; // Retry an unfinished append on the next scan.
+                offset += reader.LastLineBytes;
                 if (!line.Contains("\"token_count\"", StringComparison.Ordinal) &&
                     !line.Contains("\"turn_context\"", StringComparison.Ordinal) &&
                     !line.Contains("\"session_meta\"", StringComparison.Ordinal)) continue;
@@ -146,14 +163,15 @@ public sealed class TokenCostReader(ApplicationPaths paths, string? codexHome = 
                     var key = $"{timestamp:O}:{signature}:{Counts(usage)}";
                     records.Add(new CostRecord(timestamp, key, provider == "openai" ? model : provider + "/" + model,
                         input, cached, output, writes));
-                    if (records.Count >= 2000) { partial = true; break; }
+                    if (records.Count > 2000) { partial = true; records.RemoveRange(0, 100); }
                 }
                 catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException)
                 { partial = true; }
             }
         }
         catch (InvalidDataException) { partial = true; }
-        return new CostFileCache(info.Length, info.LastWriteTimeUtc.Ticks, records, partial || reader.SkippedOversized);
+        LastScanReadBytes += stream.Position - readStart;
+        return new CostFileCache(info.Length, info.LastWriteTimeUtc.Ticks, records, partial || reader.SkippedOversized, offset, model, provider, previous);
     }
 
     private static string? String(JsonElement value, string name) =>

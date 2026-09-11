@@ -8,10 +8,15 @@ public sealed class BoundedLineReader(TextReader reader, int maximumCharacters =
     private readonly char[] _buffer = new char[8192];
     private int _position;
     private int _length;
+    public long LastLineBytes { get; private set; }
+    public bool LastLineTerminated { get; private set; }
     public bool SkippedOversized { get; private set; }
 
     public async ValueTask<string?> ReadLineAsync(CancellationToken cancellationToken = default)
     {
+        LastLineBytes = 0;
+        LastLineTerminated = false;
+        var encoder = Encoding.UTF8.GetEncoder();
         var line = new StringBuilder();
         var dropping = false;
         while (true)
@@ -34,11 +39,14 @@ public sealed class BoundedLineReader(TextReader reader, int maximumCharacters =
                 line.Clear();
             }
             if (!dropping) line.Append(_buffer, _position, count);
+            LastLineBytes += encoder.GetByteCount(_buffer, _position, count, false);
             _position += count;
             if (end >= 0)
             {
                 _position++;
-                if (dropping) { dropping = false; continue; }
+                LastLineBytes++;
+                LastLineTerminated = true;
+                if (dropping) { dropping = false; LastLineTerminated = false; encoder.Reset(); continue; }
                 return line.ToString().TrimEnd('\r');
             }
         }

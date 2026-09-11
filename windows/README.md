@@ -1,3 +1,7 @@
+## Version 2.0
+
+The compact Linux-style dashboard, local token-cost rows, tray anchoring fixes and reduced background work are described in [the 2.0 release notes](docs/RELEASE-2.0.md).
+
 # Shadowokx Panel for Windows
 
 Shadowokx Panel is a native Windows 11 notification-area companion for Codex usage and Weather. It uses C#/.NET 8, WinUI 3, and the Windows App SDK—without embedding a browser, injecting into Explorer, or requiring administrator privileges.
