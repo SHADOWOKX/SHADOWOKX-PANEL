@@ -467,7 +467,7 @@ public sealed partial class MainWindow : Window, IDisposable
         MonthCost.Text = AccountCostEstimate.Format(account.Reported30Days, settings, CultureInfo.CurrentCulture);
         var estimateInput = 100 - settings.EstimateCachedPercent - settings.EstimateOutputPercent - settings.EstimateWritePercent;
         CostEstimateCaption.Text = settings.ShowCostEstimate
-            ? $"API estimate · {settings.EstimateModel.Replace("gpt-", "", StringComparison.Ordinal)} · assumed mix"
+            ? "API estimate · assumed mix"
             : "Account tokens";
         ToolTipService.SetToolTip(CostRows,
             $"Reference model: {settings.EstimateModel}. Assumed token mix: {estimateInput}% input, " +

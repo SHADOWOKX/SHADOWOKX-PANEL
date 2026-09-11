@@ -167,7 +167,6 @@
                                         <Border x:Name="WeeklyFill" Background="{ThemeResource AccentBrush}" CornerRadius="5" />
                                     </Grid>
                                     <StackPanel x:Name="CostRows" Spacing="3" Margin="0,-4,0,0">
-                                        <TextBlock x:Name="CostEstimateCaption" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" />
                                         <Grid><TextBlock Text="Today" FontSize="11" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="TodayCost" Text="—" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" /></Grid>
                                         <Grid><TextBlock Text="Yesterday" FontSize="11" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="YesterdayCost" Text="—" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" /></Grid>
                                         <Grid><TextBlock Text="Last 30 Days" FontSize="11" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="MonthCost" Text="—" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" /></Grid>
@@ -260,6 +259,7 @@
                                     <FontIcon Glyph="&#xE777;" FontSize="12" Foreground="{ThemeResource SecondaryTextBrush}" />
                                     <TextBlock x:Name="ResetCredits" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
                                 </StackPanel>
+                                <TextBlock x:Name="CostEstimateCaption" TextTrimming="CharacterEllipsis" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" />
                                 <TextBlock x:Name="CodexUpdated" Grid.Column="1" HorizontalAlignment="Right" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="11" />
                             </Grid>
                         </StackPanel>
