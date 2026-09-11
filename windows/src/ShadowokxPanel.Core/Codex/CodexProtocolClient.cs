@@ -54,7 +54,7 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
                     {
                         name = "shadowokx-panel",
                         title = "Shadowokx Panel",
-                        version = "1.0.0",
+                        version = "2.0.0",
                     },
                     capabilities = new
                     {

@@ -82,6 +82,8 @@ public sealed class CodexProvider : IAsyncDisposable
         await Task.WhenAll(cacheTask, historyTask).ConfigureAwait(false);
         _history = historyTask.Result;
         var cached = cacheTask.Result;
+        if (cached?.Cost is { } cost && (cost.Today is null || cost.Yesterday is null || cost.Last30Days is null))
+            cached = cached with { Cost = null };
         _lastPersistedState = cached;
         if (cached?.HasData == true && cached.LastSuccessfulRefresh is { } refreshed &&
             refreshed <= now.AddMinutes(5))

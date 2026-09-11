@@ -31,7 +31,7 @@ public static class Program
                 StartupDiagnostics.Write("instance decision: secondary");
                 StartupDiagnostics.Write("activation redirect start");
                 keyInstance.RedirectActivationToAsync(activation).AsTask()
-                    .GetAwaiter().GetResult();
+                    .WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
                 StartupDiagnostics.Write("activation redirect complete; secondary exiting");
                 return;
             }

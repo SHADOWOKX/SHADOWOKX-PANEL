@@ -31,7 +31,7 @@ public sealed class TokenCostReader(ApplicationPaths paths, string? codexHome = 
 
     public static decimal? Estimate(CostRecord record)
     {
-        if (!Prices.TryGetValue(record.Model, out var price)) return null;
+        if (!Valid(record) || !Prices.TryGetValue(record.Model, out var price)) return null;
         var longer = record.Input > 272000;
         return ((record.Input - record.Cached - record.Writes) * price[0] * (longer ? 2 : 1) +
             record.Cached * price[1] * (longer && record.Model == "gpt-6-astra" ? 2 : 1) +
@@ -72,7 +72,7 @@ public sealed class TokenCostReader(ApplicationPaths paths, string? codexHome = 
                     var store = new JsonFileStore<CostFileCache>(Path.Combine(paths.Cache, "cost-v1", key + ".json"));
                     if (!_files.TryGetValue(file, out var cached))
                         cached = await store.ReadAsync(cancellationToken).ConfigureAwait(false);
-                    if (cached is null || cached.Length != info.Length || cached.Modified != info.LastWriteTimeUtc.Ticks)
+                    if (cached?.Records is null || cached.Length != info.Length || cached.Modified != info.LastWriteTimeUtc.Ticks)
                     {
                         cached = await ParseAsync(file, info, cached, cancellationToken).ConfigureAwait(false);
                         try { await store.WriteAsync(cached, cancellationToken).ConfigureAwait(false); }
@@ -84,6 +84,7 @@ public sealed class TokenCostReader(ApplicationPaths paths, string? codexHome = 
                     partial |= cached.Partial;
                     foreach (var record in cached.Records)
                     {
+                        if (!Valid(record)) { partial = true; continue; }
                         var date = DateOnly.FromDateTime(record.Time.LocalDateTime);
                         if (date < first || date > today || !seen.Add(record.Key)) continue;
                         var cost = Estimate(record);
@@ -101,6 +102,12 @@ public sealed class TokenCostReader(ApplicationPaths paths, string? codexHome = 
         foreach (var file in _files.Keys.Where(key => !visited.Contains(key)).ToArray()) _files.Remove(file);
         return new TokenCostSummary(current, yesterday, totals, DateTimeOffset.Now, partial || totals.UnpricedTokens > 0);
     }
+
+    private static bool Valid(CostRecord? record) => record is not null &&
+        !string.IsNullOrEmpty(record.Key) && !string.IsNullOrEmpty(record.Model) &&
+        record.Input is >= 0 and <= 1_000_000_000_000 && record.Cached is >= 0 and <= 1_000_000_000_000 &&
+        record.Output is >= 0 and <= 1_000_000_000_000 && record.Writes is >= 0 and <= 1_000_000_000_000 &&
+        record.Cached + record.Writes <= record.Input;
 
     private static CostAmount Add(CostAmount left, CostAmount right) =>
         new(left.Dollars + right.Dollars, left.Tokens + right.Tokens, left.UnpricedTokens + right.UnpricedTokens);
@@ -126,7 +133,7 @@ public sealed class TokenCostReader(ApplicationPaths paths, string? codexHome = 
         var provider = append ? previousFile!.Provider : "openai";
         string? previous = append ? previousFile!.Previous : null;
         var first = DateTime.Today.AddDays(-29);
-        var records = append ? previousFile!.Records.Where(r => r.Time.LocalDateTime.Date >= first).ToList() : [];
+        var records = append ? previousFile!.Records.Where(r => Valid(r) && r.Time.LocalDateTime.Date >= first).ToList() : [];
         var partial = append && previousFile!.Partial;
         try
         {

@@ -83,6 +83,8 @@ public sealed class PerformanceRegressionTests
         var record = new CostRecord(DateTimeOffset.Now, "k", "gpt-5.6-sol", 100000, 90000, 1000, 0);
         Assert.Equal(.096m, TokenCostReader.Estimate(record));
         Assert.Null(TokenCostReader.Estimate(record with { Model = "unknown" }));
+        Assert.Null(TokenCostReader.Estimate(record with { Input = 1 }));
+        Assert.Null(TokenCostReader.Estimate(record with { Output = -1 }));
         Assert.Equal(6.175m, TokenCostReader.Estimate(record with
             { Model = "gpt-6-astra", Input = 300000, Cached = 0, Output = 1000, Writes = 20000 }));
     }
