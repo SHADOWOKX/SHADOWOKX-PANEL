@@ -26,6 +26,7 @@
                     VerticalAlignment="Center" />
                 <Button
                     x:Name="SettingsButton"
+                    Background="Transparent"
                     HorizontalAlignment="Right"
                     Style="{StaticResource IconButtonStyle}"
                     ToolTipService.ToolTip="Settings"
@@ -109,9 +110,10 @@
                                     FontWeight="SemiBold"
                                     VerticalAlignment="Center" />
                             </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="5" HorizontalAlignment="Right">
+                                <Button Style="{StaticResource IconButtonStyle}" Click="OpenCodex_Click" ToolTipService.ToolTip="Open Codex application" AutomationProperties.Name="Open Codex application"><Image Source="Assets/robot.svg" Width="18" Height="18" /></Button>
                             <Button
                                 x:Name="CodexRefreshButton"
-                                HorizontalAlignment="Right"
                                 Style="{StaticResource IconButtonStyle}"
                                 ToolTipService.ToolTip="Refresh Codex usage"
                                 AutomationProperties.Name="Refresh Codex usage"
@@ -121,6 +123,8 @@
                                     <ProgressRing x:Name="CodexRefreshRing" Width="18" Height="18" IsActive="False" Visibility="Collapsed" />
                                 </Grid>
                             </Button>
+                                <Button x:Name="CopyUsageButton" Style="{StaticResource IconButtonStyle}" Click="CopyUsage_Click" ToolTipService.ToolTip="Copy usage image" AutomationProperties.Name="Copy usage image"><FontIcon Glyph="&#xE8D4;" FontSize="15" /></Button>
+                            </StackPanel>
                         </Grid>
 
                         <Border x:Name="CodexErrorCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
@@ -137,7 +141,7 @@
                             <Border x:Name="WeeklyCard" Style="{StaticResource CardStyle}">
                                 <StackPanel Spacing="6">
                                     <Grid>
-                                        <TextBlock Text="Weekly allowance" Style="{StaticResource CardTitleStyle}" />
+                                        <TextBlock x:Name="AllowanceTitle" Text="Weekly allowance" Style="{StaticResource CardTitleStyle}" />
                                         <Border x:Name="CapacityPill" HorizontalAlignment="Right" Background="{ThemeResource CardHoverBrush}" CornerRadius="9" Padding="9,4">
                                             <StackPanel Orientation="Horizontal" Spacing="5">
                                                 <Ellipse x:Name="CapacityDot" Width="6" Height="6" Fill="{ThemeResource AccentBrush}" VerticalAlignment="Center" />

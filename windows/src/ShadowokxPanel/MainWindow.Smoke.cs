@@ -70,19 +70,25 @@ public sealed partial class MainWindow
 
     private async Task CaptureAsync(string file)
     {
-        var bitmap = new RenderTargetBitmap();
-        await bitmap.RenderAsync(Root);
-        var pixels = await bitmap.GetPixelsAsync();
-        using var stream = new InMemoryRandomAccessStream();
-        var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
-        encoder.SetPixelData(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied,
-            (uint)bitmap.PixelWidth, (uint)bitmap.PixelHeight, 96, 96, pixels.ToArray());
-        await encoder.FlushAsync();
-        stream.Seek(0);
+        using var stream = await CreateImageAsync(Root);
         using var reader = new DataReader(stream.GetInputStreamAt(0));
         await reader.LoadAsync((uint)stream.Size);
         var bytes = new byte[(int)stream.Size];
         reader.ReadBytes(bytes);
         await File.WriteAllBytesAsync(file, bytes);
     }
+    private static async Task<InMemoryRandomAccessStream> CreateImageAsync(Microsoft.UI.Xaml.FrameworkElement visual)
+    {
+        var bitmap = new RenderTargetBitmap();
+        await bitmap.RenderAsync(visual);
+        var pixels = await bitmap.GetPixelsAsync();
+        var stream = new InMemoryRandomAccessStream();
+        var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
+        encoder.SetPixelData(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied,
+            (uint)bitmap.PixelWidth, (uint)bitmap.PixelHeight, 96, 96, pixels.ToArray());
+        await encoder.FlushAsync();
+        stream.Seek(0);
+        return stream;
+    }
+
 }

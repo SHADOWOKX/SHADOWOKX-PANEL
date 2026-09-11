@@ -402,6 +402,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private void RenderCodex(CodexState state, Core.Settings.AppSettings settings)
     {
         var hasData = state.HasData;
+        CopyUsageButton.IsEnabled = hasData;
         CodexErrorCard.Visibility = !hasData ? Visibility.Visible : Visibility.Collapsed;
         CodexContent.Visibility = hasData ? Visibility.Visible : Visibility.Collapsed;
         CodexErrorTitle.Text = state.Status == ProviderStatus.Loading ? "Loading Codex usage" :
@@ -432,7 +433,8 @@ public sealed partial class MainWindow : Window, IDisposable
         if (!hasData)
             return;
 
-        var weekly = state.Weekly;
+        var weekly = state.Weekly ?? state.FiveHour;
+        AllowanceTitle.Text = state.Weekly is null ? "5-hour allowance" : "Weekly allowance";
         WeeklyCard.Visibility = weekly is null ? Visibility.Collapsed : Visibility.Visible;
         if (weekly is not null)
         {
@@ -468,7 +470,7 @@ public sealed partial class MainWindow : Window, IDisposable
                 FormatUpdated(cost.UpdatedAt, DateTimeOffset.Now - cost.UpdatedAt > TimeSpan.FromMinutes(5))
             : "Local session cost estimate is loading. Unavailable values are not zero.");
         var fiveHour = state.FiveHour;
-        FiveHourCard.Visibility = fiveHour is null ? Visibility.Collapsed : Visibility.Visible;
+        FiveHourCard.Visibility = fiveHour is null || state.Weekly is null ? Visibility.Collapsed : Visibility.Visible;
         FiveHourText.Text = fiveHour is null
             ? "Not reported by this Codex session."
             : $"{Math.Round(fiveHour.RemainingPercent):0}% remaining";
@@ -752,6 +754,39 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         try { await _viewModel.RefreshWeatherAsync(); }
         catch (OperationCanceledException) { }
+    }
+
+    private async void OpenCodex_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (!await Launcher.LaunchUriAsync(new Uri("codex://")))
+                ToolTipService.SetToolTip((Button)sender, "Codex could not be opened. Check that the app is installed.");
+        }
+        catch (Exception error) when (error is System.Runtime.InteropServices.COMException or InvalidOperationException)
+        {
+            ToolTipService.SetToolTip((Button)sender, "Codex could not be opened.");
+        }
+    }
+
+    private async void CopyUsage_Click(object sender, RoutedEventArgs e)
+    {
+        CopyUsageButton.IsEnabled = false;
+        try
+        {
+            using var stream = await CreateImageAsync(Root);
+            if (_disposed) return;
+            var data = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            data.SetBitmap(Windows.Storage.Streams.RandomAccessStreamReference.CreateFromStream(stream));
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(data);
+            Windows.ApplicationModel.DataTransfer.Clipboard.Flush();
+            ToolTipService.SetToolTip(CopyUsageButton, "Usage image copied");
+        }
+        catch (Exception error) when (error is System.Runtime.InteropServices.COMException or InvalidOperationException)
+        {
+            ToolTipService.SetToolTip(CopyUsageButton, "Could not copy the image. Try again.");
+        }
+        finally { if (!_disposed) CopyUsageButton.IsEnabled = _viewModel.Codex.HasData; }
     }
 
     private void SettingsButton_Click(object sender, RoutedEventArgs e) => OpenSettings();

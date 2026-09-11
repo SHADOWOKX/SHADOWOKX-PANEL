@@ -52,6 +52,21 @@ public sealed class PerformanceRegressionTests
     }
 
     [Fact]
+    public async Task OversizedSessionLinesAreSkippedAndUtf8OffsetsRemainExact()
+    {
+        var first = new string('x', 20000) + "\n";
+        var second = "مرحبا 🤖\r\n";
+        using var text = new StringReader(first + second + "unfinished");
+        var reader = new BoundedLineReader(text, 100, skipOversized: true);
+        Assert.Equal("مرحبا 🤖", await reader.ReadLineAsync());
+        Assert.Equal(System.Text.Encoding.UTF8.GetByteCount(first + second), reader.LastLineBytes);
+        Assert.True(reader.SkippedOversized);
+        Assert.True(reader.LastLineTerminated);
+        Assert.Equal("unfinished", await reader.ReadLineAsync());
+        Assert.False(reader.LastLineTerminated);
+    }
+
+    [Fact]
     public async Task CancelledReaderStopsBeforeConsumingInput()
     {
         using var text = new StringReader("hello");

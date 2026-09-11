@@ -155,7 +155,7 @@ Before publishing, complete [the Windows release QA checklist](docs/RELEASE-QA.m
 
 - A single primary instance remains alive in the notification area; later launches redirect to it.
 - The notification icon is rendered in memory as a large, white pixel-style Codex percentage, with true alpha and exact DPI sizing; the tooltip retains the full value and status, and no scaled tray bitmap is loaded.
-- Codex uses one adaptive scheduler: 30 seconds while its visible page is open and 60 seconds in the background. Concurrent triggers are coalesced.
+- Codex uses one adaptive scheduler: 30 seconds while its visible page is open and 3 minutes in the background. Concurrent triggers are coalesced.
 - Provider work is asynchronous, cancellable, size-bounded, and time-bounded; last-known-good data survives transient failures.
 - The graph redraws only when its data or layout changes.
 - Provider updates repaint only the visible module; theme resources and rounded-window geometry are reapplied only when their inputs change.
