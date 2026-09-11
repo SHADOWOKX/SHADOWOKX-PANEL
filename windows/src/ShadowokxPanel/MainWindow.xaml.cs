@@ -462,13 +462,19 @@ public sealed partial class MainWindow : Window, IDisposable
         }
 
         var account = AccountUsageRows.Read(state.TokenUsage, DateTimeOffset.Now);
-        TodayCost.Text = FormatAccountTokens(account.Today);
-        YesterdayCost.Text = FormatAccountTokens(account.Yesterday);
-        MonthCost.Text = FormatAccountTokens(account.Reported30Days);
+        TodayCost.Text = AccountCostEstimate.Format(account.Today, settings, CultureInfo.CurrentCulture);
+        YesterdayCost.Text = AccountCostEstimate.Format(account.Yesterday, settings, CultureInfo.CurrentCulture);
+        MonthCost.Text = AccountCostEstimate.Format(account.Reported30Days, settings, CultureInfo.CurrentCulture);
+        var estimateInput = 100 - settings.EstimateCachedPercent - settings.EstimateOutputPercent - settings.EstimateWritePercent;
+        CostEstimateCaption.Text = settings.ShowCostEstimate
+            ? $"API estimate · {settings.EstimateModel.Replace("gpt-", "", StringComparison.Ordinal)} · assumed mix"
+            : "Account tokens";
         ToolTipService.SetToolTip(CostRows,
-            "Account token activity across devices. Missing days are not treated as zero.\n" +
-            "Last 30 Days sums the daily buckets returned by the account service.\n" +
-            "The account service does not provide daily USD costs. Linux API estimates use that device's local session logs.");
+            $"Reference model: {settings.EstimateModel}. Assumed token mix: {estimateInput}% input, " +
+            $"{settings.EstimateCachedPercent}% cached, {settings.EstimateOutputPercent}% output, {settings.EstimateWritePercent}% cache writes.\n" +
+            $"{(settings.EstimateLongContext ? "Long-context" : "Standard-context")} rates, verified {Core.Codex.ApiPriceCatalog.VerifiedDate}. Change in Settings → Codex.\n" +
+            "An API-price estimate, not your subscription bill. Account totals do not report model or token categories.\n" +
+            "Missing days are not zero; Last 30 Days sums the reported account days only.");
         var fiveHour = state.FiveHour;
         FiveHourCard.Visibility = fiveHour is null || state.Weekly is null ? Visibility.Collapsed : Visibility.Visible;
         FiveHourText.Text = fiveHour is null
@@ -913,8 +919,6 @@ public sealed partial class MainWindow : Window, IDisposable
         var brush = (SolidColorBrush)Application.Current.Resources[name];
         return opacity >= 1 ? brush : new SolidColorBrush(brush.Color) { Opacity = opacity };
     }
-
-    private static string FormatAccountTokens(long? tokens) => tokens.HasValue ? $"{FormatTokens(tokens)} tokens" : "Not reported";
 
     private static string FormatTokens(long? value) => value.HasValue
         ? TokenCountFormatter.Format(value.Value, CultureInfo.CurrentCulture)

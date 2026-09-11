@@ -1,4 +1,5 @@
 using ShadowokxPanel.Core.Storage;
+using ShadowokxPanel.Core.Codex;
 
 namespace ShadowokxPanel.Core.Settings;
 
@@ -44,8 +45,15 @@ public sealed class SettingsStore
         if (settings.SettingsSchemaVersion < CurrentSettingsSchemaVersion &&
             accentPreset == AccentPreset.Rose)
             accentPreset = AccentPreset.Orange;
+        var validMix = settings.EstimateCachedPercent >= 0 && settings.EstimateOutputPercent >= 0 &&
+            settings.EstimateWritePercent >= 0 &&
+            (long)settings.EstimateCachedPercent + settings.EstimateOutputPercent + settings.EstimateWritePercent <= 100;
         return settings with
         {
+            EstimateModel = ApiPriceCatalog.Find(settings.EstimateModel)?.Model ?? "gpt-5.6-sol",
+            EstimateCachedPercent = validMix ? settings.EstimateCachedPercent : 0,
+            EstimateOutputPercent = validMix ? settings.EstimateOutputPercent : 0,
+            EstimateWritePercent = validMix ? settings.EstimateWritePercent : 0,
             SettingsSchemaVersion = CurrentSettingsSchemaVersion,
             Theme = Enum.IsDefined(settings.Theme) ? settings.Theme : ThemePreset.System,
             Accent = accentPreset,

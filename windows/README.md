@@ -2,7 +2,7 @@
 
 The compact Linux-style dashboard, tray anchoring fixes and reduced background work are described in [the 2.0 release notes](docs/RELEASE-2.0.md).
 
-Version 2.0.1 uses account token activity across devices for Today, Yesterday and the reported last 30 days. Missing account days show “Not reported”; daily USD costs are unavailable from the account service. Share saves a PNG in Pictures/Shadowokx Panel and opens its folder. See [the fixes and limitations](docs/RELEASE-2.0.1.md).
+Version 2.0.2 adds USD estimates to account-wide token activity using official model prices and a configurable, explicitly assumed token mix. Default: Sol, 100% uncached input. Change the reference model and cache/output shares in Settings → Codex. This is an API-price scenario, not measured account billing. See [pricing assumptions and release notes](docs/RELEASE-2.0.2.md). Share saves a PNG in Pictures/Shadowokx Panel and opens its folder.
 
 # Shadowokx Panel for Windows
 

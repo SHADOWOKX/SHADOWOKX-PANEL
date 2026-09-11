@@ -2,6 +2,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using ShadowokxPanel.Core.Settings;
+using ShadowokxPanel.Core.Codex;
 using ShadowokxPanel.Platform;
 using ShadowokxPanel.Services;
 using Windows.Graphics;
@@ -39,6 +40,14 @@ public sealed partial class SettingsWindow : Window
         CustomAccentBox.Text = settings.CustomAccent;
         DensityCombo.SelectedIndex = settings.Density == LayoutDensity.Compact ? 0 : 1;
         AnimationsToggle.IsOn = settings.Animations;
+        CostEstimateToggle.IsOn = settings.ShowCostEstimate;
+        EstimateModelCombo.ItemsSource = ApiPriceCatalog.Models.Select(p => p.Model).ToArray();
+        EstimateModelCombo.SelectedItem = settings.EstimateModel;
+        EstimateCachedBox.Value = settings.EstimateCachedPercent;
+        EstimateOutputBox.Value = settings.EstimateOutputPercent;
+        EstimateWriteBox.Value = settings.EstimateWritePercent;
+        EstimateLongToggle.IsOn = settings.EstimateLongContext;
+        UpdateEstimateInfo(settings);
         LifetimeToggle.IsOn = settings.ShowLifetimeTokens;
         HistoryToggle.IsOn = settings.ShowTokenHistory;
         UsageStateToggle.IsOn = settings.ShowUsageState;
@@ -69,8 +78,23 @@ public sealed partial class SettingsWindow : Window
             ? (ThemePreset)ThemeCombo.SelectedIndex : ThemePreset.System;
         var accent = Enum.IsDefined(typeof(AccentPreset), AccentCombo.SelectedIndex)
             ? (AccentPreset)AccentCombo.SelectedIndex : AccentPreset.Orange;
+        var cached = EstimateCachedBox.Value;
+        var output = EstimateOutputBox.Value;
+        var writes = EstimateWriteBox.Value;
+        if (!double.IsFinite(cached) || !double.IsFinite(output) || !double.IsFinite(writes) ||
+            cached < 0 || output < 0 || writes < 0 || cached + output + writes > 100)
+        {
+            EstimateInfo.Text = "Enter percentages whose total is at most 100%. Changes have not been saved.";
+            return;
+        }
         var next = _host.Settings.Current with
         {
+            ShowCostEstimate = CostEstimateToggle.IsOn,
+            EstimateModel = EstimateModelCombo.SelectedItem as string ?? "gpt-5.6-sol",
+            EstimateCachedPercent = (int)cached,
+            EstimateOutputPercent = (int)output,
+            EstimateWritePercent = (int)writes,
+            EstimateLongContext = EstimateLongToggle.IsOn,
             StartWithWindows = StartWithWindowsToggle.IsOn,
             ShowWeather = ShowWeatherToggle.IsOn,
             ShowCodexStateIndicator = CodexStateToggle.IsOn,
@@ -97,6 +121,7 @@ public sealed partial class SettingsWindow : Window
         {
             StartupService.SetEnabled(next.StartWithWindows);
             await _host.Settings.SaveAsync(next);
+            UpdateEstimateInfo(_host.Settings.Current);
             CustomAccentBox.IsEnabled = next.Accent == AccentPreset.Custom;
             ThemeService.Apply(Root, _host.Settings.Current);
         }
@@ -105,6 +130,13 @@ public sealed partial class SettingsWindow : Window
         {
             LoadValues(_host.Settings.Current);
         }
+    }
+
+    private void UpdateEstimateInfo(AppSettings settings)
+    {
+        var price = ApiPriceCatalog.Find(settings.EstimateModel)!;
+        EstimateInfo.Text = $"Uncached input: {100 - settings.EstimateCachedPercent - settings.EstimateOutputPercent - settings.EstimateWritePercent}%. USD per 1M: input {price.Rate(settings.EstimateLongContext, 0)}, cache {price.Rate(settings.EstimateLongContext, 1)}, output {price.Rate(settings.EstimateLongContext, 2)}, writes {price.Rate(settings.EstimateLongContext, 3)}. Verified {ApiPriceCatalog.VerifiedDate}.";
+        EstimateSourceLink.NavigateUri = new Uri(price.SourceUrl);
     }
 
     private async void ClearHistory_Click(object sender, RoutedEventArgs eventArgs)

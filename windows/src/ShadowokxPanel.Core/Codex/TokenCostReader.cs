@@ -15,15 +15,6 @@ public sealed record CostFileCache(long Length, long Modified, IReadOnlyList<Cos
 
 public sealed class TokenCostReader(ApplicationPaths paths, string? codexHome = null)
 {
-    // Same price snapshot as the Linux panel (2026-09-11), USD per million tokens.
-    private static readonly Dictionary<string, decimal[]> Prices = new(StringComparer.Ordinal)
-    {
-        ["gpt-6-astra"] = [10, 1, 50, 12.5m],
-        ["gpt-5.6-sol"] = [4, .4m, 20, 5],
-        ["gpt-5.6"] = [4, .4m, 20, 5],
-        ["gpt-5.6-terra"] = [2, .2m, 12, 2.5m],
-        ["gpt-5.6-luna"] = [.2m, .02m, 1.2m, .25m],
-    };
     internal long LastScanReadBytes { get; private set; }
     private readonly string _home = codexHome ?? Environment.GetEnvironmentVariable("CODEX_HOME") ??
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex");
@@ -31,11 +22,11 @@ public sealed class TokenCostReader(ApplicationPaths paths, string? codexHome = 
 
     public static decimal? Estimate(CostRecord record)
     {
-        if (!Valid(record) || !Prices.TryGetValue(record.Model, out var price)) return null;
+        if (!Valid(record) || ApiPriceCatalog.Find(record.Model) is not { } price) return null;
         var longer = record.Input > 272000;
-        return ((record.Input - record.Cached - record.Writes) * price[0] * (longer ? 2 : 1) +
-            record.Cached * price[1] * (longer && record.Model == "gpt-6-astra" ? 2 : 1) +
-            record.Output * price[2] * (longer ? 1.5m : 1) + record.Writes * price[3] * (longer ? 2 : 1)) / 1_000_000;
+        return ((record.Input - record.Cached - record.Writes) * price.Rate(longer, 0) +
+            record.Cached * price.Rate(longer, 1) + record.Output * price.Rate(longer, 2) +
+            record.Writes * price.Rate(longer, 3)) / 1_000_000;
     }
 
     public Task<TokenCostSummary> ReadAsync(CancellationToken cancellationToken = default) =>
