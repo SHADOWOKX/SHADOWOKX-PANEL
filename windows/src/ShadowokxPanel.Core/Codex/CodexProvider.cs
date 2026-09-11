@@ -10,7 +10,7 @@ public sealed record CodexRefreshPolicy(TimeSpan VisibleInterval, TimeSpan Backg
 {
     public static CodexRefreshPolicy Default { get; } = new(
         TimeSpan.FromSeconds(30),
-        TimeSpan.FromSeconds(60));
+        TimeSpan.FromMinutes(3));
 }
 
 public sealed class CodexProvider : IAsyncDisposable
@@ -37,6 +37,9 @@ public sealed class CodexProvider : IAsyncDisposable
     private bool _visible;
     private bool _started;
     private bool _ready;
+    private bool _disposed;
+    private int _failures;
+    private DateTimeOffset _lastAttempt;
 
     public CodexProvider(
         ApplicationPaths paths,
@@ -75,6 +78,8 @@ public sealed class CodexProvider : IAsyncDisposable
         await Task.WhenAll(cacheTask, historyTask).ConfigureAwait(false);
         _history = historyTask.Result;
         var cached = cacheTask.Result;
+        if (cached?.Cost is { } cost && (cost.Today is null || cost.Yesterday is null || cost.Last30Days is null))
+            cached = cached with { Cost = null };
         _lastPersistedState = cached;
         if (cached?.HasData == true && cached.LastSuccessfulRefresh is { } refreshed &&
             refreshed <= now.AddMinutes(5))
@@ -103,7 +108,9 @@ public sealed class CodexProvider : IAsyncDisposable
                 return _refreshTask;
             if (!force && !IsStale())
                 return Task.FromResult(State);
-            var task = RefreshCoreAsync(cancellationToken);
+            if (_lifetime.IsCancellationRequested)
+                return Task.FromResult(State);
+            var task = Task.Run(() => RefreshCoreAsync(cancellationToken));
             _refreshTask = task;
             _ = task.ContinueWith(
                 _ =>
@@ -126,14 +133,16 @@ public sealed class CodexProvider : IAsyncDisposable
         var refresh = false;
         lock (_sync)
         {
-            if (_visible == visible)
+            if (_disposed || _visible == visible)
                 return;
             _visible = visible;
             refresh = visible && _ready;
         }
         _scheduleChanges.Writer.TryWrite(true);
         if (refresh)
-            _ = RefreshAsync(true, _lifetime.Token);
+        {
+            _ = RefreshAsync(false, _lifetime.Token);
+        }
     }
 
     public async Task ClearHistoryAsync(CancellationToken cancellationToken = default)
@@ -152,18 +161,25 @@ public sealed class CodexProvider : IAsyncDisposable
         await RefreshAsync(true, cancellationToken).ConfigureAwait(false);
     }
 
-    private bool IsStale() => State.LastSuccessfulRefresh is not { } refreshed ||
-        State.Status is ProviderStatus.Error or ProviderStatus.Stale ||
-        DateTimeOffset.Now - refreshed >= CurrentInterval();
+    private bool IsStale()
+    {
+        if (_failures > 0 && DateTimeOffset.Now - _lastAttempt < CurrentInterval()) return false;
+        return State.LastSuccessfulRefresh is not { } refreshed ||
+            State.Status is ProviderStatus.Error or ProviderStatus.Stale ||
+            DateTimeOffset.Now - refreshed >= CurrentInterval();
+    }
 
     private TimeSpan CurrentInterval()
     {
         lock (_sync)
-            return _visible ? _refreshPolicy.VisibleInterval : _refreshPolicy.BackgroundInterval;
+            return _failures > 0
+                ? TimeSpan.FromSeconds(Math.Min(900, _refreshPolicy.BackgroundInterval.TotalSeconds * Math.Pow(2, Math.Min(4, _failures - 1))))
+                : _visible ? _refreshPolicy.VisibleInterval : _refreshPolicy.BackgroundInterval;
     }
 
     private async Task<CodexState> RefreshCoreAsync(CancellationToken externalCancellation)
     {
+        _lastAttempt = DateTimeOffset.Now;
         var previous = State;
         Publish(previous with
         {
@@ -198,21 +214,24 @@ public sealed class CodexProvider : IAsyncDisposable
             {
                 await LogAsync("codex.history.write.failed").ConfigureAwait(false);
             }
-            var state = live with { TokenUsage = TokenHistoryStore.Apply(live.TokenUsage, _history, now) };
+            var state = live with { TokenUsage = TokenHistoryStore.Apply(live.TokenUsage, _history, now), Cost = null };
             try { await PersistCacheIfNeededAsync(state, now, linked.Token).ConfigureAwait(false); }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
                 await LogAsync("codex.cache.write.failed").ConfigureAwait(false);
             }
+            _failures = 0;
             Publish(state);
             return state;
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested || externalCancellation.IsCancellationRequested)
         {
+            if (!_lifetime.IsCancellationRequested) Publish(previous);
             return State;
         }
         catch (Exception error)
         {
+            _failures++;
             if (error is CodexClientException { Failure: CodexClientFailure.StartFailed })
                 _launchSpec = null;
             var (code, message) = error switch
@@ -264,7 +283,7 @@ public sealed class CodexProvider : IAsyncDisposable
                     while (_scheduleChanges.Reader.TryRead(out _)) { }
                     continue;
                 }
-                await RefreshAsync(true, cancellationToken).ConfigureAwait(false);
+                await RefreshAsync(false, cancellationToken).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
@@ -295,12 +314,18 @@ public sealed class CodexProvider : IAsyncDisposable
         left.LifetimeTokens == right.LifetimeTokens && left.TodayTokens == right.TodayTokens &&
         left.PeakDailyTokens == right.PeakDailyTokens && left.PeakDate == right.PeakDate &&
         left.SevenDayTokens == right.SevenDayTokens &&
-        left.DailyBuckets.SequenceEqual(right.DailyBuckets);
+        left.DailyBuckets.SequenceEqual(right.DailyBuckets) &&
+        (left.AccountDailyBuckets is null ? right.AccountDailyBuckets is null :
+            right.AccountDailyBuckets is not null && left.AccountDailyBuckets.SequenceEqual(right.AccountDailyBuckets));
 
     private void Publish(CodexState state)
     {
-        State = state;
-        StateChanged?.Invoke(this, state);
+        lock (_sync)
+        {
+            if (_lifetime.IsCancellationRequested) return;
+            State = state;
+            StateChanged?.Invoke(this, state);
+        }
     }
 
     private Task LogAsync(string eventName, object? details = null) =>
@@ -308,6 +333,11 @@ public sealed class CodexProvider : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        lock (_sync)
+        {
+            if (_disposed) return;
+            _disposed = true;
+        }
         _lifetime.Cancel();
         lock (_sync)
             _ready = false;

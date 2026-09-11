@@ -53,6 +53,22 @@ public sealed class TokenGraphControl : Canvas
             return;
         }
 
+        var caption = new TextBlock { Text = "DAILY TOKENS", FontSize = 9,
+            Foreground = ResourceBrush("SecondaryTextBrush") };
+        Children.Add(caption);
+        var scaleLabel = new TextBlock
+        {
+            Text = "0 – " + TokenCountFormatter.Format(_buckets.Max(b => b.Tokens), CultureInfo.CurrentCulture),
+            FontSize = 9, Width = ActualWidth, HorizontalTextAlignment = TextAlignment.Right,
+            Foreground = ResourceBrush("SecondaryTextBrush"),
+        };
+        Children.Add(scaleLabel);
+        points = points.Select(p => p with { Y = 16 + p.Y * Math.Max(1, graphHeight - 16) / graphHeight }).ToArray();
+        foreach (var fraction in new[] { 0d, .5d, 1d })
+            Children.Add(new Line { X1 = 7, X2 = ActualWidth - 7,
+                Y1 = 18 + fraction * (graphHeight - 20), Y2 = 18 + fraction * (graphHeight - 20),
+                Stroke = ResourceBrush("CardBorderBrush"), StrokeThickness = 1 });
+
         var areaFigure = new PathFigure
         {
             StartPoint = new Point(points[0].X, graphHeight - 2),
@@ -96,14 +112,11 @@ public sealed class TokenGraphControl : Canvas
 
         foreach (var point in points)
         {
-            var newest = point == points[^1];
             var marker = new Ellipse
             {
-                Width = newest ? 8 : 4,
-                Height = newest ? 8 : 4,
+                Width = 4,
+                Height = 4,
                 Fill = ResourceBrush("AccentBrush"),
-                Stroke = newest ? ResourceBrush("PrimaryTextBrush") : null,
-                StrokeThickness = newest ? 1.5 : 0,
             };
             SetLeft(marker, point.X - marker.Width / 2);
             SetTop(marker, point.Y - marker.Height / 2);
@@ -118,7 +131,7 @@ public sealed class TokenGraphControl : Canvas
             {
                 Text = sparse
                     ? point.Date.ToString("MMM d", CultureInfo.CurrentCulture)
-                    : point.Date.ToString("ddd", CultureInfo.CurrentCulture),
+                    : point.Date.ToString("%d", CultureInfo.CurrentCulture),
                 Foreground = ResourceBrush("SecondaryTextBrush"),
                 FontSize = 10,
                 HorizontalTextAlignment = TextAlignment.Center,

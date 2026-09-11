@@ -40,6 +40,12 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         private set => Set(ref _selectedPage, value);
     }
 
+    internal void ApplyPreview(CodexState codex, WeatherState weather)
+    {
+        Codex = codex;
+        Weather = weather;
+    }
+
     public UsagePace UsagePace => UsageAnalytics.GetPace(Codex.TokenUsage, DateTimeOffset.Now);
 
     public async Task SelectPageAsync(string page)
@@ -51,7 +57,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
             await _host.Settings.SaveAsync(Settings with { LastPage = SelectedPage });
     }
 
-    public Task RefreshCodexAsync() => _host.Codex.RefreshAsync(true);
+    public Task RefreshCodexAsync(bool force = true) => _host.Codex.RefreshAsync(force);
     public Task RefreshWeatherAsync() => _host.Weather.RefreshAsync(true);
     public Task RefreshAllAsync(bool force = true) => _host.RefreshAllAsync(force);
 
@@ -75,10 +81,12 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
     private void Enqueue(Action action)
     {
+        if (_disposed)
+            return;
         if (_dispatcher.HasThreadAccess)
             action();
         else
-            _dispatcher.TryEnqueue(() => action());
+            _dispatcher.TryEnqueue(() => { if (!_disposed) action(); });
     }
 
     public void Dispose()

@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using ShadowokxPanel.Core.Models;
 using ShadowokxPanel.Core.Storage;
 
@@ -8,6 +9,10 @@ public sealed class WeatherProvider : IAsyncDisposable
     private readonly IWeatherClient _client;
     private readonly JsonFileStore<WeatherCache> _cache;
     private readonly RedactingLogger? _logger;
+    private readonly Channel<bool> _scheduleChanges = Channel.CreateBounded<bool>(new BoundedChannelOptions(1)
+    { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true });
+    private bool _started;
+    private bool _disposed;
     private readonly object _sync = new();
     private readonly CancellationTokenSource _lifetime = new();
     private CancellationTokenSource _configuration = new();
@@ -41,6 +46,11 @@ public sealed class WeatherProvider : IAsyncDisposable
 
     public async Task<WeatherState> StartAsync(CancellationToken cancellationToken = default)
     {
+        lock (_sync)
+        {
+            if (_started || _lifetime.IsCancellationRequested) return State;
+            _started = true;
+        }
         var cached = await _cache.ReadAsync(cancellationToken).ConfigureAwait(false);
         var now = DateTimeOffset.Now;
         if (cached is not null && cached.ResolvedLocation.Query == _query &&
@@ -65,11 +75,15 @@ public sealed class WeatherProvider : IAsyncDisposable
     {
         lock (_sync)
         {
+            if (!_enabled || _lifetime.IsCancellationRequested) return Task.FromResult(State);
             if (_refreshTask is not null)
                 return _refreshTask;
             if (!force && !IsStale())
                 return Task.FromResult(State);
-            var task = RefreshCoreAsync(_query, _unit, cancellationToken);
+            var query = _query;
+            var unit = _unit;
+            var configuration = _configuration.Token;
+            var task = Task.Run(() => RefreshCoreAsync(query, unit, configuration, cancellationToken));
             _refreshTask = task;
             _ = task.ContinueWith(
                 _ =>
@@ -106,6 +120,7 @@ public sealed class WeatherProvider : IAsyncDisposable
         }
         if (pending is not null)
             await pending.ConfigureAwait(false);
+        _scheduleChanges.Writer.TryWrite(true);
         if (_enabled)
             await RefreshAsync(true, cancellationToken).ConfigureAwait(false);
     }
@@ -114,7 +129,7 @@ public sealed class WeatherProvider : IAsyncDisposable
     {
         lock (_sync)
         {
-            if (_enabled == enabled)
+            if (_disposed || _enabled == enabled)
                 return;
             _enabled = enabled;
             if (!enabled)
@@ -125,6 +140,7 @@ public sealed class WeatherProvider : IAsyncDisposable
                 _configuration = new CancellationTokenSource();
             }
         }
+        _scheduleChanges.Writer.TryWrite(true);
     }
 
     private bool IsStale() => State.LastSuccessfulRefresh is not { } refreshed ||
@@ -134,6 +150,7 @@ public sealed class WeatherProvider : IAsyncDisposable
     private async Task<WeatherState> RefreshCoreAsync(
         string query,
         string unit,
+        CancellationToken configurationToken,
         CancellationToken externalCancellation)
     {
         var previous = State;
@@ -142,13 +159,12 @@ public sealed class WeatherProvider : IAsyncDisposable
             Status = previous.HasData ? ProviderStatus.Refreshing : ProviderStatus.Loading,
             ErrorMessage = null,
         });
-        var configurationToken = _configuration.Token;
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(
             externalCancellation, _lifetime.Token, configurationToken);
         try
         {
             var result = await _client.ReadAsync(query, unit, linked.Token).ConfigureAwait(false);
-            if (query != _query || unit != _unit)
+            if (configurationToken.IsCancellationRequested || query != _query || unit != _unit)
                 return State;
             try
             {
@@ -166,6 +182,7 @@ public sealed class WeatherProvider : IAsyncDisposable
             _lifetime.IsCancellationRequested || externalCancellation.IsCancellationRequested ||
             configurationToken.IsCancellationRequested)
         {
+            if (!_lifetime.IsCancellationRequested) Publish(previous);
             return State;
         }
         catch (Exception error)
@@ -187,13 +204,24 @@ public sealed class WeatherProvider : IAsyncDisposable
 
     private async Task RunTimerAsync(CancellationToken cancellationToken)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
         try
         {
-            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+            while (!cancellationToken.IsCancellationRequested)
             {
-                if (_enabled && IsStale())
-                    await RefreshAsync(false, cancellationToken).ConfigureAwait(false);
+                using var iteration = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                var delay = Task.Delay(_enabled ? TimeSpan.FromMinutes(_refreshMinutes) :
+                    Timeout.InfiniteTimeSpan, iteration.Token);
+                var changed = _scheduleChanges.Reader.WaitToReadAsync(iteration.Token).AsTask();
+                var completed = await Task.WhenAny(delay, changed).ConfigureAwait(false);
+                iteration.Cancel();
+                try { await Task.WhenAll(delay, changed).ConfigureAwait(false); }
+                catch (OperationCanceledException) { }
+                if (completed == changed)
+                {
+                    while (_scheduleChanges.Reader.TryRead(out _)) { }
+                    continue;
+                }
+                if (_enabled) await RefreshAsync(false, cancellationToken).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
@@ -201,6 +229,7 @@ public sealed class WeatherProvider : IAsyncDisposable
 
     private void Publish(WeatherState state)
     {
+        if (_disposed) return;
         State = state;
         StateChanged?.Invoke(this, state);
     }
@@ -210,6 +239,11 @@ public sealed class WeatherProvider : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        lock (_sync)
+        {
+            if (_disposed) return;
+            _disposed = true;
+        }
         _lifetime.Cancel();
         _configuration.Cancel();
         if (_timerTask is not null)

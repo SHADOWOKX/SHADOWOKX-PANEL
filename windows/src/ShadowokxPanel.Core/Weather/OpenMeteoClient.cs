@@ -14,13 +14,14 @@ public interface IWeatherClient
         CancellationToken cancellationToken = default);
 }
 
-public sealed class OpenMeteoClient(HttpClient? httpClient = null) : IWeatherClient, IDisposable
+public sealed class OpenMeteoClient(HttpClient? httpClient = null, TimeSpan? requestTimeout = null) : IWeatherClient, IDisposable
 {
+    private ResolvedLocation? _resolvedLocation;
     private const int MaximumResponseBytes = 1_048_576;
     private readonly HttpClient _http = httpClient ?? new HttpClient
     {
         Timeout = TimeSpan.FromSeconds(15),
-        DefaultRequestHeaders = { UserAgent = { ProductInfoHeaderValue.Parse("ShadowokxPanel/1.0") } },
+        DefaultRequestHeaders = { UserAgent = { ProductInfoHeaderValue.Parse("ShadowokxPanel/2.0") } },
     };
     private readonly bool _ownsClient = httpClient is null;
 
@@ -29,8 +30,12 @@ public sealed class OpenMeteoClient(HttpClient? httpClient = null) : IWeatherCli
         string unit,
         CancellationToken cancellationToken = default)
     {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(requestTimeout ?? TimeSpan.FromSeconds(30));
+        cancellationToken = timeout.Token;
         var normalized = WeatherNormalizer.NormalizeQuery(query);
-        ResolvedLocation? location = null;
+        var location = _resolvedLocation?.Query == normalized ? _resolvedLocation : null;
+        if (location is null)
         foreach (var candidate in WeatherNormalizer.SearchQueries(normalized))
         {
             var uri = new Uri("https://geocoding-api.open-meteo.com/v1/search?" +
@@ -63,6 +68,7 @@ public sealed class OpenMeteoClient(HttpClient? httpClient = null) : IWeatherCli
         if (location is null)
             throw new WeatherProviderException("Location not found. Try “City, Country”.");
 
+        _resolvedLocation = location;
         var culture = CultureInfo.InvariantCulture;
         var forecastUri = new Uri("https://api.open-meteo.com/v1/forecast?" + string.Join('&',
         [

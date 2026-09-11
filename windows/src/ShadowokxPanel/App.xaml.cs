@@ -6,7 +6,8 @@ namespace ShadowokxPanel;
 
 public partial class App : Application, IAsyncDisposable
 {
-    private readonly AppHost _host = new();
+    private static readonly bool SmokeMode = Environment.GetCommandLineArgs().Contains("--ui-smoke");
+    private readonly AppHost _host = new(SmokeMode ? Path.Combine(Path.GetTempPath(), "ShadowokxPanel-smoke-" + Environment.ProcessId) : null);
     private readonly object _lifecycleSync = new();
     private readonly DispatcherQueue _dispatcher;
     private MainWindow? _window;
@@ -70,6 +71,12 @@ public partial class App : Application, IAsyncDisposable
             _window.InitializeTray();
             StartupDiagnostics.Write("tray initialization successful");
 
+            if (SmokeMode)
+            {
+                await _window.RunSmokeAsync();
+                await ExitAsync("UI smoke complete");
+                return;
+            }
             StartupDiagnostics.Write("provider startup start");
             await _host.StartProvidersAsync();
             StartupDiagnostics.Write("provider startup end");

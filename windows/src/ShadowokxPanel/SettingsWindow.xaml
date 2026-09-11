@@ -38,6 +38,15 @@
 
                 <StackPanel Spacing="10">
                     <TextBlock Text="CODEX" Style="{StaticResource SectionLabelStyle}" />
+                    <ToggleSwitch x:Name="CostEstimateToggle" Header="Show API cost estimate" Toggled="SettingChanged" />
+                    <ComboBox x:Name="EstimateModelCombo" Header="Reference model for account estimates" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged" />
+                    <TextBlock Text="Account totals do not include model or token types. These are your assumptions, not measured usage. Default: Sol, 100% uncached input. Percentages below are shares of ALL tokens; the remainder is uncached input." TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource SecondaryTextBrush}" />
+                    <NumberBox x:Name="EstimateCachedBox" Header="Cached input (%)" Minimum="0" Maximum="100" ValueChanged="NumberChanged" />
+                    <NumberBox x:Name="EstimateOutputBox" Header="Output (%)" Minimum="0" Maximum="100" ValueChanged="NumberChanged" />
+                    <NumberBox x:Name="EstimateWriteBox" Header="Cache writes (%)" Minimum="0" Maximum="100" ValueChanged="NumberChanged" />
+                    <ToggleSwitch x:Name="EstimateLongToggle" Header="Assume prompts above 272K input tokens" Toggled="SettingChanged" />
+                    <TextBlock x:Name="EstimateInfo" TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource SecondaryTextBrush}" />
+                    <HyperlinkButton x:Name="EstimateSourceLink" Content="Official model prices" />
                     <ToggleSwitch x:Name="LifetimeToggle" Header="Show lifetime tokens" Toggled="SettingChanged" />
                     <ToggleSwitch x:Name="HistoryToggle" Header="Show token history" Toggled="SettingChanged" />
                     <ToggleSwitch x:Name="UsageStateToggle" Header="Show usage state" Toggled="SettingChanged" />

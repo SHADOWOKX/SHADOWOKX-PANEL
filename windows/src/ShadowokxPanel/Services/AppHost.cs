@@ -18,9 +18,9 @@ public sealed class AppHost : IAsyncDisposable
     private bool _settingsSubscribed;
     private AppSettings _appliedSettings = new();
 
-    public AppHost()
+    public AppHost(string? dataRoot = null)
     {
-        Paths = new ApplicationPaths();
+        Paths = new ApplicationPaths(dataRoot);
         Settings = new SettingsStore(Paths);
     }
 

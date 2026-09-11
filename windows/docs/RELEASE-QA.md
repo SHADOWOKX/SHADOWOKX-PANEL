@@ -53,11 +53,11 @@ Record the Windows version, release commit, application version, installer SHA-2
 - [ ] Codex discovery succeeds independently for process PATH, user PATH, machine PATH, registered App Paths/install locations, versioned OpenAI payloads, npm, pnpm, Bun, Volta, nvm-windows, Scoop, Chocolatey, and WindowsApps installations available to the current user.
 - [ ] Found-but-cannot-start, app-server failure, signed-out, malformed-response, and timeout cases produce distinct concise states without revealing paths or protocol payloads.
 - [ ] Codex unavailable state is truthful and the application remains usable when Codex is absent or signed out.
-- [ ] Startup, popup-open, Codex-tab selection, and manual actions refresh immediately; visible cadence is about 30 seconds and hidden cadence about 60 seconds.
+- [ ] Startup and manual actions refresh immediately; popup-open and Codex-tab selection reuse data younger than 30 seconds. Visible cadence is about 30 seconds and hidden cadence about 3 minutes. Failed automatic requests back off.
 - [ ] Manual and automatic refresh do not overlap, blank cached data, inflate same-day history, or create extra processes.
 - [ ] Weather refresh displays current and hourly data for a valid location.
 - [ ] Codex and Weather fit their normal content without visible vertical scrollbar chrome; constrained work areas retain wheel/touch scrolling.
-- [ ] The default/legacy-default accent is orange; the weekly bar is visibly 9 DIP thick, correctly proportional, and the full reset date is not clipped at 100%, 125%, 150%, or 200% scaling.
+- [ ] The default/legacy-default accent is orange; the weekly bar is visibly 9 DIP thick, green/yellow/red by remaining capacity, correctly proportional after repeated tab changes, and the full reset date is not clipped at 100%, 125%, 150%, or 200% scaling.
 - [ ] A usage-insight row appears only when canonical history is sufficient and disappears when **Show usage state** is disabled.
 - [ ] Clear day/night, partly cloudy day/night, cloud, overcast, fog, drizzle, rain, heavy rain, snow, showers, thunderstorm, and unknown all render app-owned icons—never missing-glyph squares.
 - [ ] Cached Weather remains visible during a temporary network failure.
@@ -117,3 +117,11 @@ Record the Windows version, release commit, application version, installer SHA-2
 - [ ] Unsigned release: release notes clearly disclose **Unknown publisher**/SmartScreen behavior and provide the SHA-256 checksums; do not imply that unsigned binaries are trusted.
 - [ ] No secrets, signing certificates, private keys, tokens, personal paths, caches, or logs are present in Git or release files.
 - [ ] Every failure found above is fixed and the checklist is rerun before the GitHub release is published.
+
+## Version 2 performance and cost checks
+
+- [ ] Cost rows match local usage fixtures, show unpriced coverage, and retain correct day boundaries.
+- [ ] Reopen 50 times within 30 seconds; no extra Codex child processes are launched.
+- [ ] Record idle CPU, private memory and handle count for five minutes, then repeat after 100 open/tab/close cycles; no continuing growth or hidden animation.
+- [ ] Compare the same workload on version 1 and version 2; record measurements rather than assuming zero resource use.
+- [ ] Test tray overflow, keyboard activation, Explorer restart, and mixed-DPI monitor reconnect.

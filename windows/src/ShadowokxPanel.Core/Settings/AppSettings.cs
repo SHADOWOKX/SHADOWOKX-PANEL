@@ -44,6 +44,13 @@ public sealed record AppSettings
     public string CustomAccent { get; init; } = "#f97316";
     public LayoutDensity Density { get; init; } = LayoutDensity.Comfortable;
     public bool Animations { get; init; } = true;
+    public bool ShowCostEstimate { get; init; } = true;
+    public string EstimateModel { get; init; } = "gpt-5.6-sol";
+    // Explicit initial reference: 100% uncached input at standard context rates.
+    public int EstimateCachedPercent { get; init; }
+    public int EstimateOutputPercent { get; init; }
+    public int EstimateWritePercent { get; init; }
+    public bool EstimateLongContext { get; init; }
     public bool ShowLifetimeTokens { get; init; } = true;
     public bool ShowTokenHistory { get; init; } = true;
     public bool ShowUsageState { get; init; } = true;

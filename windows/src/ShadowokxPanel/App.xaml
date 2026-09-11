@@ -30,8 +30,8 @@
                 <Setter Property="Background" Value="{ThemeResource CardBrush}" />
                 <Setter Property="BorderBrush" Value="{ThemeResource CardBorderBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="12" />
-                <Setter Property="Padding" Value="14" />
+                <Setter Property="CornerRadius" Value="16" />
+                <Setter Property="Padding" Value="12" />
             </Style>
             <Style x:Key="CardTitleStyle" TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{ThemeResource PrimaryTextBrush}" />
@@ -46,15 +46,15 @@
             </Style>
             <Style x:Key="MetricLabelStyle" TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{ThemeResource SecondaryTextBrush}" />
-                <Setter Property="FontSize" Value="12" />
+                <Setter Property="FontSize" Value="11" />
             </Style>
             <Style x:Key="MetricValueStyle" TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{ThemeResource PrimaryTextBrush}" />
-                <Setter Property="FontSize" Value="14" />
+                <Setter Property="FontSize" Value="13" />
                 <Setter Property="FontWeight" Value="SemiBold" />
             </Style>
             <Style x:Key="IconButtonStyle" TargetType="Button">
-                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Background" Value="{ThemeResource CardHoverBrush}" />
                 <Setter Property="Foreground" Value="{ThemeResource PrimaryTextBrush}" />
                 <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="CornerRadius" Value="10" />

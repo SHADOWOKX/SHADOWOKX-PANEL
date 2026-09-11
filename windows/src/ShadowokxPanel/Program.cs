@@ -24,13 +24,14 @@ public static class Program
             var currentInstance = AppInstance.GetCurrent();
             var activation = currentInstance.GetActivatedEventArgs();
             StartupDiagnostics.Write("AppInstance key lookup");
-            var keyInstance = AppInstance.FindOrRegisterForKey(InstanceKey);
+            var keyInstance = AppInstance.FindOrRegisterForKey(Environment.GetCommandLineArgs().Contains("--ui-smoke")
+                ? InstanceKey + ".Smoke." + Environment.ProcessId : InstanceKey);
             if (!keyInstance.IsCurrent)
             {
                 StartupDiagnostics.Write("instance decision: secondary");
                 StartupDiagnostics.Write("activation redirect start");
                 keyInstance.RedirectActivationToAsync(activation).AsTask()
-                    .GetAwaiter().GetResult();
+                    .WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
                 StartupDiagnostics.Write("activation redirect complete; secondary exiting");
                 return;
             }

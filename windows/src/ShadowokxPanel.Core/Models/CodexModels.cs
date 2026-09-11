@@ -34,7 +34,10 @@ public sealed record TokenUsage(
     long? PeakDailyTokens,
     DateOnly? PeakDate,
     IReadOnlyList<UsageBucket> DailyBuckets,
-    long? SevenDayTokens);
+    long? SevenDayTokens)
+{
+    public IReadOnlyList<UsageBucket>? AccountDailyBuckets { get; init; }
+}
 
 public sealed record CodexState
 {
@@ -45,6 +48,7 @@ public sealed record CodexState
     public UsageWindow? Weekly { get; init; }
     public int ResetCreditsAvailable { get; init; }
     public TokenUsage? TokenUsage { get; init; }
+    public Codex.TokenCostSummary? Cost { get; init; }
     public DateTimeOffset? LastSuccessfulRefresh { get; init; }
     public bool IsStale => Status is ProviderStatus.Stale or ProviderStatus.Cached;
     public bool HasData => Weekly is not null || FiveHour is not null;

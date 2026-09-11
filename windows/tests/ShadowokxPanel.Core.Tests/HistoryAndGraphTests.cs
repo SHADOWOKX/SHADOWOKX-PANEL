@@ -14,7 +14,7 @@ public sealed class HistoryAndGraphTests
     }
 
     [Fact]
-    public async Task CurrentDayMergesWithoutImportingOlderAccountBuckets()
+    public async Task ImportsHistoricalAccountBucketsFromOtherDevices()
     {
         var history = TokenHistoryDocument.Empty(Now);
         var usage = new TokenUsage(5000, 200, 999, new DateOnly(2026, 8, 30),
@@ -25,9 +25,9 @@ public sealed class HistoryAndGraphTests
         using var temporary = TemporaryDirectory.Create();
         var store = new TokenHistoryStore(temporary.Paths);
         var merged = await store.MergeAsync(history, usage, Now);
-        var single = Assert.Single(merged.DailyBuckets);
-        Assert.Equal(new DateOnly(2026, 8, 31), single.Date);
-        Assert.Equal(200, single.Tokens);
+        Assert.Equal(usage.DailyBuckets, merged.DailyBuckets);
+        var restored = await store.LoadAsync(Now);
+        Assert.Equal(usage.DailyBuckets, restored.DailyBuckets);
     }
 
     [Fact]

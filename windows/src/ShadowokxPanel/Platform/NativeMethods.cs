@@ -78,6 +78,18 @@ internal static class NativeMethods
     }
 
     [StructLayout(LayoutKind.Sequential)]
+    internal struct NotifyIconIdentifier
+    {
+        internal uint cbSize;
+        internal nint hWnd;
+        internal uint uID;
+        internal Guid guidItem;
+    }
+
+    [DllImport("shell32.dll", EntryPoint = "Shell_NotifyIconGetRect")]
+    internal static extern int ShellNotifyIconGetRect(ref NotifyIconIdentifier identifier, out Rect rectangle);
+
+    [StructLayout(LayoutKind.Sequential)]
     internal struct Point { internal int X; internal int Y; }
 
     [StructLayout(LayoutKind.Sequential)]
