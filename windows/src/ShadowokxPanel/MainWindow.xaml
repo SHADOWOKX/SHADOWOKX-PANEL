@@ -123,7 +123,7 @@
                                     <ProgressRing x:Name="CodexRefreshRing" Width="18" Height="18" IsActive="False" Visibility="Collapsed" />
                                 </Grid>
                             </Button>
-                                <Button x:Name="CopyUsageButton" Style="{StaticResource IconButtonStyle}" Click="CopyUsage_Click" ToolTipService.ToolTip="Copy usage image" AutomationProperties.Name="Copy usage image"><FontIcon Glyph="&#xE8D4;" FontSize="15" /></Button>
+                                <Button x:Name="CopyUsageButton" Style="{StaticResource IconButtonStyle}" Click="CopyUsage_Click" ToolTipService.ToolTip="Copy usage image" AutomationProperties.Name="Copy usage image"><Image Source="Assets/Actions/share.svg" Width="18" Height="18" Stretch="Uniform" /></Button>
                             </StackPanel>
                         </Grid>
 
