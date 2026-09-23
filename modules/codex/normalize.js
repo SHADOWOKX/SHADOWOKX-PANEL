@@ -125,7 +125,7 @@ export function normalizeAccountTokenUsage(response, nowMs = Date.now()) {
     const peakDate = buckets.find(bucket => bucket.tokens === peakDailyTokens)?.date ?? null;
     const todayTokens = buckets.find(bucket => bucket.date === localUsageDateKey(nowMs))?.tokens ?? null;
     const lifetimeTokens = normalizeTokenCount(response.summary?.lifetimeTokens);
-    if (lifetimeTokens === null && todayTokens === null && peakDailyTokens === null)
+    if (lifetimeTokens === null && todayTokens === null && peakDailyTokens === null && buckets.length === 0)
         return null;
     const dailyBuckets = recentUsageBuckets(buckets, nowMs);
     return {
@@ -164,7 +164,7 @@ function normalizeCachedTokenUsage(value) {
             : normalizeTokenCount(value.sevenDayTokens),
     };
     return tokenUsage.lifetimeTokens !== null || tokenUsage.todayTokens !== null ||
-        tokenUsage.peakDailyTokens !== null
+        tokenUsage.peakDailyTokens !== null || dailyBuckets.length > 0
         ? tokenUsage
         : null;
 }
@@ -236,6 +236,7 @@ export function normalizeCachedRateLimits(value) {
             ? Math.max(0, Math.min(999, Math.round(value.resetCreditsAvailable)))
             : 0,
         tokenUsage: normalizeCachedTokenUsage(value.tokenUsage),
+        accountTokenUsage: normalizeCachedTokenUsage(value.accountTokenUsage),
         lastSuccessfulRefresh: value.lastSuccessfulRefresh,
     };
 }

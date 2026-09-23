@@ -91,6 +91,20 @@ gnome-extensions enable shadow-panel@shadowokx
 ./uninstall.sh
 ```
 
+### Linux token totals and API-equivalent estimate
+
+The Codex page shows exact **Today**, **Yesterday**, and **Last 7 Days** token counts
+from the signed-in Codex account usage response. Weekly allowance percentages are a
+separate server-reported measure and cannot be converted to tokens. USD values are
+approximate API-equivalent estimates: the locally observed model and cache mix is
+applied to those exact account totals. This is not a Codex or ChatGPT subscription
+charge; unsupported local models make the estimate partial.
+
+Bundled standard API prices were checked on 2026-09-23 against the official
+[OpenAI model pricing pages](https://developers.openai.com/api/docs/pricing). The
+Linux GNOME package is built and attached as an artifact by the `Linux GNOME package`
+GitHub Actions workflow for pushes to `main` and pull requests.
+
 ## Windows 11
 
 ### [Download the latest Windows Setup (x64)](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/latest/download/ShadowokxPanel-Setup-x64.exe)

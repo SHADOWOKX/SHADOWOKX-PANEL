@@ -1,0 +1,83 @@
+name: Linux GNOME package
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/linux-package.yml'
+      - 'extension.js'
+      - 'metadata.json'
+      - 'package.json'
+      - 'prefs.js'
+      - 'stylesheet.css'
+      - 'schemas/**'
+      - 'icons/**'
+      - 'lib/**'
+      - 'modules/**'
+      - 'services/**'
+      - 'ui/**'
+      - 'scripts/package.sh'
+      - 'scripts/validate-json.mjs'
+      - 'scripts/validate-release.mjs'
+      - 'README.md'
+      - 'NOTICE.md'
+      - 'LICENSE'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/linux-package.yml'
+      - 'extension.js'
+      - 'metadata.json'
+      - 'package.json'
+      - 'prefs.js'
+      - 'stylesheet.css'
+      - 'schemas/**'
+      - 'icons/**'
+      - 'lib/**'
+      - 'modules/**'
+      - 'services/**'
+      - 'ui/**'
+      - 'scripts/package.sh'
+      - 'scripts/validate-json.mjs'
+      - 'scripts/validate-release.mjs'
+      - 'README.md'
+      - 'NOTICE.md'
+      - 'LICENSE'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Build GNOME Shell 50 extension ZIP
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install GNOME packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes gjs gnome-shell libglib2.0-bin unzip zip
+
+      - name: Build and inspect Linux package
+        run: |
+          output_dir="$RUNNER_TEMP/shadow-panel-package"
+          ./scripts/package.sh "$output_dir"
+          package="$output_dir/shadow-panel@shadowokx.shell-extension.zip"
+          unzip -tq "$package"
+          unzip -Z1 "$package" | grep -qx 'modules/codex/costWorker.js'
+          unzip -Z1 "$package" | grep -qx 'modules/codex/cost.js'
+
+      - name: Upload Linux package
+        uses: actions/upload-artifact@v7
+        with:
+          name: shadow-panel-linux-gnome50-${{ github.sha }}
+          path: ${{ runner.temp }}/shadow-panel-package/shadow-panel@shadowokx.shell-extension.zip
+          if-no-files-found: error
+          retention-days: 30

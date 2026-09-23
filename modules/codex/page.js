@@ -28,14 +28,19 @@ import {
 import {BasePage} from '../basePage.js';
 import {exportCodexSummaryImage} from './shareImage.js';
 import {localUsageDateKey} from './normalize.js';
+import {costRow} from './costRow.js';
 import {tokenSparkline} from './sparkline.js';
 
 function contentSignature(state) {
+    const {updatedAt: _updatedAt, days: _days, ...costUsage} = state?.costUsage ?? {};
+    const accountTokenUsage = state?.accountTokenUsage ?? null;
     if (!state?.lastSuccessfulRefresh) {
         return JSON.stringify({
             status: state?.status ?? null,
             errorCode: state?.errorCode ?? null,
             error: state?.error ?? null,
+            accountTokenUsage,
+            costUsage,
         });
     }
     return JSON.stringify({
@@ -43,6 +48,8 @@ function contentSignature(state) {
         fiveHour: state.fiveHour,
         resetCreditsAvailable: state.resetCreditsAvailable,
         tokenUsage: state.tokenUsage,
+        accountTokenUsage,
+        costUsage,
     });
 }
 
@@ -151,7 +158,7 @@ export class CodexPage extends BasePage {
             });
             let sectionCount = 0;
             if (this.context.settings.get_boolean('show-codex-weekly')) {
-                content.add_child(this._weeklyHero(state.weekly));
+                content.add_child(this._weeklyHero(state.weekly, state.costUsage, state.accountTokenUsage));
                 sectionCount++;
             }
             if (this.context.settings.get_boolean('show-codex-five-hour')) {
@@ -164,6 +171,9 @@ export class CodexPage extends BasePage {
                     style_class: 'shadow-inline-empty shadow-muted',
                 }));
             }
+
+            if (!this.context.settings.get_boolean('show-codex-weekly'))
+                content.add_child(costRow(state.costUsage, state.accountTokenUsage));
 
             content.add_child(this._tokenActivity(state.tokenUsage));
 
@@ -232,7 +242,7 @@ export class CodexPage extends BasePage {
         return actions;
     }
 
-    _weeklyHero(window) {
+    _weeklyHero(window, costUsage, accountTokenUsage) {
         const card = new St.BoxLayout({
             vertical: true,
             style_class: 'shadow-card shadow-weekly-hero',
@@ -259,6 +269,7 @@ export class CodexPage extends BasePage {
                 style_class: 'shadow-muted',
                 x_align: Clutter.ActorAlign.START,
             }));
+            card.add_child(costRow(costUsage, accountTokenUsage));
             return card;
         }
 
@@ -318,6 +329,7 @@ export class CodexPage extends BasePage {
             style_class: 'shadow-progress-available',
         }));
         card.add_child(legend);
+        card.add_child(costRow(costUsage, accountTokenUsage));
 
         if (this.context.settings.get_boolean('show-codex-reset-time')) {
             const reset = new St.BoxLayout({style_class: 'shadow-weekly-reset', x_expand: true});
