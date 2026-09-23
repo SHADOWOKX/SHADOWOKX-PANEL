@@ -430,7 +430,8 @@ export class CodexPage extends BasePage {
         }
 
         if (this.context.settings.get_boolean('show-codex-token-stats')) {
-            const sparkline = this._tokenSparkline(usage.dailyBuckets);
+            const visibleBuckets = normalizeSparklineBuckets(usage.dailyBuckets);
+            const sparkline = this._tokenSparkline(visibleBuckets);
             if (sparkline)
                 card.add_child(sparkline);
             else
@@ -440,7 +441,7 @@ export class CodexPage extends BasePage {
                 }));
 
             const stats = new St.BoxLayout({style_class: 'shadow-token-row', x_expand: true});
-            const today = usage.dailyBuckets?.find(
+            const today = visibleBuckets.find(
                 bucket => bucket.date === localUsageDateKey(Date.now())
             );
             const todayMetric = this._tokenMetric(
@@ -454,9 +455,11 @@ export class CodexPage extends BasePage {
                 todayMetric.accessible_name = `Today ${this._formatTokens(today.tokens)} tokens`;
             }
             stats.add_child(todayMetric);
-            if (Number.isSafeInteger(usage.peakDailyTokens))
-                stats.add_child(this._tokenMetric('Peak', this._formatCompactTokens(usage.peakDailyTokens)));
-            const peakDate = this._formatUsageDate(usage.peakDate);
+            const peak = visibleBuckets.reduce((best, bucket) =>
+                !best || bucket.tokens > best.tokens ? bucket : best, null);
+            if (peak)
+                stats.add_child(this._tokenMetric('Peak', this._formatCompactTokens(peak.tokens)));
+            const peakDate = this._formatUsageDate(peak?.date);
             if (peakDate)
                 stats.add_child(this._tokenMetric('Peak day', peakDate));
             if (stats.get_children().length > 0)

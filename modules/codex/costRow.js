@@ -105,9 +105,9 @@ export function costRow(usage, accountUsage) {
         note.clutter_text.set_line_wrap(true);
         box.add_child(note);
     } else if (!Number.isSafeInteger(todayTokens)) {
-        const latest = latestDate ? ` Latest account date returned: ${formatDate(latestDate)}.` : '';
+        const latest = latestDate ? ` · Latest account data: ${formatDate(latestDate)}` : '';
         const note = new St.Label({
-            text: `Codex has not returned an account bucket for ${formatDate(todayDate)} yet.${latest} Daily account data may arrive later; no local session totals are substituted.`,
+            text: `Today's usage isn't available yet${latest}`,
             style_class: 'shadow-cost-note shadow-muted', x_expand: true,
         });
         note.clutter_text.set_line_wrap(true);
