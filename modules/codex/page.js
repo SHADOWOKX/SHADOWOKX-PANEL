@@ -175,10 +175,10 @@ export class CodexPage extends BasePage {
             if (!this.context.settings.get_boolean('show-codex-weekly'))
                 content.add_child(costRow(state.costUsage, state.accountTokenUsage));
 
-            content.add_child(this._tokenActivity(state.tokenUsage));
+            content.add_child(this._tokenActivity(state.accountTokenUsage));
 
             if (this.context.settings.get_boolean('show-codex-insights')) {
-                const insight = this._tokenInsight(state.tokenUsage);
+                const insight = this._tokenInsight(state.accountTokenUsage);
                 if (insight)
                     content.add_child(insight);
             }
@@ -539,8 +539,8 @@ export class CodexPage extends BasePage {
     }
 
     _tokenInsight(usage) {
-        const prior = usage.dailyBuckets?.filter(bucket => bucket.date !== localUsageDateKey(Date.now())) ?? [];
-        if (!Number.isSafeInteger(usage.todayTokens) || prior.length < 2)
+        const prior = usage?.dailyBuckets?.filter(bucket => bucket.date !== localUsageDateKey(Date.now())) ?? [];
+        if (!Number.isSafeInteger(usage?.todayTokens) || prior.length < 2)
             return null;
         const average = prior.reduce((total, bucket) => total + bucket.tokens, 0) / prior.length;
         if (!(average > 0))

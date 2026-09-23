@@ -223,6 +223,14 @@ export function normalizeCachedRateLimits(value) {
     const weekly = normalizeWindow(value.weekly);
     if (!fiveHour && !weekly)
         return null;
+    const accountTokenUsage = normalizeCachedTokenUsage(value.accountTokenUsage) ??
+        normalizeCachedTokenUsage({
+            lifetimeTokens: value.tokenUsage?.lifetimeTokens,
+            todayTokens: null,
+            peakDailyTokens: null,
+            dailyBuckets: [],
+            sevenDayTokens: null,
+        });
     return {
         status: 'cached',
         connection: 'connected',
@@ -236,7 +244,7 @@ export function normalizeCachedRateLimits(value) {
             ? Math.max(0, Math.min(999, Math.round(value.resetCreditsAvailable)))
             : 0,
         tokenUsage: normalizeCachedTokenUsage(value.tokenUsage),
-        accountTokenUsage: normalizeCachedTokenUsage(value.accountTokenUsage),
+        accountTokenUsage,
         lastSuccessfulRefresh: value.lastSuccessfulRefresh,
     };
 }

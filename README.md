@@ -94,7 +94,8 @@ gnome-extensions enable shadow-panel@shadowokx
 ### Linux token totals and API-equivalent estimate
 
 The Codex page shows exact **Today**, **Yesterday**, and **Last 7 Days** token counts
-from the signed-in Codex account usage response. Weekly allowance percentages are a
+from the signed-in Codex account usage response. The token activity chart and its
+daily statistics use those same account-reported buckets. Weekly allowance percentages are a
 separate server-reported measure and cannot be converted to tokens. USD values are
 approximate API-equivalent estimates: the locally observed model and cache mix is
 applied to those exact account totals. This is not a Codex or ChatGPT subscription
