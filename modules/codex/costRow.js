@@ -55,6 +55,14 @@ export function costRow(usage, accountUsage) {
     const localDayForDate = date => localDays.find(day => day.date === date);
     const week = localDays.filter(day => day.date >= weekStartDate && day.date <= todayDate);
     const todayTokens = accountTokensForDate(accountUsage, todayDate);
+    const caption = new St.BoxLayout({style_class: 'shadow-cost-caption', x_expand: true});
+    caption.add_child(new St.Label({
+        text: 'ACCOUNT TOKENS', style_class: 'shadow-muted', x_expand: true,
+    }));
+    caption.add_child(new St.Label({
+        text: '≈ API USD', style_class: 'shadow-muted',
+    }));
+    box.add_child(caption);
     const periods = [
         {
             title: `Today · ${formatDate(todayDate)}`,
@@ -81,33 +89,48 @@ export function costRow(usage, accountUsage) {
         row.add_child(new St.Label({text: period.title, style_class: 'shadow-muted', x_expand: true}));
         const cost = usage?.available
             ? estimateAccountCost(period.tokens, period.localCost, period.pricedTokens) : null;
-        const amount = Number.isSafeInteger(period.tokens)
-            ? `${cost === null ? '—' : `≈${formatCost(cost)}`} · ${tokensFormatter.format(period.tokens)} tokens`
-            : period.title.startsWith('Today') && accountUsage ? 'Not reported yet' : '—';
-        const value = new St.Label({text: amount, style_class: 'shadow-cost-amount'});
-        row.add_child(value);
+        if (Number.isSafeInteger(period.tokens)) {
+            row.add_child(new St.Label({
+                text: tokensFormatter.format(period.tokens),
+                style_class: 'shadow-cost-amount',
+            }));
+            if (cost !== null) {
+                const estimate = new St.Label({
+                    text: `≈${formatCost(cost)}`,
+                    style_class: 'shadow-cost-estimate shadow-muted',
+                });
+                attachTooltip(estimate,
+                    'API estimate: account tokens × locally recorded model and cache mix.');
+                row.add_child(estimate);
+            }
+        } else {
+            row.add_child(new St.Label({
+                text: period.title.startsWith('Today') && accountUsage
+                    ? 'Pending' : '—',
+                style_class: 'shadow-cost-amount',
+            }));
+        }
         row.accessible_name = `${period.title}: ${Number.isSafeInteger(period.tokens)
             ? `${tokensFormatter.format(period.tokens)} account tokens`
             : period.title.startsWith('Today') && accountUsage
                 ? 'Codex account has not reported this date yet'
                 : 'account token total unavailable'}` +
             `${cost === null ? '' : `, estimated API-equivalent cost ${formatCost(cost)}`}`;
-        value.accessible_name = row.accessible_name;
         box.add_child(row);
     }
 
     const latestDate = accountUsage?.latestReportedDate ?? accountUsage?.dailyBuckets?.at(-1)?.date ?? null;
     if (!accountUsage) {
         const note = new St.Label({
-            text: 'Waiting for Codex account token data. Local session totals are not substituted.',
+            text: 'Account token data unavailable',
             style_class: 'shadow-cost-note shadow-muted', x_expand: true,
         });
         note.clutter_text.set_line_wrap(true);
         box.add_child(note);
     } else if (!Number.isSafeInteger(todayTokens)) {
-        const latest = latestDate ? ` · Latest account data: ${formatDate(latestDate)}` : '';
+        const status = latestDate ? `Account data through ${formatDate(latestDate)}` : 'Today pending from account';
         const note = new St.Label({
-            text: `Today's usage isn't available yet${latest}`,
+            text: status,
             style_class: 'shadow-cost-note shadow-muted', x_expand: true,
         });
         note.clutter_text.set_line_wrap(true);
@@ -115,27 +138,6 @@ export function costRow(usage, accountUsage) {
         box.add_child(note);
     }
 
-    box.accessible_name = 'Exact Codex account token totals with approximate API-equivalent cost';
-    attachTooltip(box, () => {
-        if (!accountUsage)
-            return 'Account token totals are unavailable. Refresh Codex usage to load them.';
-        const updated = Number.isFinite(accountUsage.updatedAt)
-            ? `Account response read ${new Date(accountUsage.updatedAt).toLocaleString()}.\n`
-            : '';
-        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'device local time';
-        const latest = latestDate ? `Latest account date returned: ${latestDate}.\n` : '';
-        const todayNote = Number.isSafeInteger(todayTokens) ? ''
-            : `No account bucket for ${todayDate}; today's account total is not reported yet.\n`;
-        const models = usage?.models?.map(model =>
-            `${model.model}: ${model.priced ? formatCost(model.cost) : 'Unpriced'}`).join('\n') ?? '';
-        return `${updated}${latest}${todayNote}` +
-            'Token totals come from the Codex account usage response. Its daily buckets contain date-only startDate values, but the response does not provide a timezone or day-boundary rule; the panel preserves those dates and compares them with the device calendar.' +
-            ` Device time zone: ${timezone}.\n` +
-            'USD is a standard API-equivalent estimate: it applies the locally recorded, priced model/cache mix to the exact account token totals. Fast-mode premiums and tool-call fees are excluded; it is not a Codex or ChatGPT subscription charge.\n' +
-            `${usage?.partial ? 'Some local token records or models are unpriced, so the estimate extrapolates from the priced session mix.' : 'Local session pricing data is complete for recognized models.'}` +
-            `${usage?.stale ? '\nThe local model/cache scan is using its last available result.' : ''}` +
-            `${models ? `\n\nLocal session models\n${models}` : ''}` +
-            `\nPrices checked ${usage?.priceDate ?? '—'} · USD. Allowance percentages are separate from token totals.`;
-    });
+    box.accessible_name = 'Token totals from your Codex account. Approximate USD values use the locally recorded model and cache mix.';
     return box;
 }

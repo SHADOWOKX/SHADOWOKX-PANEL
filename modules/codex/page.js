@@ -12,14 +12,11 @@ import {
     animationsEnabled,
     animateRefreshButton,
     attachTooltip,
-    fitScrollToContent,
     iconButton,
     moduleIconButton,
     moduleIcon,
     pageTitle,
     resolveAccent,
-    resetScrollPosition,
-    scrollContainer,
     sectionTitle,
     stateMessage,
     statusPill,
@@ -89,7 +86,6 @@ export class CodexPage extends BasePage {
             this._render();
         } else {
             this._refreshTimedLabels();
-            this.fit();
         }
         this.context.scheduler.every('codex-timed-labels', CODEX_TIMED_LABEL_INTERVAL, () =>
             this._refreshTimedLabels());
@@ -101,25 +97,10 @@ export class CodexPage extends BasePage {
         this.context.scheduler.cancel('codex-timed-labels');
     }
 
-    activate() {
-        if (this._destroyed || this._pageDestroyed)
-            return;
-        this.fit();
-        resetScrollPosition(this._scroll);
-    }
-
-    fit() {
-        if (this._destroyed || this._pageDestroyed)
-            return;
-        fitScrollToContent(this._scroll, this._scrollContent, this.context, this.actor);
-    }
-
     _render() {
         if (this._destroyed || this._pageDestroyed || !this.actor)
             return;
         const state = this._provider.getState();
-        let nextScroll = null;
-        let nextScrollContent = null;
         let nextRefreshButton = null;
         const nextTimedLabels = [];
         this._buildingTimedLabels = nextTimedLabels;
@@ -187,21 +168,16 @@ export class CodexPage extends BasePage {
             const facts = this._facts(state);
             if (facts)
                 content.add_child(facts);
-            nextScrollContent = content;
-            nextScroll = scrollContainer(content, 'shadow-codex-scroll');
-            page.add_child(nextScroll);
+            page.add_child(content);
         });
         this._buildingTimedLabels = null;
         if (rendered) {
-            this._scrollContent = nextScrollContent;
-            this._scroll = nextScroll;
             this._hasRendered = true;
             this._stateDirty = false;
             this._renderedSignature = contentSignature(state);
             this._refreshButton = nextRefreshButton;
             this._timedLabels = nextTimedLabels;
         }
-        this.fit();
     }
 
     _actions(state) {
@@ -288,21 +264,7 @@ export class CodexPage extends BasePage {
             style_class: 'shadow-weekly-unit',
             y_align: Clutter.ActorAlign.END,
         }));
-        const summary = new St.BoxLayout({
-            style_class: 'shadow-limit-summary', x_expand: true,
-        });
-        value.x_expand = true;
-        summary.add_child(value);
-        const consumed = new St.BoxLayout({
-            vertical: true, style_class: 'shadow-limit-consumed',
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        consumed.add_child(new St.Label({
-            text: `${100 - window.remainingPercent}%`, style_class: 'shadow-limit-used-value',
-        }));
-        consumed.add_child(new St.Label({text: 'used', style_class: 'shadow-metric-label'}));
-        summary.add_child(consumed);
-        card.add_child(summary);
+        card.add_child(value);
 
         const animate = this._popupOpen && this._lastWeeklyPercent !== null &&
             this._lastWeeklyPercent !== window.remainingPercent &&
@@ -315,21 +277,6 @@ export class CodexPage extends BasePage {
             animate
         ).actor);
 
-        const legend = new St.BoxLayout({
-            style_class: 'shadow-progress-legend',
-            x_expand: true,
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        legend.add_child(new St.Label({
-            text: 'Remaining allowance',
-            style_class: 'shadow-muted',
-            x_expand: true,
-        }));
-        legend.add_child(new St.Label({
-            text: '100% total',
-            style_class: 'shadow-progress-available',
-        }));
-        card.add_child(legend);
         card.add_child(costRow(costUsage, accountTokenUsage));
 
         if (this.context.settings.get_boolean('show-codex-reset-time')) {
@@ -399,14 +346,6 @@ export class CodexPage extends BasePage {
         });
         const heading = new St.BoxLayout({style_class: 'shadow-token-heading', x_expand: true});
         heading.add_child(sectionTitle('Token activity'));
-        if (usage?.dailyBuckets?.length >= 2) {
-            heading.add_child(statusPill(
-                this.context.settings,
-                '7-day history',
-                'neutral',
-                'document-open-recent-symbolic'
-            ));
-        }
         card.add_child(heading);
         if (!usage) {
             card.add_child(new St.Label({
@@ -419,14 +358,13 @@ export class CodexPage extends BasePage {
 
         if (this.context.settings.get_boolean('show-codex-token-lifetime') &&
             Number.isSafeInteger(usage.lifetimeTokens)) {
-            const lifetime = this._tokenMetric(
-                'Lifetime tokens',
-                this._formatCompactTokens(usage.lifetimeTokens),
-                true
-            );
+            const lifetime = new St.Label({
+                text: `${this._formatCompactTokens(usage.lifetimeTokens)} lifetime`,
+                style_class: 'shadow-token-lifetime',
+            });
             lifetime.accessible_name = `Lifetime tokens ${this._formatTokens(usage.lifetimeTokens)}`;
-            attachTooltip(lifetime, `${this._formatTokens(usage.lifetimeTokens)} tokens`);
-            card.add_child(lifetime);
+            attachTooltip(lifetime, `${this._formatTokens(usage.lifetimeTokens)} account tokens`);
+            heading.add_child(lifetime);
         }
 
         if (this.context.settings.get_boolean('show-codex-token-stats')) {
@@ -441,20 +379,6 @@ export class CodexPage extends BasePage {
                 }));
 
             const stats = new St.BoxLayout({style_class: 'shadow-token-row', x_expand: true});
-            const today = visibleBuckets.find(
-                bucket => bucket.date === localUsageDateKey(Date.now())
-            );
-            const todayMetric = this._tokenMetric(
-                'Today',
-                Number.isSafeInteger(today?.tokens)
-                    ? this._formatCompactTokens(today.tokens)
-                    : 'Unavailable'
-            );
-            if (Number.isSafeInteger(today?.tokens)) {
-                attachTooltip(todayMetric, `${this._formatTokens(today.tokens)} tokens`);
-                todayMetric.accessible_name = `Today ${this._formatTokens(today.tokens)} tokens`;
-            }
-            stats.add_child(todayMetric);
             const peak = visibleBuckets.reduce((best, bucket) =>
                 !best || bucket.tokens > best.tokens ? bucket : best, null);
             if (peak)
@@ -479,7 +403,7 @@ export class CodexPage extends BasePage {
         });
         const scale = new St.BoxLayout({style_class: 'shadow-chart-scale', x_expand: true});
         scale.add_child(new St.Label({
-            text: 'DAILY TOKENS', style_class: 'shadow-chart-caption shadow-muted', x_expand: true,
+            text: 'ACCOUNT TOKENS · LAST 7 DAYS', style_class: 'shadow-chart-caption shadow-muted', x_expand: true,
         }));
         scale.add_child(new St.Label({
             text: `0 – ${this._formatCompactTokens(Math.max(...normalized.map(point => point.tokens)))}`,
@@ -568,24 +492,12 @@ export class CodexPage extends BasePage {
         return row;
     }
 
-    _tokenMetric(label, value, primary = false) {
+    _tokenMetric(label, value) {
         const metric = new St.BoxLayout({
-            vertical: true,
-            style_class: primary ? 'shadow-token-metric shadow-token-primary' : 'shadow-token-metric',
-            x_expand: true,
+            vertical: true, style_class: 'shadow-token-metric', x_expand: true,
         });
-        const labelActor = new St.Label({text: label, style_class: 'shadow-token-label'});
-        const valueActor = new St.Label({
-            text: value,
-            style_class: primary ? 'shadow-token-primary-value' : 'shadow-token-value',
-        });
-        if (primary) {
-            metric.add_child(valueActor);
-            metric.add_child(labelActor);
-        } else {
-            metric.add_child(labelActor);
-            metric.add_child(valueActor);
-        }
+        metric.add_child(new St.Label({text: label, style_class: 'shadow-token-label'}));
+        metric.add_child(new St.Label({text: value, style_class: 'shadow-token-value'}));
         return metric;
     }
 
@@ -743,8 +655,6 @@ export class CodexPage extends BasePage {
         this._stopRefreshAnimation();
         this.context.scheduler.cancel('codex-timed-labels');
         super.destroy();
-        this._scroll = null;
-        this._scrollContent = null;
         this._refreshButton = null;
         this._timedLabels = [];
     }

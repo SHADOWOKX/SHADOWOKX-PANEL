@@ -2,7 +2,7 @@
 
 A lightweight cross-platform panel for checking **ChatGPT Codex usage** and **local weather** from one place.
 
-Linux `2.3.4` · Windows `1.0.0`.
+Linux `2.3.5` · Windows `1.0.0`.
 
 - Weekly and 5-hour Codex limits
 - Original Shadowokx mascot with idle, awake, and active states
@@ -53,9 +53,9 @@ Tested on Ubuntu 26.04.1 LTS, GNOME Shell 50.x and Wayland.
 
 ### Download Linux package
 
-[**Download Shadowokx Panel 2.3.4 for Linux (GNOME Shell 50)**](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/linux-v2.3.4/shadow-panel@shadowokx.shell-extension.zip)
+[**Download Shadowokx Panel 2.3.5 for Linux (GNOME Shell 50)**](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/linux-v2.3.5/shadow-panel@shadowokx.shell-extension.zip)
 
-[SHA-256 checksum](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/linux-v2.3.4/checksums-linux.txt)
+[SHA-256 checksum](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/linux-v2.3.5/checksums-linux.txt)
 
 Install the downloaded ZIP with:
 
