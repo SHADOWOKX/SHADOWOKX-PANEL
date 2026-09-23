@@ -55,12 +55,10 @@ export function costRow(usage, accountUsage) {
     const localDayForDate = date => localDays.find(day => day.date === date);
     const week = localDays.filter(day => day.date >= weekStartDate && day.date <= todayDate);
     const todayTokens = accountTokensForDate(accountUsage, todayDate);
+    const localToday = localDayForDate(todayDate);
     const caption = new St.BoxLayout({style_class: 'shadow-cost-caption', x_expand: true});
     caption.add_child(new St.Label({
         text: 'ACCOUNT TOKENS', style_class: 'shadow-muted', x_expand: true,
-    }));
-    caption.add_child(new St.Label({
-        text: '≈ API USD', style_class: 'shadow-muted',
     }));
     box.add_child(caption);
     const periods = [
@@ -138,6 +136,31 @@ export function costRow(usage, accountUsage) {
         box.add_child(note);
     }
 
-    box.accessible_name = 'Token totals from your Codex account. Approximate USD values use the locally recorded model and cache mix.';
+    if (!Number.isSafeInteger(todayTokens) && usage?.available && !usage.stale &&
+        Number.isSafeInteger(localToday?.tokens) && localToday.tokens > 0) {
+        const live = new St.BoxLayout({
+            style_class: 'shadow-cost-period shadow-cost-local', x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        live.add_child(new St.Label({
+            text: 'This device · live', style_class: 'shadow-cost-live-label', x_expand: true,
+        }));
+        live.add_child(new St.Label({
+            text: tokensFormatter.format(localToday.tokens), style_class: 'shadow-cost-amount',
+        }));
+        if (Number.isFinite(localToday.cost) && localToday.pricedTokens > 0) {
+            const estimate = new St.Label({
+                text: `≈${formatCost(localToday.cost)}`,
+                style_class: 'shadow-cost-estimate shadow-muted',
+            });
+            attachTooltip(estimate,
+                'Value of recorded local sessions with recognized models; not a billed charge.');
+            live.add_child(estimate);
+        }
+        live.accessible_name = `This device today: ${tokensFormatter.format(localToday.tokens)} locally recorded tokens; not the account total`;
+        box.add_child(live);
+    }
+
+    box.accessible_name = 'Account token totals and separate live usage recorded on this device. USD values are estimates.';
     return box;
 }

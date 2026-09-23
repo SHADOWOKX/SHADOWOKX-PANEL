@@ -114,8 +114,11 @@ gnome-extensions enable shadow-panel@shadowokx
 The Codex page shows exact **Today**, **Yesterday**, and **Last 7 Days** token counts
 from the signed-in Codex account usage response. The token activity chart and its
 daily statistics use those same account-reported buckets. When Codex has not returned
-an account bucket for today, the panel labels it as not reported and does not substitute
-local session totals. Codex returns daily dates without a published timezone/day-boundary
+an account bucket for today, the panel labels it as pending. A separate "This device · live"
+line shows tokens recorded by local Codex sessions since device midnight and their
+partial price estimate; it does not replace or modify the account total or chart.
+Opening the panel or pressing Refresh rescans those local records. Codex returns daily
+dates without a published timezone/day-boundary
 rule; the panel preserves those date strings and shows them beside Today/Yesterday labels.
 Weekly allowance percentages are a
 separate server-reported measure and cannot be converted to tokens. USD values are
@@ -123,7 +126,7 @@ approximate API-equivalent estimates: the locally observed model and cache mix i
 applied to those exact account totals. This is not a Codex or ChatGPT subscription
 charge; unsupported local models make the estimate partial.
 
-Bundled standard API prices were checked on 2026-09-23 against the official
+Bundled standard API prices were checked on 2026-09-24 against the official
 [OpenAI model pricing pages](https://developers.openai.com/api/docs/pricing). The
 Linux GNOME package is built and attached as an artifact by the `Linux GNOME package`
 GitHub Actions workflow for pushes to `main` and pull requests.

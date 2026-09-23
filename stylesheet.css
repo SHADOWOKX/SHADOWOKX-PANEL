@@ -909,3 +909,7 @@
 .shadow-cost-amount { font-weight: 650; font-feature-settings: "tnum"; }
 .shadow-cost-estimate { min-width: 52px; text-align: right; font-feature-settings: "tnum"; }
 .shadow-cost-note { font-size: 10px; }
+
+/* Keep live device activity visually separate from account totals. */
+.shadow-cost-local { margin-top: 4px; padding-top: 6px; border-top: 1px solid rgba(128, 128, 128, 0.15); }
+.shadow-cost-live-label { font-weight: 700; }

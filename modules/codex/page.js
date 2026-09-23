@@ -193,7 +193,7 @@ export class CodexPage extends BasePage {
         const refresh = iconButton(
             refreshing ? 'process-working-symbolic' : 'view-refresh-symbolic',
             refreshing ? 'Refreshing Codex usage' : 'Refresh Codex usage',
-            () => this._provider.refresh(true),
+            () => this._provider.refresh(true, true),
             'shadow-icon-button shadow-action-icon-button'
         );
         refresh.reactive = !refreshing;
@@ -547,7 +547,7 @@ export class CodexPage extends BasePage {
         row.add_child(credits);
         if (hasUpdate) {
             row.add_child(this._timedLabel(
-                () => `Updated ${formatRelativeAge(
+                () => `Checked ${formatRelativeAge(
                     this._provider.getState()?.lastSuccessfulRefresh
                 )}`,
                 {

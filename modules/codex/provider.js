@@ -133,7 +133,7 @@ export class CodexProvider extends Observable {
         );
     }
 
-    setViewVisible(visible, refreshNow = false) {
+    setViewVisible(visible, refreshNow = false, refreshCosts = false) {
         if (this._destroyed)
             return Promise.resolve(this.getState());
         const next = Boolean(visible);
@@ -141,14 +141,16 @@ export class CodexProvider extends Observable {
             this._viewVisible = next;
             this._reschedule();
         }
-        return refreshNow ? this.refresh(true) : Promise.resolve(this.getState());
+        return refreshNow ? this.refresh(true, refreshCosts) : Promise.resolve(this.getState());
     }
 
-    refresh(force = true) {
+    refresh(force = true, refreshCosts = false) {
         if (this._destroyed)
             return Promise.resolve(this.getState());
         if (!this._started && this._startPromise)
             return this._startPromise;
+        if (refreshCosts)
+            this._refreshCosts(true);
         if (this._inFlight)
             return this._inFlight;
         if (!force && !this.isStale())
@@ -173,9 +175,9 @@ export class CodexProvider extends Observable {
         return !last || Date.now() - last >= maxAge;
     }
 
-    _refreshCosts() {
+    _refreshCosts(force = false) {
         if (this._costInFlight || GLib.getenv('SHADOW_PANEL_TEST_ISOLATED') === '1' ||
-            Date.now() - this._lastCostScan < (this._viewVisible ? 120000 : 300000))
+            !force && Date.now() - this._lastCostScan < (this._viewVisible ? 30000 : 300000))
             return;
         this._lastCostScan = Date.now();
         this._costInFlight = this._costReader.read().then(costUsage => {
