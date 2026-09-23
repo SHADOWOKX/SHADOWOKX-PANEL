@@ -109,23 +109,17 @@ jobs:
           output_dir="$RUNNER_TEMP/shadow-panel-package"
           package="$output_dir/shadow-panel@shadowokx.shell-extension.zip"
           checksums="$output_dir/checksums-linux.txt"
+          notes_file="$RUNNER_TEMP/linux-release-notes.md"
 
-          notes="$(cat <<EOF
-Shadowokx Panel for Linux v$VERSION
-
-- GNOME Shell 50 package for Ubuntu 26.04.1 / Wayland.
-- Includes the latest Codex account token totals, seven-day activity, date handling, and Linux packaging fixes.
-- Today is shown as not reported when the Codex account has not returned a current-day bucket; local session totals are not substituted.
-
-Install:
-```bash
-gnome-extensions install --force ./shadow-panel@shadowokx.shell-extension.zip
-gnome-extensions enable shadow-panel@shadowokx
-```
-
-Log out and back in once after installation so GNOME Shell reloads the extension.
-EOF
-)"
+          printf '%s\n' \
+            "Shadowokx Panel for Linux v$VERSION" \
+            "" \
+            "- GNOME Shell 50 package for Ubuntu 26.04.1 / Wayland." \
+            "- Includes the latest Codex account token totals, seven-day activity, date handling, and Linux packaging fixes." \
+            "- Today is shown as not reported when the Codex account has not returned a current-day bucket; local session totals are not substituted." \
+            "" \
+            "Install the downloaded ZIP, then log out and back in once so GNOME Shell reloads the extension." \
+            > "$notes_file"
 
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" "$package" "$checksums" --clobber
@@ -134,5 +128,5 @@ EOF
               --target "$GITHUB_SHA" \
               --title "Shadowokx Panel for Linux v$VERSION" \
               --prerelease \
-              --notes "$notes"
+              --notes-file "$notes_file"
           fi
