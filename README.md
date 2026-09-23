@@ -95,7 +95,11 @@ gnome-extensions enable shadow-panel@shadowokx
 
 The Codex page shows exact **Today**, **Yesterday**, and **Last 7 Days** token counts
 from the signed-in Codex account usage response. The token activity chart and its
-daily statistics use those same account-reported buckets. Weekly allowance percentages are a
+daily statistics use those same account-reported buckets. When Codex has not returned
+an account bucket for today, the panel labels it as not reported and does not substitute
+local session totals. Codex returns daily dates without a published timezone/day-boundary
+rule; the panel preserves those date strings and shows them beside Today/Yesterday labels.
+Weekly allowance percentages are a
 separate server-reported measure and cannot be converted to tokens. USD values are
 approximate API-equivalent estimates: the locally observed model and cache mix is
 applied to those exact account totals. This is not a Codex or ChatGPT subscription

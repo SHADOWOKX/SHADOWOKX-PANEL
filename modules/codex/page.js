@@ -33,7 +33,8 @@ import {tokenSparkline} from './sparkline.js';
 
 function contentSignature(state) {
     const {updatedAt: _updatedAt, days: _days, ...costUsage} = state?.costUsage ?? {};
-    const accountTokenUsage = state?.accountTokenUsage ?? null;
+    const {updatedAt: _accountUpdatedAt, ...accountUsageData} = state?.accountTokenUsage ?? {};
+    const accountTokenUsage = state?.accountTokenUsage ? accountUsageData : null;
     if (!state?.lastSuccessfulRefresh) {
         return JSON.stringify({
             status: state?.status ?? null,
