@@ -309,7 +309,11 @@
   font-weight: 700;
 }
 
-.shadow-codex-content,
+.shadow-codex-content {
+  padding: 0 2px 2px 0;
+  spacing: 9px;
+}
+
 .shadow-weather-content {
   padding: 0 2px 4px 0;
   spacing: 12px;
@@ -410,8 +414,8 @@
 
 /* Codex */
 .shadow-weekly-hero {
-  padding: 14px 16px;
-  spacing: 8px;
+  padding: 12px 15px;
+  spacing: 7px;
 }
 
 .shadow-usage-heading {
@@ -523,8 +527,14 @@
 }
 
 .shadow-token-activity {
-  padding: 12px 14px;
+  padding: 11px 14px;
   spacing: 6px;
+}
+
+.shadow-token-lifetime {
+  font-size: 11px;
+  font-weight: 650;
+  font-feature-settings: "tnum";
 }
 
 .shadow-token-heading {
@@ -577,7 +587,7 @@
 }
 
 .shadow-token-sparkline {
-  height: 68px;
+  height: 54px;
   border-radius: 10px;
   background-color: rgba(128, 128, 128, 0.025);
 }
@@ -893,6 +903,13 @@
 }
 
 /* Exact account token totals and compact API-equivalent estimates. */
-.shadow-cost-row { spacing: 4px; padding-top: 4px; font-size: 11px; }
-.shadow-cost-period { spacing: 10px; min-height: 16px; }
-.shadow-cost-amount { font-weight: 600; font-feature-settings: "tnum"; }
+.shadow-cost-row { spacing: 4px; padding-top: 3px; font-size: 11px; }
+.shadow-cost-caption { font-size: 9px; font-weight: 650; letter-spacing: 0.2px; }
+.shadow-cost-period { spacing: 8px; min-height: 16px; }
+.shadow-cost-amount { font-weight: 650; font-feature-settings: "tnum"; }
+.shadow-cost-estimate { min-width: 52px; text-align: right; font-feature-settings: "tnum"; }
+.shadow-cost-note { font-size: 10px; }
+
+/* Keep live device activity visually separate from account totals. */
+.shadow-cost-local { margin-top: 4px; padding-top: 6px; border-top: 1px solid rgba(128, 128, 128, 0.15); }
+.shadow-cost-live-label { font-weight: 700; }

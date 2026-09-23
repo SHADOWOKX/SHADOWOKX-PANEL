@@ -369,7 +369,7 @@ class ShadowIndicator extends PanelMenu.Button {
         }
         this._tabs?.setActive(id);
         if (this._popupOpen && previousId !== id) {
-            this._codexProvider?.setViewVisible(id === 'codex', id === 'codex');
+            this._codexProvider?.setViewVisible(id === 'codex', id === 'codex', id === 'codex');
             selectedPage?.onPopupOpened();
         }
         selectedPage?.activate();
@@ -524,7 +524,7 @@ class ShadowIndicator extends PanelMenu.Button {
             return;
         this._popupOpen = true;
         this._mascot?.setPopupOpen(true);
-        this._codexProvider?.setViewVisible(this._activeId === 'codex', true);
+        this._codexProvider?.setViewVisible(this._activeId === 'codex', true, this._activeId === 'codex');
         try {
             this._pages.get(this._activeId)?.onPopupOpened();
         } catch (error) {
