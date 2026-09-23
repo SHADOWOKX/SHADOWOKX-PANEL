@@ -891,3 +891,8 @@
 .shadow-sun-metric {
   spacing: 9px;
 }
+
+/* Exact account token totals and compact API-equivalent estimates. */
+.shadow-cost-row { spacing: 4px; padding-top: 4px; font-size: 11px; }
+.shadow-cost-period { spacing: 10px; min-height: 16px; }
+.shadow-cost-amount { font-weight: 600; font-feature-settings: "tnum"; }

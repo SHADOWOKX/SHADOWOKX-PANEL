@@ -28,14 +28,20 @@ import {
 import {BasePage} from '../basePage.js';
 import {exportCodexSummaryImage} from './shareImage.js';
 import {localUsageDateKey} from './normalize.js';
+import {costRow} from './costRow.js';
 import {tokenSparkline} from './sparkline.js';
 
 function contentSignature(state) {
+    const {updatedAt: _updatedAt, days: _days, ...costUsage} = state?.costUsage ?? {};
+    const {updatedAt: _accountUpdatedAt, ...accountUsageData} = state?.accountTokenUsage ?? {};
+    const accountTokenUsage = state?.accountTokenUsage ? accountUsageData : null;
     if (!state?.lastSuccessfulRefresh) {
         return JSON.stringify({
             status: state?.status ?? null,
             errorCode: state?.errorCode ?? null,
             error: state?.error ?? null,
+            accountTokenUsage,
+            costUsage,
         });
     }
     return JSON.stringify({
@@ -43,6 +49,8 @@ function contentSignature(state) {
         fiveHour: state.fiveHour,
         resetCreditsAvailable: state.resetCreditsAvailable,
         tokenUsage: state.tokenUsage,
+        accountTokenUsage,
+        costUsage,
     });
 }
 
@@ -151,7 +159,7 @@ export class CodexPage extends BasePage {
             });
             let sectionCount = 0;
             if (this.context.settings.get_boolean('show-codex-weekly')) {
-                content.add_child(this._weeklyHero(state.weekly));
+                content.add_child(this._weeklyHero(state.weekly, state.costUsage, state.accountTokenUsage));
                 sectionCount++;
             }
             if (this.context.settings.get_boolean('show-codex-five-hour')) {
@@ -165,10 +173,13 @@ export class CodexPage extends BasePage {
                 }));
             }
 
-            content.add_child(this._tokenActivity(state.tokenUsage));
+            if (!this.context.settings.get_boolean('show-codex-weekly'))
+                content.add_child(costRow(state.costUsage, state.accountTokenUsage));
+
+            content.add_child(this._tokenActivity(state.accountTokenUsage));
 
             if (this.context.settings.get_boolean('show-codex-insights')) {
-                const insight = this._tokenInsight(state.tokenUsage);
+                const insight = this._tokenInsight(state.accountTokenUsage);
                 if (insight)
                     content.add_child(insight);
             }
@@ -232,7 +243,7 @@ export class CodexPage extends BasePage {
         return actions;
     }
 
-    _weeklyHero(window) {
+    _weeklyHero(window, costUsage, accountTokenUsage) {
         const card = new St.BoxLayout({
             vertical: true,
             style_class: 'shadow-card shadow-weekly-hero',
@@ -259,6 +270,7 @@ export class CodexPage extends BasePage {
                 style_class: 'shadow-muted',
                 x_align: Clutter.ActorAlign.START,
             }));
+            card.add_child(costRow(costUsage, accountTokenUsage));
             return card;
         }
 
@@ -318,6 +330,7 @@ export class CodexPage extends BasePage {
             style_class: 'shadow-progress-available',
         }));
         card.add_child(legend);
+        card.add_child(costRow(costUsage, accountTokenUsage));
 
         if (this.context.settings.get_boolean('show-codex-reset-time')) {
             const reset = new St.BoxLayout({style_class: 'shadow-weekly-reset', x_expand: true});
@@ -417,7 +430,8 @@ export class CodexPage extends BasePage {
         }
 
         if (this.context.settings.get_boolean('show-codex-token-stats')) {
-            const sparkline = this._tokenSparkline(usage.dailyBuckets);
+            const visibleBuckets = normalizeSparklineBuckets(usage.dailyBuckets);
+            const sparkline = this._tokenSparkline(visibleBuckets);
             if (sparkline)
                 card.add_child(sparkline);
             else
@@ -427,7 +441,7 @@ export class CodexPage extends BasePage {
                 }));
 
             const stats = new St.BoxLayout({style_class: 'shadow-token-row', x_expand: true});
-            const today = usage.dailyBuckets?.find(
+            const today = visibleBuckets.find(
                 bucket => bucket.date === localUsageDateKey(Date.now())
             );
             const todayMetric = this._tokenMetric(
@@ -441,9 +455,11 @@ export class CodexPage extends BasePage {
                 todayMetric.accessible_name = `Today ${this._formatTokens(today.tokens)} tokens`;
             }
             stats.add_child(todayMetric);
-            if (Number.isSafeInteger(usage.peakDailyTokens))
-                stats.add_child(this._tokenMetric('Peak', this._formatCompactTokens(usage.peakDailyTokens)));
-            const peakDate = this._formatUsageDate(usage.peakDate);
+            const peak = visibleBuckets.reduce((best, bucket) =>
+                !best || bucket.tokens > best.tokens ? bucket : best, null);
+            if (peak)
+                stats.add_child(this._tokenMetric('Peak', this._formatCompactTokens(peak.tokens)));
+            const peakDate = this._formatUsageDate(peak?.date);
             if (peakDate)
                 stats.add_child(this._tokenMetric('Peak day', peakDate));
             if (stats.get_children().length > 0)
@@ -527,8 +543,8 @@ export class CodexPage extends BasePage {
     }
 
     _tokenInsight(usage) {
-        const prior = usage.dailyBuckets?.filter(bucket => bucket.date !== localUsageDateKey(Date.now())) ?? [];
-        if (!Number.isSafeInteger(usage.todayTokens) || prior.length < 2)
+        const prior = usage?.dailyBuckets?.filter(bucket => bucket.date !== localUsageDateKey(Date.now())) ?? [];
+        if (!Number.isSafeInteger(usage?.todayTokens) || prior.length < 2)
             return null;
         const average = prior.reduce((total, bucket) => total + bucket.tokens, 0) / prior.length;
         if (!(average > 0))

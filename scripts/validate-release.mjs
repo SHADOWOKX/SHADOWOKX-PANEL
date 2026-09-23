@@ -48,8 +48,11 @@ try {
         throw new Error('extension revision is invalid');
     if (packageMetadata.version !== APP_VERSION)
         throw new Error('semantic version declarations are inconsistent');
-    if (!readText('README.md').includes(`Release \`${APP_VERSION}\``))
-        throw new Error('README release version is inconsistent');
+    const readme = readText('README.md');
+    if (!readme.includes(`Release \`${APP_VERSION}\``) &&
+        !readme.includes(`Linux \`${APP_VERSION}\``)) {
+        throw new Error('README Linux release version is inconsistent');
+    }
     const ignore = readText('.gitignore');
     for (const generated of [
         'dist/',

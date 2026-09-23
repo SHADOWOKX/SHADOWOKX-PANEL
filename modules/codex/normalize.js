@@ -123,14 +123,18 @@ export function normalizeAccountTokenUsage(response, nowMs = Date.now()) {
     const reportedPeak = normalizeTokenCount(response.summary?.peakDailyTokens);
     const peakDailyTokens = reportedPeak ?? peakBucket?.tokens ?? null;
     const peakDate = buckets.find(bucket => bucket.tokens === peakDailyTokens)?.date ?? null;
-    const todayTokens = buckets.find(bucket => bucket.date === localUsageDateKey(nowMs))?.tokens ?? null;
+    const todayDate = localUsageDateKey(nowMs);
+    const todayTokens = buckets.find(bucket => bucket.date === todayDate)?.tokens ?? null;
     const lifetimeTokens = normalizeTokenCount(response.summary?.lifetimeTokens);
-    if (lifetimeTokens === null && todayTokens === null && peakDailyTokens === null)
+    if (lifetimeTokens === null && todayTokens === null && peakDailyTokens === null && buckets.length === 0)
         return null;
     const dailyBuckets = recentUsageBuckets(buckets, nowMs);
     return {
         lifetimeTokens,
+        todayDate,
         todayTokens,
+        latestReportedDate: buckets.at(-1)?.date ?? null,
+        updatedAt: nowMs,
         peakDailyTokens,
         peakDate,
         peakHour: null,
@@ -153,7 +157,10 @@ function normalizeCachedTokenUsage(value) {
         : [];
     const tokenUsage = {
         lifetimeTokens: normalizeTokenCount(value.lifetimeTokens),
+        todayDate: normalizeUsageDate(value.todayDate),
         todayTokens: normalizeTokenCount(value.todayTokens),
+        latestReportedDate: normalizeUsageDate(value.latestReportedDate) ?? dailyBuckets.at(-1)?.date ?? null,
+        updatedAt: Number.isFinite(value.updatedAt) && value.updatedAt > 0 ? value.updatedAt : null,
         peakDailyTokens: normalizeTokenCount(value.peakDailyTokens),
         peakDate: normalizeUsageDate(value.peakDate),
         peakHour: null,
@@ -164,7 +171,7 @@ function normalizeCachedTokenUsage(value) {
             : normalizeTokenCount(value.sevenDayTokens),
     };
     return tokenUsage.lifetimeTokens !== null || tokenUsage.todayTokens !== null ||
-        tokenUsage.peakDailyTokens !== null
+        tokenUsage.peakDailyTokens !== null || dailyBuckets.length > 0
         ? tokenUsage
         : null;
 }
@@ -223,6 +230,20 @@ export function normalizeCachedRateLimits(value) {
     const weekly = normalizeWindow(value.weekly);
     if (!fiveHour && !weekly)
         return null;
+    const cachedAccountTokenUsage = normalizeCachedTokenUsage(value.accountTokenUsage) ??
+        normalizeCachedTokenUsage({
+            lifetimeTokens: value.tokenUsage?.lifetimeTokens,
+            todayTokens: null,
+            peakDailyTokens: null,
+            dailyBuckets: [],
+            sevenDayTokens: null,
+        });
+    const accountTokenUsage = cachedAccountTokenUsage
+        ? {
+            ...cachedAccountTokenUsage,
+            updatedAt: cachedAccountTokenUsage.updatedAt ?? value.lastSuccessfulRefresh,
+        }
+        : null;
     return {
         status: 'cached',
         connection: 'connected',
@@ -236,6 +257,7 @@ export function normalizeCachedRateLimits(value) {
             ? Math.max(0, Math.min(999, Math.round(value.resetCreditsAvailable)))
             : 0,
         tokenUsage: normalizeCachedTokenUsage(value.tokenUsage),
+        accountTokenUsage,
         lastSuccessfulRefresh: value.lastSuccessfulRefresh,
     };
 }
