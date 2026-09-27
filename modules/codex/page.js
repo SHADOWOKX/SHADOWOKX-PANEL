@@ -46,6 +46,7 @@ function contentSignature(state) {
         tokenUsage: state.tokenUsage,
         accountTokenUsage,
         costUsage: state.costUsage,
+        accountUsageStatus: state.accountUsageStatus,
         stale: state.stale,
         calendarDate: localUsageDateKey(Date.now()),
     });
@@ -140,7 +141,7 @@ export class CodexPage extends BasePage {
             });
             let sectionCount = 0;
             if (this.context.settings.get_boolean('show-codex-weekly')) {
-                content.add_child(this._weeklyHero(state.weekly, state.accountTokenUsage, state.costUsage));
+                content.add_child(this._weeklyHero(state.weekly, state.accountTokenUsage, state.costUsage, state.accountUsageStatus));
                 sectionCount++;
             }
             if (this.context.settings.get_boolean('show-codex-five-hour')) {
@@ -155,7 +156,7 @@ export class CodexPage extends BasePage {
             }
 
             if (!this.context.settings.get_boolean('show-codex-weekly'))
-                content.add_child(costRow(state.accountTokenUsage, state.costUsage));
+                content.add_child(costRow(state.accountTokenUsage, state.costUsage, state.accountUsageStatus));
 
             content.add_child(this._tokenActivity(state.accountTokenUsage));
 
@@ -219,7 +220,7 @@ export class CodexPage extends BasePage {
         return actions;
     }
 
-    _weeklyHero(window, accountTokenUsage, costUsage) {
+    _weeklyHero(window, accountTokenUsage, costUsage, accountUsageStatus) {
         const card = new St.BoxLayout({
             vertical: true,
             style_class: 'shadow-card shadow-weekly-hero',
@@ -248,7 +249,7 @@ export class CodexPage extends BasePage {
                 style_class: 'shadow-muted',
                 x_align: Clutter.ActorAlign.START,
             }));
-            card.add_child(costRow(accountTokenUsage, costUsage));
+            card.add_child(costRow(accountTokenUsage, costUsage, accountUsageStatus));
             return card;
         }
 
@@ -279,7 +280,7 @@ export class CodexPage extends BasePage {
             animate
         ).actor);
 
-        card.add_child(costRow(accountTokenUsage, costUsage));
+        card.add_child(costRow(accountTokenUsage, costUsage, accountUsageStatus));
 
         if (this.context.settings.get_boolean('show-codex-reset-time')) {
             const reset = new St.BoxLayout({style_class: 'shadow-weekly-reset', x_expand: true});
@@ -549,9 +550,12 @@ export class CodexPage extends BasePage {
         row.add_child(credits);
         if (hasUpdate) {
             row.add_child(this._timedLabel(
-                () => `${this._provider.getState()?.stale ? 'Cached' : 'Checked'} ${formatRelativeAge(
-                    this._provider.getState()?.lastSuccessfulRefresh
-                )}`,
+                () => {
+                    const current = this._provider.getState();
+                    const tokens = current?.accountTokenUsage;
+                    const label = current?.stale ? 'Cached' : tokens ? 'Tokens checked' : 'Limits checked';
+                    return `${label} ${formatRelativeAge(tokens?.updatedAt ?? current?.lastSuccessfulRefresh)}`;
+                },
                 {
                 style_class: 'shadow-footer-updated',
                 x_align: Clutter.ActorAlign.END,

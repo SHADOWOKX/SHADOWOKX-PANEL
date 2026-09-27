@@ -35,14 +35,14 @@ function accountTokensForDate(accountUsage, date) {
     return Number.isSafeInteger(bucket?.tokens) ? bucket.tokens : null;
 }
 
-export function costRow(accountUsage, localUsage) {
+export function costRow(accountUsage, localUsage, accountUsageStatus) {
     const box = new St.BoxLayout({vertical: true, style_class: 'shadow-cost-row', x_expand: true});
     const todayDate = localUsageDateKey(Date.now());
     const yesterdayDate = shiftDate(todayDate, -1);
     const todayTokens = accountTokensForDate(accountUsage, todayDate);
     const caption = new St.BoxLayout({style_class: 'shadow-cost-caption', x_expand: true});
     caption.add_child(new St.Label({
-        text: 'ACCOUNT TOKENS', style_class: 'shadow-muted', x_expand: true,
+        text: accountUsageStatus === 'refreshing' ? 'ACCOUNT TOKENS · CHECKING' : 'ACCOUNT TOKENS', style_class: 'shadow-muted', x_expand: true,
     }));
     box.add_child(caption);
     const periods = [

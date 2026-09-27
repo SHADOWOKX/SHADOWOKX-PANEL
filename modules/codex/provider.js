@@ -176,6 +176,7 @@ export class CodexProvider extends Observable {
         this._setState({
             ...previous,
             status: previous?.lastSuccessfulRefresh ? 'refreshing' : 'loading',
+            accountUsageStatus: 'refreshing',
             error: null,
         });
 
@@ -191,7 +192,8 @@ export class CodexProvider extends Observable {
                 throw new Error('codex-invalid-response');
             }
             const state = {...liveState, accountTokenUsage: liveState.tokenUsage,
-                costUsage: this.getState().costUsage ?? null};
+                costUsage: this.getState().costUsage ?? null,
+                accountUsageStatus: liveState.tokenUsage ? 'reported' : 'unavailable'};
             if (this._destroyed)
                 return this.getState();
             this._setState(state);
@@ -221,6 +223,7 @@ export class CodexProvider extends Observable {
             const state = {
                 ...latest,
                 status: hasCache ? 'stale' : 'error',
+                accountUsageStatus: latest.accountTokenUsage ? 'cached' : 'unavailable',
                 connection: 'unavailable',
                 stale: hasCache,
                 errorCode: details.code,
@@ -242,6 +245,7 @@ export class CodexProvider extends Observable {
             costUsage: this.getState().costUsage ?? null,
             tokenUsage: this.getState().tokenUsage,
             status: 'refreshing',
+            accountUsageStatus: 'refreshing',
         });
     }
 
