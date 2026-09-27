@@ -908,3 +908,8 @@
 .shadow-cost-period { spacing: 8px; min-height: 16px; }
 .shadow-cost-amount { font-weight: 650; font-feature-settings: "tnum"; }
 .shadow-cost-note { font-size: 10px; }
+
+.shadow-spend-summary { margin-top: 5px; padding-top: 7px; border-top: 1px solid rgba(255,255,255,0.07); spacing: 16px; }
+.shadow-spend-cell { spacing: 2px; }
+.shadow-spend-caption { font-size: 9px; }
+.shadow-spend-value { font-size: 16px; font-weight: 700; font-feature-settings: "tnum"; }

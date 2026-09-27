@@ -1,5 +1,7 @@
 import Clutter from 'gi://Clutter';
 import St from 'gi://St';
+import {attachTooltip} from '../../ui/components.js';
+import {formatCost} from './cost.js';
 import {localUsageDateKey} from './normalize.js';
 
 const tokensFormatter = new Intl.NumberFormat('en-US', {maximumFractionDigits: 0});
@@ -33,7 +35,7 @@ function accountTokensForDate(accountUsage, date) {
     return Number.isSafeInteger(bucket?.tokens) ? bucket.tokens : null;
 }
 
-export function costRow(accountUsage) {
+export function costRow(accountUsage, localUsage) {
     const box = new St.BoxLayout({vertical: true, style_class: 'shadow-cost-row', x_expand: true});
     const todayDate = localUsageDateKey(Date.now());
     const yesterdayDate = shiftDate(todayDate, -1);
@@ -100,6 +102,32 @@ export function costRow(accountUsage) {
         box.add_child(note);
     }
 
+    const spend = new St.BoxLayout({style_class: 'shadow-spend-summary', x_expand: true});
+    const weekStart = shiftDate(todayDate, -6);
+    const localDays = localUsage?.available && localUsage.today === todayDate
+        ? localUsage.days.filter(day => day.date >= weekStart && day.date <= todayDate) : null;
+    const today = localDays?.find(day => day.date === todayDate);
+    const periodsCost = [today, localDays ? {cost: localDays.reduce((sum, day) => sum + day.cost, 0),
+        tokens: localDays.reduce((sum, day) => sum + day.tokens, 0),
+        unknownTokens: localDays.reduce((sum, day) => sum + day.unknownTokens, 0)} : null];
+    const amounts = periodsCost.map(period => period &&
+        (period.tokens === 0 || period.tokens > period.unknownTokens) ? period.cost : null);
+    const incomplete = localUsage?.partial || localDays?.some(day => day.unknownTokens > 0);
+    for (const [index, title] of ['Today', '7 days'].entries()) {
+        const cell = new St.BoxLayout({vertical: true, x_expand: true,
+            style_class: 'shadow-spend-cell'});
+        cell.add_child(new St.Label({text: `${title} · device estimate`,
+            style_class: 'shadow-muted shadow-spend-caption'}));
+        const amount = new St.Label({text: Number.isFinite(amounts[index])
+            ? `≈${formatCost(amounts[index])}${incomplete ? ' *' : ''}` : '—',
+            style_class: 'shadow-spend-value'});
+        attachTooltip(amount, 'USD estimate for recorded sessions on this device, using model-specific input, cached input and output prices. Not an account bill. ' +
+            (incomplete ? 'Partial: some models or records could not be priced. ' : '') +
+            `Standard rates; fast-mode premiums and tool fees excluded. Recorded tokens in this period: ${tokensFormatter.format(periodsCost[index]?.tokens ?? 0)}. Prices checked ${localUsage?.priceDate ?? 'unavailable'}.`);
+        cell.add_child(amount);
+        spend.add_child(cell);
+    }
+    box.add_child(spend);
     box.accessible_name = 'Token totals reported by your Codex account. Missing dates are not estimated.';
     return box;
 }

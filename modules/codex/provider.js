@@ -8,6 +8,7 @@ import {
     BACKGROUND_CODEX_REFRESH_INTERVAL,
     VISIBLE_CODEX_REFRESH_INTERVAL,
 } from '../../lib/constants.js';
+import {CostReader} from './costReader.js';
 import {findCodexExecutable} from './discovery.js';
 import {normalizeCachedRateLimits, normalizeRateLimits} from './normalize.js';
 
@@ -63,6 +64,9 @@ export class CodexProvider extends Observable {
             logger
         );
         this._inFlight = null;
+        this._costReader = new CostReader();
+        this._costInFlight = null;
+        this._lastCostScan = 0;
         this._startPromise = null;
         this._started = false;
         this._cancellable = null;
@@ -118,6 +122,8 @@ export class CodexProvider extends Observable {
             this._viewVisible = next;
             this._reschedule();
         }
+        if (next)
+            this._refreshCost();
         return refreshNow ? this.refresh(true) : Promise.resolve(this.getState());
     }
 
@@ -138,6 +144,20 @@ export class CodexProvider extends Observable {
         return this._inFlight;
     }
 
+    _refreshCost() {
+        if (this._destroyed || !this._viewVisible || this._costInFlight ||
+            Date.now() - this._lastCostScan < 60_000)
+            return;
+        this._lastCostScan = Date.now();
+        this._costInFlight = this._costReader.read().then(costUsage => {
+            if (!this._destroyed)
+                this._setState({...this.getState(), costUsage});
+        }).catch(() => {
+            if (!this._destroyed)
+                this._setState({...this.getState(), costUsage: null});
+        }).finally(() => { this._costInFlight = null; });
+    }
+
     isStale() {
         const current = this.getState();
         if (current?.status === 'stale' || current?.status === 'error' ||
@@ -151,6 +171,7 @@ export class CodexProvider extends Observable {
     }
 
     async _refresh() {
+        this._refreshCost();
         const previous = this.getState();
         this._setState({
             ...previous,
@@ -169,7 +190,8 @@ export class CodexProvider extends Observable {
             } catch {
                 throw new Error('codex-invalid-response');
             }
-            const state = {...liveState, accountTokenUsage: liveState.tokenUsage};
+            const state = {...liveState, accountTokenUsage: liveState.tokenUsage,
+                costUsage: this.getState().costUsage ?? null};
             if (this._destroyed)
                 return this.getState();
             this._setState(state);
@@ -217,6 +239,7 @@ export class CodexProvider extends Observable {
         this._setState({
             ...limits,
             accountTokenUsage: this.getState().accountTokenUsage,
+            costUsage: this.getState().costUsage ?? null,
             tokenUsage: this.getState().tokenUsage,
             status: 'refreshing',
         });
@@ -441,6 +464,7 @@ export class CodexProvider extends Observable {
 
     destroy() {
         this._destroyed = true;
+        this._costReader.destroy();
         this._started = false;
         this._cancellable?.cancel();
         try {

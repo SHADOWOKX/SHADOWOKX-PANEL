@@ -45,6 +45,7 @@ function contentSignature(state) {
         resetCreditsAvailable: state.resetCreditsAvailable,
         tokenUsage: state.tokenUsage,
         accountTokenUsage,
+        costUsage: state.costUsage,
         stale: state.stale,
         calendarDate: localUsageDateKey(Date.now()),
     });
@@ -139,7 +140,7 @@ export class CodexPage extends BasePage {
             });
             let sectionCount = 0;
             if (this.context.settings.get_boolean('show-codex-weekly')) {
-                content.add_child(this._weeklyHero(state.weekly, state.accountTokenUsage));
+                content.add_child(this._weeklyHero(state.weekly, state.accountTokenUsage, state.costUsage));
                 sectionCount++;
             }
             if (this.context.settings.get_boolean('show-codex-five-hour')) {
@@ -154,7 +155,7 @@ export class CodexPage extends BasePage {
             }
 
             if (!this.context.settings.get_boolean('show-codex-weekly'))
-                content.add_child(costRow(state.accountTokenUsage));
+                content.add_child(costRow(state.accountTokenUsage, state.costUsage));
 
             content.add_child(this._tokenActivity(state.accountTokenUsage));
 
@@ -218,7 +219,7 @@ export class CodexPage extends BasePage {
         return actions;
     }
 
-    _weeklyHero(window, accountTokenUsage) {
+    _weeklyHero(window, accountTokenUsage, costUsage) {
         const card = new St.BoxLayout({
             vertical: true,
             style_class: 'shadow-card shadow-weekly-hero',
@@ -247,7 +248,7 @@ export class CodexPage extends BasePage {
                 style_class: 'shadow-muted',
                 x_align: Clutter.ActorAlign.START,
             }));
-            card.add_child(costRow(accountTokenUsage));
+            card.add_child(costRow(accountTokenUsage, costUsage));
             return card;
         }
 
@@ -278,7 +279,7 @@ export class CodexPage extends BasePage {
             animate
         ).actor);
 
-        card.add_child(costRow(accountTokenUsage));
+        card.add_child(costRow(accountTokenUsage, costUsage));
 
         if (this.context.settings.get_boolean('show-codex-reset-time')) {
             const reset = new St.BoxLayout({style_class: 'shadow-weekly-reset', x_expand: true});
