@@ -5,7 +5,7 @@ import St from 'gi://St';
 import {formatCountdown, formatRelativeAge, formatResetDate} from '../../lib/format.js';
 import {CODEX_TIMED_LABEL_INTERVAL} from '../../lib/constants.js';
 import {normalizeSparklineBuckets, sparklineDayLabels} from '../../lib/sparkline.js';
-import {codexUsageStatus} from '../../lib/summary.js';
+import {codexUsageStatus, codexLimitColor} from '../../lib/summary.js';
 import {launchUri} from '../../services/launcher.js';
 import {
     ProgressMeter,
@@ -29,7 +29,6 @@ import {costRow} from './costRow.js';
 import {tokenSparkline} from './sparkline.js';
 
 function contentSignature(state) {
-    const {updatedAt: _updatedAt, days: _days, ...costUsage} = state?.costUsage ?? {};
     const {updatedAt: _accountUpdatedAt, ...accountUsageData} = state?.accountTokenUsage ?? {};
     const accountTokenUsage = state?.accountTokenUsage ? accountUsageData : null;
     if (!state?.lastSuccessfulRefresh) {
@@ -38,7 +37,6 @@ function contentSignature(state) {
             errorCode: state?.errorCode ?? null,
             error: state?.error ?? null,
             accountTokenUsage,
-            costUsage,
         });
     }
     return JSON.stringify({
@@ -47,7 +45,8 @@ function contentSignature(state) {
         resetCreditsAvailable: state.resetCreditsAvailable,
         tokenUsage: state.tokenUsage,
         accountTokenUsage,
-        costUsage,
+        stale: state.stale,
+        calendarDate: localUsageDateKey(Date.now()),
     });
 }
 
@@ -140,7 +139,7 @@ export class CodexPage extends BasePage {
             });
             let sectionCount = 0;
             if (this.context.settings.get_boolean('show-codex-weekly')) {
-                content.add_child(this._weeklyHero(state.weekly, state.costUsage, state.accountTokenUsage));
+                content.add_child(this._weeklyHero(state.weekly, state.accountTokenUsage));
                 sectionCount++;
             }
             if (this.context.settings.get_boolean('show-codex-five-hour')) {
@@ -155,7 +154,7 @@ export class CodexPage extends BasePage {
             }
 
             if (!this.context.settings.get_boolean('show-codex-weekly'))
-                content.add_child(costRow(state.costUsage, state.accountTokenUsage));
+                content.add_child(costRow(state.accountTokenUsage));
 
             content.add_child(this._tokenActivity(state.accountTokenUsage));
 
@@ -193,7 +192,7 @@ export class CodexPage extends BasePage {
         const refresh = iconButton(
             refreshing ? 'process-working-symbolic' : 'view-refresh-symbolic',
             refreshing ? 'Refreshing Codex usage' : 'Refresh Codex usage',
-            () => this._provider.refresh(true, true),
+            () => this._provider.refresh(true),
             'shadow-icon-button shadow-action-icon-button'
         );
         refresh.reactive = !refreshing;
@@ -219,7 +218,7 @@ export class CodexPage extends BasePage {
         return actions;
     }
 
-    _weeklyHero(window, costUsage, accountTokenUsage) {
+    _weeklyHero(window, accountTokenUsage) {
         const card = new St.BoxLayout({
             vertical: true,
             style_class: 'shadow-card shadow-weekly-hero',
@@ -232,7 +231,9 @@ export class CodexPage extends BasePage {
             const tone = window.remainingPercent >= 60
                 ? 'accent'
                 : window.remainingPercent >= 30 ? 'warning' : 'danger';
-            heading.add_child(statusPill(this.context.settings, status.label, tone));
+            const pill = statusPill(this.context.settings, status.label, tone);
+            pill.get_first_child().style = `background-color: ${codexLimitColor(window.remainingPercent)};`;
+            heading.add_child(pill);
         }
         card.add_child(heading);
         if (!window) {
@@ -246,7 +247,7 @@ export class CodexPage extends BasePage {
                 style_class: 'shadow-muted',
                 x_align: Clutter.ActorAlign.START,
             }));
-            card.add_child(costRow(costUsage, accountTokenUsage));
+            card.add_child(costRow(accountTokenUsage));
             return card;
         }
 
@@ -257,7 +258,7 @@ export class CodexPage extends BasePage {
         value.add_child(new St.Label({
             text: `${window.remainingPercent}%`,
             style_class: 'shadow-weekly-value',
-            style: `color: ${resolveAccent(this.context.settings)};`,
+            style: `color: ${codexLimitColor(window.remainingPercent)};`,
         }));
         value.add_child(new St.Label({
             text: 'remaining',
@@ -272,12 +273,12 @@ export class CodexPage extends BasePage {
         this._lastWeeklyPercent = window.remainingPercent;
         card.add_child(new ProgressMeter(
             window.remainingPercent,
-            resolveAccent(this.context.settings),
+            codexLimitColor(window.remainingPercent),
             'remaining',
             animate
         ).actor);
 
-        card.add_child(costRow(costUsage, accountTokenUsage));
+        card.add_child(costRow(accountTokenUsage));
 
         if (this.context.settings.get_boolean('show-codex-reset-time')) {
             const reset = new St.BoxLayout({style_class: 'shadow-weekly-reset', x_expand: true});
@@ -332,7 +333,7 @@ export class CodexPage extends BasePage {
         section.add_child(new St.Label({
             text: `${window.remainingPercent}% remaining`,
             style_class: 'shadow-five-hour-value',
-            style: `color: ${resolveAccent(this.context.settings)};`,
+            style: `color: ${codexLimitColor(window.remainingPercent)};`,
             y_align: Clutter.ActorAlign.CENTER,
         }));
         return section;
@@ -547,7 +548,7 @@ export class CodexPage extends BasePage {
         row.add_child(credits);
         if (hasUpdate) {
             row.add_child(this._timedLabel(
-                () => `Checked ${formatRelativeAge(
+                () => `${this._provider.getState()?.stale ? 'Cached' : 'Checked'} ${formatRelativeAge(
                     this._provider.getState()?.lastSuccessfulRefresh
                 )}`,
                 {

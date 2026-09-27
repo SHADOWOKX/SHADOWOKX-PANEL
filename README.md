@@ -109,26 +109,19 @@ gnome-extensions enable shadow-panel@shadowokx
 ./uninstall.sh
 ```
 
-### Linux token totals and API-equivalent estimate
+### Linux account usage
 
-The Codex page shows exact **Today**, **Yesterday**, and **Last 7 Days** token counts
-from the signed-in Codex account usage response. The token activity chart and its
-daily statistics use those same account-reported buckets. When Codex has not returned
-an account bucket for today, the panel labels it as pending. A separate "This device · live"
-line shows tokens recorded by local Codex sessions since device midnight and their
-partial price estimate; it does not replace or modify the account total or chart.
-Opening the panel or pressing Refresh rescans those local records. Codex returns daily
-dates without a published timezone/day-boundary
-rule; the panel preserves those date strings and shows them beside Today/Yesterday labels.
-Weekly allowance percentages are a
-separate server-reported measure and cannot be converted to tokens. USD values are
-approximate API-equivalent estimates: the locally observed model and cache mix is
-applied to those exact account totals. This is not a Codex or ChatGPT subscription
-charge; unsupported local models make the estimate partial.
+Displayed token counts and allowance percentages come from the signed-in Codex
+account read endpoints. Missing current-day usage is shown as pending with the
+latest returned account date. Local session counts, lifetime-delta attribution,
+and extrapolated dollar amounts are not displayed. The account response does not
+provide a billed dollar value, so the panel does not invent one.
 
-Bundled standard API prices were checked on 2026-09-24 against the official
-[OpenAI model pricing pages](https://developers.openai.com/api/docs/pricing). The
-Linux GNOME package is built and attached as an artifact by the `Linux GNOME package`
+Refresh sends only initialization and account read requests. It does not start a
+thread or model turn. Remaining allowance colors follow a shared red → orange →
+amber → green scale across the percentage, progress bar, and top-bar summary.
+
+The Linux GNOME package is built and attached as an artifact by the `Linux GNOME package`
 GitHub Actions workflow for pushes to `main` and pull requests.
 
 ## Windows 11

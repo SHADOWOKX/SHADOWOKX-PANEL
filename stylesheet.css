@@ -902,14 +902,9 @@
   spacing: 9px;
 }
 
-/* Exact account token totals and compact API-equivalent estimates. */
+/* Exact account-reported token totals. */
 .shadow-cost-row { spacing: 4px; padding-top: 3px; font-size: 11px; }
 .shadow-cost-caption { font-size: 9px; font-weight: 650; letter-spacing: 0.2px; }
 .shadow-cost-period { spacing: 8px; min-height: 16px; }
 .shadow-cost-amount { font-weight: 650; font-feature-settings: "tnum"; }
-.shadow-cost-estimate { min-width: 52px; text-align: right; font-feature-settings: "tnum"; }
 .shadow-cost-note { font-size: 10px; }
-
-/* Keep live device activity visually separate from account totals. */
-.shadow-cost-local { margin-top: 4px; padding-top: 6px; border-top: 1px solid rgba(128, 128, 128, 0.15); }
-.shadow-cost-live-label { font-weight: 700; }

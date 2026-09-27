@@ -15,6 +15,7 @@ import {ACCENTS, MODULE_IDS, MODULE_META} from '../lib/constants.js';
 import {chooseInitialModule} from '../lib/moduleConfig.js';
 import {
     codexRemainingSummary,
+    codexLimitColor,
     codexUsagePace,
     weatherSummaryTemperature,
 } from '../lib/summary.js';
@@ -369,7 +370,7 @@ class ShadowIndicator extends PanelMenu.Button {
         }
         this._tabs?.setActive(id);
         if (this._popupOpen && previousId !== id) {
-            this._codexProvider?.setViewVisible(id === 'codex', id === 'codex', id === 'codex');
+            this._codexProvider?.setViewVisible(id === 'codex', id === 'codex');
             selectedPage?.onPopupOpened();
         }
         selectedPage?.activate();
@@ -399,6 +400,7 @@ class ShadowIndicator extends PanelMenu.Button {
         this._mascot?.setDisplayEnabled(codexIcon);
         this._codexSummary.icon.visible = codexIcon;
         this._codexSummary.label.text = codexParts.join('  ');
+        this._codexSummary.label.style = `color: ${codexLimitColor(codexPercent)};`;
         this._codexSummary.label.visible = codexParts.length > 0;
         this._codexSummary.item.visible = codexIcon || codexParts.length > 0;
         this._codexSummary.item.accessible_name = codexPercent === null
@@ -524,7 +526,7 @@ class ShadowIndicator extends PanelMenu.Button {
             return;
         this._popupOpen = true;
         this._mascot?.setPopupOpen(true);
-        this._codexProvider?.setViewVisible(this._activeId === 'codex', true, this._activeId === 'codex');
+        this._codexProvider?.setViewVisible(this._activeId === 'codex', true);
         try {
             this._pages.get(this._activeId)?.onPopupOpened();
         } catch (error) {
