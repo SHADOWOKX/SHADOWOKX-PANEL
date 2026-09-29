@@ -54,7 +54,7 @@ public sealed record AppSettings
     public bool EstimateLongContext { get; init; }
     public bool ShowLifetimeTokens { get; init; } = true;
     public bool ShowTokenHistory { get; init; } = true;
-    public bool ShowUsageState { get; init; } = true;
+    public bool ShowUsageState { get; init; }
     public string WeatherLocation { get; init; } = "Cairo, Egypt";
     public string TemperatureUnit { get; init; } = "celsius";
     public string WindUnit { get; init; } = "kmh";

@@ -14,12 +14,12 @@ public static class ThemeService
     private static readonly IReadOnlyDictionary<ThemePreset, Palette> Palettes =
         new Dictionary<ThemePreset, Palette>
         {
-            [ThemePreset.Shadow] = new("#202324", "#25292b", "#2d3234", "#393e40", "#f4f6f7", "#a5adb2", ElementTheme.Dark),
+            [ThemePreset.Shadow] = new("#30312f", "#393a38", "#3d3e3c", "#4b4c4a", "#f4f4f4", "#a6a9a6", ElementTheme.Dark),
             [ThemePreset.Midnight] = new("#151820", "#1d222d", "#252b37", "#343b49", "#f4f7fb", "#9da8b8", ElementTheme.Dark),
             [ThemePreset.Graphite] = new("#15171a", "#1f2226", "#292d32", "#343941", "#f5f6f7", "#a5abb3", ElementTheme.Dark),
             [ThemePreset.Nord] = new("#242933", "#2e3440", "#3b4252", "#4c566a", "#eceff4", "#b6c0d1", ElementTheme.Dark),
             [ThemePreset.Amoled] = new("#000000", "#0c0c0d", "#171719", "#262629", "#ffffff", "#a9a9ae", ElementTheme.Dark),
-            [ThemePreset.Light] = new("#e4e5e3", "#f5f5f2", "#ffffff", "#d1d2cd", "#242523", "#696d68", ElementTheme.Light),
+            [ThemePreset.Light] = new("#efefeb", "#e8e8e4", "#e0e0dc", "#d2d2ce", "#252624", "#70736f", ElementTheme.Light),
         };
 
     private static readonly IReadOnlyDictionary<AccentPreset, string> Accents =

@@ -15,6 +15,7 @@ public sealed class TokenGraphControl : Canvas
 {
     private IReadOnlyList<UsageBucket> _buckets = [];
     private bool _weekly;
+    private ActivityCell? _hovered;
     private DateOnly _today;
     private readonly TextBlock _caption = new() { FontSize = 9, TextTrimming = TextTrimming.CharacterEllipsis };
     private readonly List<TextBlock> _labels = [];
@@ -38,6 +39,8 @@ public sealed class TokenGraphControl : Canvas
             var row = (int)Math.Floor((position.Y - _top) / _stepY);
             var cell = Activity.Cells.FirstOrDefault(c => c.Column == column && c.Row == row);
             if (cell is null || position.Y < _top || position.Y > _top + Activity.Rows * _stepY) { ResetCaption(); return; }
+            if (ReferenceEquals(cell, _hovered)) return;
+            _hovered = cell;
             var tokens = cell.Tokens.HasValue ? cell.Tokens.Value.ToString("N0", CultureInfo.CurrentCulture) + " tokens" : "Not reported";
             var coverage = _weekly ? $" · {cell.ReportedDays}/{cell.ExpectedDays} days" : string.Empty;
             _caption.Text = $"{cell.Date:MMM d, yyyy} · {tokens}{coverage}";
@@ -65,8 +68,11 @@ public sealed class TokenGraphControl : Canvas
     }
     public void RefreshTheme() => Render();
 
-    private void ResetCaption() => _caption.Text = _weekly
-        ? "WEEKLY TOTALS · REPORTED ACCOUNT DAYS" : "DAILY TOKENS · LAST 12 MONTHS";
+    private void ResetCaption()
+    {
+        _hovered = null;
+        _caption.Text = _weekly ? "WEEKLY TOTALS · REPORTED ACCOUNT DAYS" : "DAILY TOKENS · LAST 12 MONTHS";
+    }
 
     private void Render()
     {

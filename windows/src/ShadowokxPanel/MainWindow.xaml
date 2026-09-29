@@ -21,7 +21,7 @@
                 <TextBlock
                     Text="Shadowokx Panel"
                     Foreground="{ThemeResource PrimaryTextBrush}"
-                    FontSize="16"
+                    FontSize="15"
                     FontWeight="SemiBold"
                     VerticalAlignment="Center" />
                 <Button
@@ -60,7 +60,7 @@
                         VerticalAlignment="Stretch"
                         VerticalContentAlignment="Center"
                         Background="Transparent"
-                        BorderThickness="0"
+                        BorderThickness="1"
                         CornerRadius="12"
                         AutomationProperties.Name="ChatGPT Codex page"
                         Click="CodexTab_Click">
@@ -80,7 +80,7 @@
                         VerticalAlignment="Stretch"
                         VerticalContentAlignment="Center"
                         Background="Transparent"
-                        BorderThickness="0"
+                        BorderThickness="1"
                         CornerRadius="12"
                         AutomationProperties.Name="Weather page"
                         Click="WeatherTab_Click">
@@ -106,7 +106,7 @@
                                 <TextBlock
                                     Text="Codex Usage"
                                     Foreground="{ThemeResource PrimaryTextBrush}"
-                                    FontSize="16"
+                                    FontSize="14"
                                     FontWeight="SemiBold"
                                     VerticalAlignment="Center" />
                             </StackPanel>

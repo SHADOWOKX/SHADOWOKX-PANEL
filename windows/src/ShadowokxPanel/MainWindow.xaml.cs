@@ -137,6 +137,7 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         if (_disposed)
             return;
+        if (_visible) { Activate(); return; }
         _visible = true;
         var codexVisible = _viewModel.SelectedPage != "weather" ||
             !_viewModel.Settings.ShowWeather;
@@ -370,8 +371,10 @@ public sealed partial class MainWindow : Window, IDisposable
         var weatherSelected = settings.ShowWeather && _viewModel.SelectedPage == "weather";
         CodexScroll.Visibility = weatherSelected ? Visibility.Collapsed : Visibility.Visible;
         WeatherScroll.Visibility = weatherSelected ? Visibility.Visible : Visibility.Collapsed;
-        CodexTab.Background = weatherSelected ? Transparent() : ResourceBrush("AccentBrush", 0.22);
-        WeatherTab.Background = weatherSelected ? ResourceBrush("AccentBrush", 0.22) : Transparent();
+        CodexTab.Background = weatherSelected ? Transparent() : ResourceBrush("AccentBrush", 0.12);
+        WeatherTab.Background = weatherSelected ? ResourceBrush("AccentBrush", 0.12) : Transparent();
+        CodexTab.BorderBrush = weatherSelected ? Transparent() : ResourceBrush("AccentBrush", 0.45);
+        WeatherTab.BorderBrush = weatherSelected ? ResourceBrush("AccentBrush", 0.45) : Transparent();
         if (weatherSelected)
         {
             CodexRefreshRing.IsActive = false;
@@ -486,10 +489,11 @@ public sealed partial class MainWindow : Window, IDisposable
         AccountDateCaption.Text = latest is null ? "Account token data unavailable" : $"Account data through {latest.Date:MMM d}";
         ToolTipService.SetToolTip(CostRows, null);
         CostEstimateCaption.Text = string.Empty;
-        SpendSummary.Visibility = settings.ShowCostEstimate && state.Cost is { } local &&
+        var deviceCost = state.Cost?.UpdatedAt.LocalDateTime.Date == now.LocalDateTime.Date ? state.Cost : null;
+        SpendSummary.Visibility = settings.ShowCostEstimate && deviceCost is { } local &&
             (local.Today.Tokens > 0 || local.Last7Days?.Tokens > 0) ? Visibility.Visible : Visibility.Collapsed;
-        RenderDeviceEstimate(TodayEstimate, state.Cost?.Today, state.Cost?.Partial == true);
-        RenderDeviceEstimate(WeekEstimate, state.Cost?.Last7Days, state.Cost?.Partial == true);
+        RenderDeviceEstimate(TodayEstimate, deviceCost?.Today, deviceCost?.Partial == true);
+        RenderDeviceEstimate(WeekEstimate, deviceCost?.Last7Days, deviceCost?.Partial == true);
         var fiveHour = state.FiveHour;
         FiveHourCard.Visibility = fiveHour is null || state.Weekly is null ? Visibility.Collapsed : Visibility.Visible;
         FiveHourText.Text = fiveHour is null
@@ -1038,6 +1042,7 @@ public sealed partial class MainWindow : Window, IDisposable
                 settings.ShowTokenHistory,
                 settings.ShowTokenHistory,
                 settings.ShowCostEstimate && state.Cost is { } cost &&
+                    cost.UpdatedAt.LocalDateTime.Date == DateTime.Now.Date &&
                     (cost.Today.Tokens > 0 || cost.Last7Days?.Tokens > 0),
                 settings.ShowUsageState &&
                     UsageAnalytics.GetPace(state.TokenUsage, DateTimeOffset.Now) != UsagePace.Unknown,
