@@ -31,6 +31,8 @@ import {tokenSparkline} from './sparkline.js';
 function contentSignature(state) {
     const {updatedAt: _accountUpdatedAt, ...accountUsageData} = state?.accountTokenUsage ?? {};
     const accountTokenUsage = state?.accountTokenUsage ? accountUsageData : null;
+    const {updatedAt: _costUpdatedAt, ...costUsageData} = state?.costUsage ?? {};
+    const costUsage = state?.costUsage ? costUsageData : null;
     if (!state?.lastSuccessfulRefresh) {
         return JSON.stringify({
             status: state?.status ?? null,
@@ -43,10 +45,8 @@ function contentSignature(state) {
         weekly: state.weekly,
         fiveHour: state.fiveHour,
         resetCreditsAvailable: state.resetCreditsAvailable,
-        tokenUsage: state.tokenUsage,
         accountTokenUsage,
-        costUsage: state.costUsage,
-        accountUsageStatus: state.accountUsageStatus,
+        costUsage,
         stale: state.stale,
         calendarDate: localUsageDateKey(Date.now()),
     });
@@ -61,20 +61,27 @@ export class CodexPage extends BasePage {
         this._popupOpen = false;
         this._lastWeeklyPercent = null;
         this._hasRendered = false;
+        this._hasUsageContent = false;
         this._stateDirty = true;
         this._renderedSignature = null;
         this._timedLabels = [];
         this._graphHasAppeared = false;
         this._refreshButton = null;
+        this._refreshState = null;
+        this._accountStatusLabel = null;
         this._shareCancellable = null;
         this.track(this._provider.subscribe(state => {
             const nextSignature = contentSignature(state);
             const contentChanged = nextSignature !== this._renderedSignature;
             this._stateDirty ||= contentChanged;
-            if (!this._hasRendered || this._popupOpen && contentChanged) {
+            const primeFirstUsage = !this._hasUsageContent && state.lastSuccessfulRefresh &&
+                !this.context.isPopupOpen?.();
+            if (!this._hasRendered || primeFirstUsage ||
+                this._popupOpen && contentChanged) {
                 this._render();
             } else if (this._popupOpen) {
                 this._setRefreshState(state.status === 'refreshing' || state.status === 'loading');
+                this._syncAccountStatus(state.accountUsageStatus);
                 this._refreshTimedLabels();
             }
         }));
@@ -86,6 +93,9 @@ export class CodexPage extends BasePage {
             this._lastWeeklyPercent = null;
             this._render();
         } else {
+            const state = this._provider.getState();
+            this._setRefreshState(state.status === 'refreshing' || state.status === 'loading');
+            this._syncAccountStatus(state.accountUsageStatus);
             this._refreshTimedLabels();
         }
         this.context.scheduler.every('codex-timed-labels', CODEX_TIMED_LABEL_INTERVAL, () =>
@@ -95,6 +105,7 @@ export class CodexPage extends BasePage {
     onPopupClosed() {
         this._popupOpen = false;
         this._stopRefreshAnimation();
+        this._refreshState = null;
         this.context.scheduler.cancel('codex-timed-labels');
     }
 
@@ -105,6 +116,7 @@ export class CodexPage extends BasePage {
         let nextRefreshButton = null;
         const nextTimedLabels = [];
         this._buildingTimedLabels = nextTimedLabels;
+        this._buildingAccountStatusLabel = null;
         const rendered = this.replaceContent(page => {
             const actions = this._actions(state);
             nextRefreshButton = actions._shadowRefreshButton;
@@ -156,7 +168,7 @@ export class CodexPage extends BasePage {
             }
 
             if (!this.context.settings.get_boolean('show-codex-weekly'))
-                content.add_child(costRow(state.accountTokenUsage, state.costUsage, state.accountUsageStatus));
+                content.add_child(this._costRow(state.accountTokenUsage, state.costUsage, state.accountUsageStatus));
 
             content.add_child(this._tokenActivity(state.accountTokenUsage));
 
@@ -174,11 +186,17 @@ export class CodexPage extends BasePage {
         this._buildingTimedLabels = null;
         if (rendered) {
             this._hasRendered = true;
+            this._hasUsageContent ||= Boolean(state.lastSuccessfulRefresh);
             this._stateDirty = false;
             this._renderedSignature = contentSignature(state);
             this._refreshButton = nextRefreshButton;
+            this._refreshState = this._popupOpen
+                ? state.status === 'refreshing' || state.status === 'loading'
+                : null;
+            this._accountStatusLabel = this._buildingAccountStatusLabel;
             this._timedLabels = nextTimedLabels;
         }
+        this._buildingAccountStatusLabel = null;
     }
 
     _actions(state) {
@@ -249,7 +267,7 @@ export class CodexPage extends BasePage {
                 style_class: 'shadow-muted',
                 x_align: Clutter.ActorAlign.START,
             }));
-            card.add_child(costRow(accountTokenUsage, costUsage, accountUsageStatus));
+            card.add_child(this._costRow(accountTokenUsage, costUsage, accountUsageStatus));
             return card;
         }
 
@@ -280,7 +298,7 @@ export class CodexPage extends BasePage {
             animate
         ).actor);
 
-        card.add_child(costRow(accountTokenUsage, costUsage, accountUsageStatus));
+        card.add_child(this._costRow(accountTokenUsage, costUsage, accountUsageStatus));
 
         if (this.context.settings.get_boolean('show-codex-reset-time')) {
             const reset = new St.BoxLayout({style_class: 'shadow-weekly-reset', x_expand: true});
@@ -298,6 +316,22 @@ export class CodexPage extends BasePage {
             card.add_child(reset);
         }
         return card;
+    }
+
+    _costRow(accountTokenUsage, costUsage, accountUsageStatus) {
+        const row = costRow(accountTokenUsage, costUsage, accountUsageStatus);
+        this._buildingAccountStatusLabel = row._shadowAccountStatusLabel;
+        return row;
+    }
+
+    _syncAccountStatus(accountUsageStatus) {
+        const label = this._accountStatusLabel;
+        if (!label)
+            return;
+        const text = accountUsageStatus === 'refreshing'
+            ? 'ACCOUNT TOKENS · CHECKING' : 'ACCOUNT TOKENS';
+        if (label.text !== text)
+            label.text = text;
     }
 
     _fiveHourSection(window) {
@@ -577,15 +611,19 @@ export class CodexPage extends BasePage {
         if (this._destroyed || this._pageDestroyed || !this._popupOpen)
             return;
         for (const {actor, textProvider} of this._timedLabels) {
-            if (actor && !actor.is_finalized?.())
-                actor.text = textProvider();
+            if (actor && !actor.is_finalized?.()) {
+                const text = textProvider();
+                if (actor.text !== text)
+                    actor.text = text;
+            }
         }
     }
 
     _setRefreshState(refreshing) {
         const button = this._refreshButton;
-        if (!button)
+        if (!button || this._refreshState === refreshing)
             return;
+        this._refreshState = refreshing;
         this._stopRefreshAnimation();
         button.reactive = !refreshing;
         button.can_focus = !refreshing;
@@ -664,6 +702,7 @@ export class CodexPage extends BasePage {
         this.context.scheduler.cancel('codex-timed-labels');
         super.destroy();
         this._refreshButton = null;
+        this._accountStatusLabel = null;
         this._timedLabels = [];
     }
 }

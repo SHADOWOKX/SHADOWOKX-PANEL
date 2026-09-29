@@ -61,6 +61,8 @@ export class TabStrip {
     setActive(id) {
         if (!this._buttons.has(id))
             return;
+        if (this._activeId === id)
+            return;
         const previousId = this._activeId;
 
         for (const [buttonId, {button, content}] of this._buttons) {

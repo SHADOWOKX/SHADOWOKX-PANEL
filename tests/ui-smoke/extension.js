@@ -41,6 +41,8 @@ function scrollState(page) {
     const naturalHeight = scroll._shadowNaturalHeight ?? null;
     const adjustment = scroll.vadjustment ?? scroll.vscroll?.adjustment;
     return {
+        pageMapped: Boolean(page?.actor?.mapped),
+        fitPending: Boolean(page?._fitSourceId),
         viewportHeight: scroll.height,
         measuredNaturalHeight: naturalHeight,
         needsScroll: Number.isFinite(naturalHeight) && naturalHeight > scroll.height + 1,
@@ -324,12 +326,15 @@ export default class UiSmokeExtension extends Extension {
             ? ['codex', 'weather', 'codex', 'weather']
             : ['codex', 'codex', 'codex', 'codex'];
         for (const id of sequence) {
+            const switchStart = GLib.get_monotonic_time();
             indicator._select(id);
+            const switchMs = (GLib.get_monotonic_time() - switchStart) / 1000;
             await settle();
             const page = indicator._pages.get(id);
             const labels = labelsIn(page.actor);
             report.tabSwitches.push({
                 id,
+                switchMs,
                 page: allocation(page.actor),
                 stack: allocation(indicator._pageStack),
                 scroll: scrollState(page),
@@ -471,9 +476,8 @@ export default class UiSmokeExtension extends Extension {
             services = indicator._extension.getRuntimeServices();
         }
 
-        // Exercise the popup-to-provider policy only after any intentionally
-        // deferred startup rebuild has settled. Stub refresh here so the smoke
-        // helper verifies signals/timers without spawning extra Codex helpers.
+        // Exercise the popup-to-provider policy after any startup rebuild.
+        // Refresh is stubbed so timing checks cover the UI scheduling path.
         const codexProvider = services.codexProvider;
         const originalRefresh = codexProvider.refresh.bind(codexProvider);
         let immediateRefreshes = 0;
@@ -483,15 +487,21 @@ export default class UiSmokeExtension extends Extension {
         };
         if (report.moduleIds.includes('weather'))
             indicator._select('weather');
+        const popupStart = GLib.get_monotonic_time();
         indicator.menu.open();
-        await settle();
-        report.popupRefreshImmediate = immediateRefreshes === 1;
+        report.popupOpenCallMs = (GLib.get_monotonic_time() - popupStart) / 1000;
+        report.popupRefreshDeferred = immediateRefreshes === 0;
+        await settle(240);
+        report.popupRefreshAfterPaint = immediateRefreshes ===
+            (report.moduleIds.includes('weather') ? 0 : 1);
         report.codexVisibleAfterPopupOpen = codexProvider._viewVisible;
+        const beforeCodexTab = immediateRefreshes;
+        const codexTabStart = GLib.get_monotonic_time();
         indicator._select('codex');
-        await settle();
-        report.codexTabRefreshImmediate = report.moduleIds.includes('weather')
-            ? immediateRefreshes === 2
-            : immediateRefreshes === 1;
+        report.codexTabCallMs = (GLib.get_monotonic_time() - codexTabStart) / 1000;
+        report.codexTabRefreshDeferred = immediateRefreshes === beforeCodexTab;
+        await settle(240);
+        report.codexTabRefreshAfterPaint = immediateRefreshes === 1;
         report.codexVisibleAfterTab = codexProvider._viewVisible;
         indicator._select('codex');
         await settle();
@@ -501,6 +511,11 @@ export default class UiSmokeExtension extends Extension {
         await settle();
         report.codexBackgroundAfterClose = !codexProvider._viewVisible;
         report.timerCountAfterFocusedClose = services.scheduler._sources.size;
+        const beforeQuickClose = immediateRefreshes;
+        indicator.menu.open();
+        indicator.menu.close();
+        await settle(240);
+        report.quickCloseCancelsRefresh = immediateRefreshes === beforeQuickClose;
         codexProvider.refresh = originalRefresh;
 
         const originalCodexState = codexProvider.getState();
@@ -525,11 +540,44 @@ export default class UiSmokeExtension extends Extension {
             report.topBarAutomaticUpdate = true;
         }
 
+        indicator.menu.open();
+        const stableCodexPage = indicator._pages.get('codex');
+        const originalAccountState = codexProvider.getState();
+        const stableTree = stableCodexPage.actor.get_first_child();
+        const nextAccountUsage = originalAccountState.accountTokenUsage
+            ? {...originalAccountState.accountTokenUsage, updatedAt: Date.now()}
+            : null;
+        const nextCostUsage = originalAccountState.costUsage
+            ? {...originalAccountState.costUsage, updatedAt: Date.now()}
+            : null;
+        codexProvider._setState({
+            ...originalAccountState,
+            status: 'refreshing',
+            accountUsageStatus: 'refreshing',
+            accountTokenUsage: nextAccountUsage,
+            tokenUsage: nextAccountUsage,
+            costUsage: nextCostUsage,
+        });
+        report.accountRefreshTreePreserved =
+            stableCodexPage.actor.get_first_child() === stableTree;
+        report.accountCheckingCaption = labelsIn(stableCodexPage.actor)
+            .includes('ACCOUNT TOKENS · CHECKING');
+        codexProvider._setState(originalAccountState);
+        const restoredCaption = originalAccountState.accountUsageStatus === 'refreshing'
+            ? 'ACCOUNT TOKENS · CHECKING' : 'ACCOUNT TOKENS';
+        report.accountRefreshCaptionRestored = labelsIn(stableCodexPage.actor)
+            .includes(restoredCaption);
+        await settle();
+        indicator.menu.close();
+
         for (let cycle = 0; cycle < 20; cycle++) {
+            const cycleStart = GLib.get_monotonic_time();
             indicator.menu.open();
             if (indicator.menu.isOpen)
                 report.openCloseCycles++;
             indicator.menu.close();
+            report.openCloseCallMsMax = Math.max(report.openCloseCallMsMax ?? 0,
+                (GLib.get_monotonic_time() - cycleStart) / 1000);
         }
         const hiddenChildren = new Map([...indicator._pages]
             .map(([id, page]) => [id, page.actor.get_first_child()]));

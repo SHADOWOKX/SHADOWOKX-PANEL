@@ -41,9 +41,11 @@ export function costRow(accountUsage, localUsage, accountUsageStatus) {
     const yesterdayDate = shiftDate(todayDate, -1);
     const todayTokens = accountTokensForDate(accountUsage, todayDate);
     const caption = new St.BoxLayout({style_class: 'shadow-cost-caption', x_expand: true});
-    caption.add_child(new St.Label({
+    const accountStatusLabel = new St.Label({
         text: accountUsageStatus === 'refreshing' ? 'ACCOUNT TOKENS · CHECKING' : 'ACCOUNT TOKENS', style_class: 'shadow-muted', x_expand: true,
-    }));
+    });
+    caption.add_child(accountStatusLabel);
+    box._shadowAccountStatusLabel = accountStatusLabel;
     box.add_child(caption);
     const periods = [
         {

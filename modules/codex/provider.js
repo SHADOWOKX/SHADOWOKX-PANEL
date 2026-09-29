@@ -126,8 +126,6 @@ export class CodexProvider extends Observable {
             this._viewVisible = next;
             this._reschedule();
         }
-        if (next)
-            this._refreshCost();
         return refreshNow ? this.refresh(true) : Promise.resolve(this.getState());
     }
 
@@ -136,8 +134,10 @@ export class CodexProvider extends Observable {
             return Promise.resolve(this.getState());
         if (!this._started && this._startPromise)
             return this._startPromise;
-        if (this._inFlight)
+        if (this._inFlight) {
+            this._refreshCost();
             return this._inFlight;
+        }
         if (!force && !this.isStale())
             return Promise.resolve(this.getState());
 

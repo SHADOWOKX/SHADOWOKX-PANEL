@@ -23,7 +23,9 @@ const pageWidths = new Set(report.tabSwitches.map(item => item.page.width));
 const scrolling = report.tabSwitches.some(item => item.scroll?.needsScroll);
 
 const badPolicy = report.tabSwitches.some(item => item.scroll && (
-    item.scroll.needsScroll ? item.scroll.policy === 2 : item.scroll.policy !== 2));
+    !item.scroll.pageMapped || item.scroll.fitPending ||
+    !Number.isFinite(item.scroll.measuredNaturalHeight) ||
+    (item.scroll.needsScroll ? item.scroll.policy === 2 : item.scroll.policy !== 2)));
 const badLifecycle = expectLifecycle && (!report.disabledRemoved || !report.reenabled ||
     report.timerCountAfterReenable !== report.expectedTimerCount);
 const badModules = report.moduleIds.includes('weather') !== expectWeatherPanel ||
@@ -84,10 +86,13 @@ const badCodexPolish = badCostSummary || !report.codexFooter || report.codexFoot
 const badPage = report.tabSwitches.length !== 4 || report.tabSwitches.some(item =>
     !item.hasExpectedContent || item.page.width <= 0 || item.page.height <= 0 ||
     item.stack.height <= 0 || item.childCount < 2);
-const badCodexRefreshLifecycle = !report.popupRefreshImmediate ||
+const badCodexRefreshLifecycle = !report.popupRefreshDeferred ||
+    !report.popupRefreshAfterPaint ||
     report.codexVisibleAfterPopupOpen !== !expectWeatherPanel ||
-    !report.codexTabRefreshImmediate || !report.codexVisibleAfterTab ||
-    report.sameTabRefreshes !== (expectWeatherPanel ? 2 : 1) ||
+    !report.codexTabRefreshDeferred || !report.codexTabRefreshAfterPaint ||
+    !report.codexVisibleAfterTab || report.sameTabRefreshes !== 1 ||
+    !report.quickCloseCancelsRefresh || !report.accountRefreshTreePreserved ||
+    !report.accountCheckingCaption || !report.accountRefreshCaptionRestored ||
     !report.codexBackgroundAfterClose || !report.topBarAutomaticUpdate ||
     report.timerCountWhileCodexVisible !== report.expectedTimerCount + 1 ||
     report.timerCountAfterFocusedClose !== report.expectedTimerCount;

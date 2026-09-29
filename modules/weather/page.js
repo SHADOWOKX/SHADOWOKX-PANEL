@@ -1,6 +1,7 @@
 import {temperatureGIcon, weatherGIcon} from '../../ui/weatherIcon.js';
 
 import Clutter from 'gi://Clutter';
+import GLib from 'gi://GLib';
 import Pango from 'gi://Pango';
 import St from 'gi://St';
 
@@ -28,13 +29,20 @@ export class WeatherPage extends BasePage {
         this._provider = context.weatherProvider;
         this._popupOpen = false;
         this._hasRendered = false;
+        this._hasForecastContent = false;
         this._stateDirty = true;
         this._refreshButton = null;
+        this._refreshState = null;
+        this._openRefreshId = 0;
+        this._fitSourceId = 0;
         this._renderedSignature = null;
         this.track(this._provider.subscribe(state => {
             const signature = this._contentSignature(state);
             this._stateDirty = signature !== this._renderedSignature;
-            if (!this._hasRendered || this._popupOpen && this._stateDirty)
+            const primeFirstForecast = !this._hasForecastContent && state.current &&
+                state.today && !this.context.isPopupOpen?.();
+            if (!this._hasRendered || primeFirstForecast ||
+                this._popupOpen && this._stateDirty)
                 this._render();
             else if (this._popupOpen)
                 this._setRefreshState(state.status === 'refreshing' || state.status === 'loading');
@@ -50,17 +58,34 @@ export class WeatherPage extends BasePage {
 
     onPopupOpened() {
         this._popupOpen = true;
+        this._cancelOpenRefresh();
         if (this._stateDirty)
             this._render();
         const state = this._provider.getState();
         this._setRefreshState(state.status === 'refreshing' || state.status === 'loading');
-        if (this.context.settings.get_boolean('refresh-on-open') && this._provider.isStale())
-            this._provider.refresh(false);
+        if (this.context.settings.get_boolean('refresh-on-open') && this._provider.isStale()) {
+            // Weather can resolve a location before its first await. Start it
+            // after the selected page has had a chance to paint.
+            this._openRefreshId = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 180, () => {
+                this._openRefreshId = 0;
+                if (this._popupOpen && !this._pageDestroyed)
+                    this._provider.refresh(false);
+                return GLib.SOURCE_REMOVE;
+            });
+        }
     }
 
     onPopupClosed() {
         this._popupOpen = false;
+        this._cancelOpenRefresh();
         this._stopRefreshAnimation();
+        this._refreshState = null;
+    }
+
+    _cancelOpenRefresh() {
+        if (this._openRefreshId)
+            GLib.Source.remove(this._openRefreshId);
+        this._openRefreshId = 0;
     }
 
     activate() {
@@ -71,9 +96,16 @@ export class WeatherPage extends BasePage {
     }
 
     fit() {
-        if (this._pageDestroyed)
+        if (this._pageDestroyed || this._fitSourceId)
             return;
-        fitScrollToContent(this._scroll, this._scrollContent, this.context, this.actor);
+        // Theme measurement of the full forecast is expensive on its first
+        // map. Queue it after the page becomes visible so tab clicks return.
+        this._fitSourceId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
+            this._fitSourceId = 0;
+            if (!this._pageDestroyed && this.actor?.mapped)
+                fitScrollToContent(this._scroll, this._scrollContent, this.context, this.actor);
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     _render() {
@@ -149,9 +181,13 @@ export class WeatherPage extends BasePage {
             if (!nextScroll)
                 this._hourlyScroll = null;
             this._hasRendered = true;
+            this._hasForecastContent ||= Boolean(state.current && state.today);
             this._renderedSignature = this._contentSignature(state);
             this._stateDirty = false;
             this._refreshButton = nextRefreshButton;
+            this._refreshState = this._popupOpen
+                ? state.status === 'refreshing' || state.status === 'loading'
+                : null;
         }
         this.fit();
     }
@@ -489,8 +525,9 @@ export class WeatherPage extends BasePage {
 
     _setRefreshState(refreshing) {
         const button = this._refreshButton;
-        if (!button)
+        if (!button || this._refreshState === refreshing)
             return;
+        this._refreshState = refreshing;
         this._stopRefreshAnimation();
         button.reactive = !refreshing;
         button.can_focus = !refreshing;
@@ -506,6 +543,10 @@ export class WeatherPage extends BasePage {
     }
 
     destroy() {
+        this._cancelOpenRefresh();
+        if (this._fitSourceId)
+            GLib.Source.remove(this._fitSourceId);
+        this._fitSourceId = 0;
         this._stopRefreshAnimation();
         super.destroy();
         this._scroll = null;

@@ -1,4 +1,4 @@
-import {weatherGIcon} from './weatherIcon.js';
+import {weatherArtwork, weatherGIcon} from './weatherIcon.js';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GObject from 'gi://GObject';
@@ -48,6 +48,15 @@ function resetCountdown(window) {
     return formatted === 'Reset time unavailable' ? null : formatted.replace(/^Resets in /, '');
 }
 
+function setIfChanged(actor, property, value) {
+    if (actor[property] !== value)
+        actor[property] = value;
+}
+
+// Let GNOME paint the opened popup or selected tab before starting a Codex
+// helper process. The refresh itself still reads the same account source.
+const VISIBLE_REFRESH_DELAY_MS = 180;
+
 export const ShadowIndicator = GObject.registerClass(
 class ShadowIndicator extends PanelMenu.Button {
     _init(extension, settings, logger) {
@@ -64,6 +73,8 @@ class ShadowIndicator extends PanelMenu.Button {
         this._weatherState = null;
         this._notificationSource = null;
         this._lastUsageState = null;
+        this._visibleRefreshId = 0;
+        this._lastWeatherArtwork = null;
         this._mounted = false;
         this._mountSignalId = 0;
         this._moduleIds = MODULE_IDS.filter(id =>
@@ -225,6 +236,7 @@ class ShadowIndicator extends PanelMenu.Button {
             notify: (title, message, options = {}) =>
                 this._notify(title, message, options),
             pageWidth: this._pageStack.width,
+            isPopupOpen: () => this._popupOpen,
             fitPageScroll: (scroll, pageActor) => this._fitPageScroll(scroll, pageActor),
             codexProvider: services.codexProvider,
             weatherProvider: services.weatherProvider,
@@ -344,6 +356,8 @@ class ShadowIndicator extends PanelMenu.Button {
         if (this._destroyed || !this._pages.has(id))
             return;
         const previousId = this._activeId;
+        if (previousId === id)
+            return;
         const animate = Boolean(previousId && previousId !== id &&
             animationsEnabled(this._settings));
         this._activeId = id;
@@ -370,8 +384,11 @@ class ShadowIndicator extends PanelMenu.Button {
         }
         this._tabs?.setActive(id);
         if (this._popupOpen && previousId !== id) {
-            this._codexProvider?.setViewVisible(id === 'codex', id === 'codex');
+            this._cancelVisibleRefresh();
+            this._codexProvider?.setViewVisible(id === 'codex', false);
             selectedPage?.onPopupOpened();
+            if (id === 'codex')
+                this._queueVisibleRefresh();
         }
         selectedPage?.activate();
         if (this._settings.get_boolean('remember-last-tab'))
@@ -398,15 +415,18 @@ class ShadowIndicator extends PanelMenu.Button {
         }
         const codexIcon = this._settings.get_boolean('show-codex-icon');
         this._mascot?.setDisplayEnabled(codexIcon);
-        this._codexSummary.icon.visible = codexIcon;
-        this._codexSummary.label.text = codexParts.join('  ');
-        this._codexSummary.label.style = `color: ${codexLimitColor(codexPercent)};`;
-        this._codexSummary.label.visible = codexParts.length > 0;
-        this._codexSummary.item.visible = codexIcon || codexParts.length > 0;
-        this._codexSummary.item.accessible_name = codexPercent === null
+        setIfChanged(this._codexSummary.icon, 'visible', codexIcon);
+        setIfChanged(this._codexSummary.label, 'text', codexParts.join('  '));
+        setIfChanged(this._codexSummary.label, 'style', `color: ${codexLimitColor(codexPercent)};`);
+        setIfChanged(this._codexSummary.label, 'visible', codexParts.length > 0);
+        setIfChanged(this._codexSummary.item, 'visible', codexIcon || codexParts.length > 0);
+        const codexAccessibleName = codexPercent === null
             ? 'Codex remaining capacity unavailable'
             : `Codex ${codexPercent}% remaining`;
-        this._syncUsageState();
+        const usageStateLabel = this._syncUsageState();
+        setIfChanged(this._codexSummary.item, 'accessible_name', usageStateLabel
+            ? `${codexAccessibleName}, ${usageStateLabel.toLowerCase()}`
+            : codexAccessibleName);
 
         const temperature = weatherSummaryTemperature(this._weatherState);
         const weatherParts = [];
@@ -417,26 +437,30 @@ class ShadowIndicator extends PanelMenu.Button {
             weatherParts.push(this._weatherState.current.condition.label);
         }
         const weatherIcon = this._settings.get_boolean('show-weather-icon');
-        this._weatherSummary.icon.visible = weatherIcon;
-        if (this._weatherState?.current?.condition?.icon)
+        setIfChanged(this._weatherSummary.icon, 'visible', weatherIcon);
+        const weatherCondition = this._weatherState?.current?.condition;
+        const weatherArtworkName = weatherCondition ? weatherArtwork(weatherCondition) : null;
+        if (weatherArtworkName && weatherArtworkName !== this._lastWeatherArtwork) {
             this._weatherSummary.icon.gicon = weatherGIcon(
-                this._extension.path, this._weatherState.current.condition);
-        this._weatherSummary.label.text = weatherParts.join('  ');
-        this._weatherSummary.label.visible = weatherParts.length > 0;
+                this._extension.path, weatherCondition);
+            this._lastWeatherArtwork = weatherArtworkName;
+        }
+        setIfChanged(this._weatherSummary.label, 'text', weatherParts.join('  '));
+        setIfChanged(this._weatherSummary.label, 'visible', weatherParts.length > 0);
         const weatherConfigured = this._settings.get_boolean('show-weather-top-bar') &&
             (weatherIcon || weatherParts.length > 0);
-        this._weatherSummary.item.visible = weatherConfigured &&
-            !(singleItem && this._codexSummary.item.visible);
-        this._weatherSummary.item.accessible_name = temperature === null
+        setIfChanged(this._weatherSummary.item, 'visible', weatherConfigured &&
+            !(singleItem && this._codexSummary.item.visible));
+        setIfChanged(this._weatherSummary.item, 'accessible_name', temperature === null
             ? 'Weather unavailable'
-            : `Weather ${temperature} degrees, ${this._weatherState.current.condition.label}`;
+            : `Weather ${temperature} degrees, ${this._weatherState.current.condition.label}`);
 
         const summariesVisible = this._codexSummary.item.visible || this._weatherSummary.item.visible;
-        this._fallbackIcon.visible = !summariesVisible;
+        setIfChanged(this._fallbackIcon, 'visible', !summariesVisible);
         const descriptions = [this._codexSummary, this._weatherSummary]
             .filter(summary => summary.item.visible)
             .map(summary => summary.item.accessible_name);
-        this.accessible_name = descriptions.join(', ') || 'Shadowokx Panel';
+        setIfChanged(this, 'accessible_name', descriptions.join(', ') || 'Shadowokx Panel');
     }
 
     _syncUsageState() {
@@ -444,19 +468,21 @@ class ShadowIndicator extends PanelMenu.Button {
             this._settings.get_boolean('show-codex-remaining') &&
             codexRemainingSummary(this._codexState) !== null;
         const state = enabled ? codexUsagePace(this._codexState) : null;
-        this._codexPaceIcon.visible = Boolean(state);
+        setIfChanged(this._codexPaceIcon, 'visible', Boolean(state));
         if (!state) {
             this._lastUsageState = null;
-            return;
+            return null;
         }
 
-        this._codexPaceIcon.gicon = state.key === 'high'
-            ? this._usageHighIcon
-            : Gio.ThemedIcon.new(state.iconName);
-        for (const key of ['high', 'normal', 'low'])
-            this._codexPaceIcon.remove_style_class_name(`shadow-usage-state-${key}`);
-        this._codexPaceIcon.add_style_class_name(`shadow-usage-state-${state.key}`);
-        this._codexPaceIcon.accessible_name = state.label;
+        if (state.key !== this._lastUsageState) {
+            this._codexPaceIcon.gicon = state.key === 'high'
+                ? this._usageHighIcon
+                : Gio.ThemedIcon.new(state.iconName);
+            for (const key of ['high', 'normal', 'low'])
+                this._codexPaceIcon.remove_style_class_name(`shadow-usage-state-${key}`);
+            this._codexPaceIcon.add_style_class_name(`shadow-usage-state-${state.key}`);
+            this._codexPaceIcon.accessible_name = state.label;
+        }
         if (this._lastUsageState && this._lastUsageState !== state.key &&
             this._codexPaceIcon.mapped && animationsEnabled(this._settings)) {
             this._codexPaceIcon.remove_all_transitions();
@@ -467,10 +493,10 @@ class ShadowIndicator extends PanelMenu.Button {
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             });
         } else {
-            this._codexPaceIcon.opacity = 255;
+            setIfChanged(this._codexPaceIcon, 'opacity', 255);
         }
         this._lastUsageState = state.key;
-        this._codexSummary.item.accessible_name += `, ${state.label.toLowerCase()}`;
+        return state.label;
     }
 
     syncIndicatorSettings() {
@@ -526,18 +552,41 @@ class ShadowIndicator extends PanelMenu.Button {
             return;
         this._popupOpen = true;
         this._mascot?.setPopupOpen(true);
-        this._codexProvider?.setViewVisible(this._activeId === 'codex', true);
+        this._codexProvider?.setViewVisible(this._activeId === 'codex', false);
         try {
             this._pages.get(this._activeId)?.onPopupOpened();
         } catch (error) {
             this._logger.warn(`Could not refresh ${this._activeId}`, error);
         }
+        if (this._activeId === 'codex')
+            this._queueVisibleRefresh();
+    }
+
+    _queueVisibleRefresh() {
+        this._cancelVisibleRefresh();
+        this._visibleRefreshId = GLib.timeout_add(
+            GLib.PRIORITY_DEFAULT_IDLE,
+            VISIBLE_REFRESH_DELAY_MS,
+            () => {
+                this._visibleRefreshId = 0;
+                if (!this._destroyed && this._popupOpen && this._activeId === 'codex')
+                    this._codexProvider?.refresh(true);
+                return GLib.SOURCE_REMOVE;
+            }
+        );
+    }
+
+    _cancelVisibleRefresh() {
+        if (this._visibleRefreshId)
+            GLib.Source.remove(this._visibleRefreshId);
+        this._visibleRefreshId = 0;
     }
 
     _onPopupClosed() {
         if (this._destroyed)
             return;
         this._popupOpen = false;
+        this._cancelVisibleRefresh();
         this._mascot?.setPopupOpen(false);
         this._codexProvider?.setViewVisible(false, false);
         try {
@@ -576,6 +625,7 @@ class ShadowIndicator extends PanelMenu.Button {
         if (this._destroyed)
             return;
         this._destroyed = true;
+        this._cancelVisibleRefresh();
         this._codexProvider?.setViewVisible(false, false);
         this._codexProvider = null;
         this._mascot?.destroy();
