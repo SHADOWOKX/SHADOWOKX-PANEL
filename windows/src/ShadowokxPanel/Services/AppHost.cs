@@ -43,7 +43,8 @@ public sealed class AppHost : IAsyncDisposable
             var settings = await Settings.LoadAsync(cancellationToken);
             var logger = new RedactingLogger(Paths, () => Settings.Current.DebugLogging);
             _codex = new CodexProvider(
-                Paths, settings.CodexRefreshMinutes, logger: logger);
+                Paths, settings.CodexRefreshMinutes,
+                discover: () => CodexDiscovery.Find(explicitExecutable: Settings.Current.CodexExecutablePath), logger: logger);
             _weather = new WeatherProvider(
                 Paths,
                 settings.WeatherLocation,
@@ -115,6 +116,11 @@ public sealed class AppHost : IAsyncDisposable
 
     private void OnSettingsChanged(object? sender, AppSettings settings)
     {
+        if (settings.CodexExecutablePath != _appliedSettings.CodexExecutablePath)
+        {
+            Codex.InvalidateDiscovery();
+            _ = Codex.RefreshAsync(true);
+        }
         var wasEnabled = _appliedSettings.ShowWeather;
         var weatherConfigurationChanged =
             settings.WeatherLocation != _appliedSettings.WeatherLocation ||

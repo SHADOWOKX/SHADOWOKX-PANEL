@@ -27,6 +27,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private readonly AppWindow _appWindow;
     private readonly nint _hwnd;
     private readonly DispatcherTimer _clockTimer;
+    private readonly DispatcherTimer _codexVisibilityTimer;
     private readonly TokenGraphControl _tokenGraph;
     private readonly SolidColorBrush _capacityBrush = new();
     private readonly UISettings _uiSettings = new();
@@ -96,6 +97,13 @@ public sealed partial class MainWindow : Window, IDisposable
         _viewModel = new DashboardViewModel(host, DispatcherQueue);
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
         _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
+        _codexVisibilityTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(180) };
+        _codexVisibilityTimer.Tick += (_, _) =>
+        {
+            _codexVisibilityTimer.Stop();
+            if (!_disposed && _visible && _viewModel.SelectedPage == "codex")
+                _host.Codex.SetVisible(true);
+        };
         _clockTimer.Tick += ClockTimer_Tick;
         Render();
     }
@@ -132,15 +140,14 @@ public sealed partial class MainWindow : Window, IDisposable
         _visible = true;
         var codexVisible = _viewModel.SelectedPage != "weather" ||
             !_viewModel.Settings.ShowWeather;
-        _host.Codex.SetVisible(codexVisible);
+        _host.Codex.SetVisible(false);
+        if (codexVisible) _codexVisibilityTimer.Start();
         Render();
         PositionNearTray();
         _appWindow.Show();
         Activate();
         _clockTimer.Start();
-        if (codexVisible && _host.ProvidersReady)
-            _ = _viewModel.RefreshCodexAsync(false);
-        else if (_host.ProvidersReady && _host.Settings.Current.RefreshOnOpen)
+        if (!codexVisible && _host.ProvidersReady && _host.Settings.Current.RefreshOnOpen)
             _ = _host.Weather.RefreshAsync(false);
     }
 
@@ -172,6 +179,7 @@ public sealed partial class MainWindow : Window, IDisposable
         if (!_visible)
             return;
         _visible = false;
+        _codexVisibilityTimer.Stop();
         _host.Codex.SetVisible(false);
         _clockTimer.Stop();
         CodexRefreshRing.IsActive = false;
@@ -344,7 +352,7 @@ public sealed partial class MainWindow : Window, IDisposable
             return _viewModel.Weather.HasData ? (compact ? 600 : 660) : (compact ? 340 : 360);
         if (!_viewModel.Codex.HasData)
             return compact ? 340 : 360;
-        var height = compact ? 610 : 690;
+        var height = compact ? 580 : 640;
         if (!_host.Settings.Current.ShowTokenHistory)
             height -= compact ? 90 : 105;
         if (!_host.Settings.Current.ShowLifetimeTokens)
@@ -393,6 +401,7 @@ public sealed partial class MainWindow : Window, IDisposable
             return;
 
         ThemeService.Apply(Root, settings);
+        _tokenGraph.RefreshTheme();
         _appliedTheme = settings.Theme;
         _appliedAccent = settings.Accent;
         _appliedCustomAccent = settings.CustomAccent;
@@ -443,9 +452,8 @@ public sealed partial class MainWindow : Window, IDisposable
             RemainingColumn.Width = new GridLength(remaining, GridUnitType.Star);
             UsedColumn.Width = new GridLength(100 - remaining, GridUnitType.Star);
             WeeklyFill.Visibility = remaining > 0 ? Visibility.Visible : Visibility.Collapsed;
-            var color = remaining >= 60 ? Windows.UI.Color.FromArgb(255, 34, 197, 94) :
-                remaining >= 30 ? Windows.UI.Color.FromArgb(255, 234, 179, 8) :
-                Windows.UI.Color.FromArgb(255, 239, 68, 68);
+            var (red, green, blue) = UsageAnalytics.CapacityColor(weekly.RemainingPercent);
+            var color = Windows.UI.Color.FromArgb(255, red, green, blue);
             _capacityBrush.Color = color;
             WeeklyFill.Background = _capacityBrush;
             WeeklyRemaining.Foreground = _capacityBrush;
@@ -461,20 +469,27 @@ public sealed partial class MainWindow : Window, IDisposable
                 "ddd h:mm tt", CultureInfo.CurrentCulture) ?? "Reset unavailable";
         }
 
-        var account = AccountUsageRows.Read(state.TokenUsage, DateTimeOffset.Now);
-        TodayCost.Text = AccountCostEstimate.Format(account.Today, settings, CultureInfo.CurrentCulture);
-        YesterdayCost.Text = AccountCostEstimate.Format(account.Yesterday, settings, CultureInfo.CurrentCulture);
-        MonthCost.Text = AccountCostEstimate.Format(account.Reported30Days, settings, CultureInfo.CurrentCulture);
-        var estimateInput = 100 - settings.EstimateCachedPercent - settings.EstimateOutputPercent - settings.EstimateWritePercent;
-        CostEstimateCaption.Text = settings.ShowCostEstimate
-            ? "API estimate · assumed mix"
-            : "Account tokens";
-        ToolTipService.SetToolTip(CostRows,
-            $"Reference model: {settings.EstimateModel}. Assumed token mix: {estimateInput}% input, " +
-            $"{settings.EstimateCachedPercent}% cached, {settings.EstimateOutputPercent}% output, {settings.EstimateWritePercent}% cache writes.\n" +
-            $"{(settings.EstimateLongContext ? "Long-context" : "Standard-context")} rates, verified {Core.Codex.ApiPriceCatalog.VerifiedDate}. Change in Settings → Codex.\n" +
-            "An API-price estimate, not your subscription bill. Account totals do not report model or token categories.\n" +
-            "Missing days are not zero; Last 30 Days sums the reported account days only.");
+        var now = DateTimeOffset.Now;
+        var day = DateOnly.FromDateTime(now.LocalDateTime);
+        var accountBuckets = state.TokenUsage?.AccountDailyBuckets ?? [];
+        var recent = accountBuckets.Where(bucket => day.DayNumber - bucket.Date.DayNumber is >= 0 and < 7).ToArray();
+        TodayAccountLabel.Text = $"Today · {day:MMM d}";
+        YesterdayAccountLabel.Text = $"Yesterday · {day.AddDays(-1):MMM d}";
+        WeekAccountLabel.Text = $"Last 7 days · {recent.Length} reported";
+        TodayCost.Text = ExactTokens(accountBuckets.FirstOrDefault(bucket => bucket.Date == day)?.Tokens, "Pending");
+        YesterdayCost.Text = ExactTokens(accountBuckets.FirstOrDefault(bucket => bucket.Date == day.AddDays(-1))?.Tokens);
+        long? weekTokens = null;
+        try { if (recent.Length > 0) weekTokens = recent.Sum(bucket => bucket.Tokens); }
+        catch (OverflowException) { }
+        MonthCost.Text = ExactTokens(weekTokens);
+        var latest = accountBuckets.OrderBy(bucket => bucket.Date).LastOrDefault();
+        AccountDateCaption.Text = latest is null ? "Account token data unavailable" : $"Account data through {latest.Date:MMM d}";
+        ToolTipService.SetToolTip(CostRows, null);
+        CostEstimateCaption.Text = string.Empty;
+        SpendSummary.Visibility = settings.ShowCostEstimate && state.Cost is { } local &&
+            (local.Today.Tokens > 0 || local.Last7Days?.Tokens > 0) ? Visibility.Visible : Visibility.Collapsed;
+        RenderDeviceEstimate(TodayEstimate, state.Cost?.Today, state.Cost?.Partial == true);
+        RenderDeviceEstimate(WeekEstimate, state.Cost?.Last7Days, state.Cost?.Partial == true);
         var fiveHour = state.FiveHour;
         FiveHourCard.Visibility = fiveHour is null || state.Weekly is null ? Visibility.Collapsed : Visibility.Visible;
         FiveHourText.Text = fiveHour is null
@@ -488,18 +503,13 @@ public sealed partial class MainWindow : Window, IDisposable
             ? Visibility.Visible : Visibility.Collapsed;
         var usage = state.TokenUsage;
         LifetimeTokens.Visibility = settings.ShowLifetimeTokens ? Visibility.Visible : Visibility.Collapsed;
-        LifetimeTokensLabel.Visibility = LifetimeTokens.Visibility;
-        LifetimeTokens.Text = FormatTokens(usage?.LifetimeTokens);
+        LifetimeTokens.Text = $"{FormatTokens(usage?.LifetimeTokens)} lifetime";
         _tokenGraph.Visibility = settings.ShowTokenHistory ? Visibility.Visible : Visibility.Collapsed;
         TokenGraphHost.Visibility = _tokenGraph.Visibility;
-        var graphHeight = usage?.DailyBuckets.Count >= 2 ? 82 : 48;
-        TokenGraphHost.Height = graphHeight;
-        _tokenGraph.Height = graphHeight;
-        _tokenGraph.SetData(usage?.DailyBuckets);
-        TodayTokens.Text = FormatTokens(usage?.TodayTokens);
-        PeakTokens.Text = FormatTokens(usage?.PeakDailyTokens);
-        PeakDate.Text = usage?.PeakDate?.ToString(
-            "MMM d, yyyy", CultureInfo.CurrentCulture) ?? "Not reported";
+        TokenGraphHost.Height = 84;
+        _tokenGraph.Height = 84;
+        _tokenGraph.SetData(usage?.AccountDailyBuckets);
+        RenderActivityStats();
         var pace = _viewModel.UsagePace;
         UsageStateCard.Visibility = settings.ShowUsageState && pace != UsagePace.Unknown
             ? Visibility.Visible : Visibility.Collapsed;
@@ -511,6 +521,34 @@ public sealed partial class MainWindow : Window, IDisposable
         };
         ResetCredits.Text = $"Reset credits: {state.ResetCreditsAvailable}";
         CodexUpdated.Text = FormatUpdated(state.LastSuccessfulRefresh, state.IsStale);
+    }
+
+    private static string ExactTokens(long? value, string unavailable = "—") => value.HasValue
+        ? value.Value.ToString("N0", CultureInfo.CurrentCulture) : unavailable;
+
+    private static void RenderDeviceEstimate(TextBlock target, Core.Codex.CostAmount? value, bool partial)
+    {
+        var available = value is not null && value.Tokens > value.UnpricedTokens;
+        var money = available ? value!.Dollars is > 0 and < .01m ? "<$0.01"
+            : value!.Dollars.ToString("$#,##0.00", CultureInfo.InvariantCulture) : "—";
+        target.Text = available ? $"≈{money}{(partial || value!.UnpricedTokens > 0 ? " *" : string.Empty)}" : "—";
+        ToolTipService.SetToolTip(target, available
+            ? "Estimate from recorded sessions on this device. Not an account bill." : null);
+    }
+
+    private void ActivityDays_Click(object sender, RoutedEventArgs e) { _tokenGraph.SetWeekly(false); RenderActivityStats(); }
+    private void ActivityWeeks_Click(object sender, RoutedEventArgs e) { _tokenGraph.SetWeekly(true); RenderActivityStats(); }
+    private void RenderActivityStats()
+    {
+        var data = _tokenGraph.Activity;
+        TodayTokens.Text = data.ActiveCount.ToString(CultureInfo.CurrentCulture);
+        PeakTokens.Text = FormatTokens(data.Peak?.Tokens);
+        PeakDate.Text = data.Peak?.Date.ToString("MMM d", CultureInfo.CurrentCulture) ?? "—";
+        ActivityCountLabel.Text = data.Weekly ? "Active weeks" : "Active days";
+        ActivityPeakLabel.Text = data.Weekly ? "Weekly peak" : "Daily peak";
+        ActivityDateLabel.Text = data.Weekly ? "Week starting" : "Peak day";
+        ActivityDaysButton.Background = (Brush)Application.Current.Resources[data.Weekly ? "CardBrush" : "CardHoverBrush"];
+        ActivityWeeksButton.Background = (Brush)Application.Current.Resources[data.Weekly ? "CardHoverBrush" : "CardBrush"];
     }
 
     private void RenderWeather(WeatherState state, Core.Settings.AppSettings settings)
@@ -689,7 +727,12 @@ public sealed partial class MainWindow : Window, IDisposable
 
         var weatherSelected = _viewModel.Settings.ShowWeather &&
             _viewModel.SelectedPage == "weather";
-        _host.Codex.SetVisible(!weatherSelected);
+        if (eventArgs.PropertyName == nameof(DashboardViewModel.SelectedPage))
+        {
+            _codexVisibilityTimer.Stop();
+            _host.Codex.SetVisible(false);
+            if (_visible && !weatherSelected) _codexVisibilityTimer.Start();
+        }
         if (eventArgs.PropertyName == nameof(DashboardViewModel.Codex))
         {
             var nextLayout = CodexLayoutKey.Create(_viewModel.Codex, _viewModel.Settings);
@@ -730,10 +773,8 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         try
         {
+            if (_viewModel.SelectedPage == "codex") return;
             await _viewModel.SelectPageAsync("codex");
-            _host.Codex.SetVisible(_visible);
-            if (_visible && _host.ProvidersReady)
-                await _viewModel.RefreshCodexAsync(false);
         }
         catch (IOException) { }
     }
@@ -742,7 +783,9 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         try
         {
+            if (_viewModel.SelectedPage == "weather") return;
             await _viewModel.SelectPageAsync("weather");
+            _codexVisibilityTimer.Stop();
             _host.Codex.SetVisible(false);
             if (_visible && _host.ProvidersReady)
                 await _host.Weather.RefreshAsync(false);
@@ -896,6 +939,7 @@ public sealed partial class MainWindow : Window, IDisposable
         _disposed = true;
         _exiting = true;
         _visible = false;
+        _codexVisibilityTimer.Stop();
         _host.Codex.SetVisible(false);
         _clockTimer.Stop();
         _clockTimer.Tick -= ClockTimer_Tick;
@@ -979,6 +1023,7 @@ public sealed partial class MainWindow : Window, IDisposable
         bool ShowTokenCard,
         bool ShowHistory,
         bool HasGraph,
+        bool HasSpendSummary,
         bool ShowUsageInsight,
         ProviderStatus EmptyStatus,
         string? ErrorCode)
@@ -991,7 +1036,9 @@ public sealed partial class MainWindow : Window, IDisposable
                 state.FiveHour is not null,
                 settings.ShowLifetimeTokens || settings.ShowTokenHistory,
                 settings.ShowTokenHistory,
-                state.TokenUsage?.DailyBuckets.Count >= 2,
+                settings.ShowTokenHistory,
+                settings.ShowCostEstimate && state.Cost is { } cost &&
+                    (cost.Today.Tokens > 0 || cost.Last7Days?.Tokens > 0),
                 settings.ShowUsageState &&
                     UsageAnalytics.GetPace(state.TokenUsage, DateTimeOffset.Now) != UsagePace.Unknown,
                 state.HasData ? ProviderStatus.Success : state.Status,

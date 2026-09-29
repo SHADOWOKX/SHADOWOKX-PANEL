@@ -95,8 +95,8 @@
             <Grid Grid.Row="2">
                 <ScrollViewer
                     x:Name="CodexScroll"
-                    VerticalScrollBarVisibility="Hidden"
-                    VerticalScrollMode="Enabled"
+                    VerticalScrollBarVisibility="Disabled"
+                    VerticalScrollMode="Disabled"
                     HorizontalScrollBarVisibility="Disabled"
                     HorizontalScrollMode="Disabled">
                     <StackPanel Spacing="10" Padding="0,0,0,3">
@@ -154,7 +154,7 @@
                                             <TextBlock x:Name="WeeklyRemaining" Foreground="{ThemeResource AccentBrush}" FontSize="34" FontWeight="Bold" />
                                             <TextBlock Text="remaining" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="11" VerticalAlignment="Bottom" Margin="0,0,0,6" />
                                         </StackPanel>
-                                        <StackPanel HorizontalAlignment="Right" Spacing="1">
+                                        <StackPanel HorizontalAlignment="Right" Spacing="1" Visibility="Collapsed">
                                             <TextBlock x:Name="WeeklyUsed" HorizontalAlignment="Right" FontSize="23" FontWeight="SemiBold" />
                                             <TextBlock x:Name="WeeklyAvailable" HorizontalAlignment="Right" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="10" />
                                         </StackPanel>
@@ -166,11 +166,18 @@
                                         </Grid.ColumnDefinitions>
                                         <Border x:Name="WeeklyFill" Background="{ThemeResource AccentBrush}" CornerRadius="5" />
                                     </Grid>
-                                    <StackPanel x:Name="CostRows" Spacing="3" Margin="0,-4,0,0">
-                                        <Grid><TextBlock Text="Today" FontSize="11" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="TodayCost" Text="—" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" /></Grid>
-                                        <Grid><TextBlock Text="Yesterday" FontSize="11" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="YesterdayCost" Text="—" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" /></Grid>
-                                        <Grid><TextBlock Text="Last 30 Days" FontSize="11" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="MonthCost" Text="—" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" /></Grid>
+                                    <StackPanel x:Name="CostRows" Spacing="4">
+                                        <TextBlock Text="ACCOUNT TOKENS" FontSize="9" Foreground="{ThemeResource SecondaryTextBrush}" />
+                                        <Grid><TextBlock x:Name="TodayAccountLabel" Text="Today" FontSize="11" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="TodayCost" Text="Pending" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" /></Grid>
+                                        <Grid><TextBlock x:Name="YesterdayAccountLabel" Text="Yesterday" FontSize="11" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="YesterdayCost" Text="—" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" /></Grid>
+                                        <Grid><TextBlock x:Name="WeekAccountLabel" Text="Last 7 days" FontSize="11" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="MonthCost" Text="—" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" /></Grid>
+                                        <TextBlock x:Name="AccountDateCaption" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
+                                    <Grid x:Name="SpendSummary" ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2"><TextBlock Text="Today · device estimate" FontSize="9" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="TodayEstimate" Text="—" FontSize="16" FontWeight="SemiBold" /></StackPanel>
+                                        <StackPanel Grid.Column="1" Spacing="2"><TextBlock Text="7 days · device estimate" FontSize="9" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="WeekEstimate" Text="—" FontSize="16" FontWeight="SemiBold" /></StackPanel>
+                                    </Grid>
                                     <Border Height="1" Background="{ThemeResource CardBorderBrush}" Margin="0,-3,0,-3" />
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
@@ -204,19 +211,19 @@
                             </Border>
 
                             <Border x:Name="TokenCard" Style="{StaticResource CardStyle}">
-                                <StackPanel Spacing="8">
+                                <StackPanel Spacing="5">
                                     <Grid>
                                         <TextBlock Text="Token activity" Style="{StaticResource CardTitleStyle}" />
-                                        <Border HorizontalAlignment="Right" Background="{ThemeResource CardHoverBrush}" CornerRadius="9" Padding="9,4">
-                                            <StackPanel Orientation="Horizontal" Spacing="5">
-                                                <FontIcon Glyph="&#xE81C;" FontSize="11" />
-                                                <TextBlock Text="7-day history" FontSize="11" />
-                                            </StackPanel>
-                                        </Border>
+                                        <TextBlock x:Name="LifetimeTokens" HorizontalAlignment="Right" FontSize="11" FontWeight="SemiBold" />
                                     </Grid>
-                                    <TextBlock x:Name="LifetimeTokens" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="24" FontWeight="SemiBold" />
-                                    <TextBlock x:Name="LifetimeTokensLabel" Text="Lifetime tokens" Style="{StaticResource MetricLabelStyle}" Margin="0,-8,0,0" />
-                                    <Grid x:Name="TokenGraphHost" Height="92" MinWidth="120" />
+                                    <Grid>
+                                        <TextBlock x:Name="LifetimeTokensLabel" Text="Account history · 12 months" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" VerticalAlignment="Center" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="3">
+                                            <Button x:Name="ActivityDaysButton" Content="Days" FontSize="10" Padding="6,2" MinWidth="0" MinHeight="0" CornerRadius="6" Click="ActivityDays_Click" />
+                                            <Button x:Name="ActivityWeeksButton" Content="Weeks" FontSize="10" Padding="6,2" MinWidth="0" MinHeight="0" CornerRadius="6" Click="ActivityWeeks_Click" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Grid x:Name="TokenGraphHost" Height="84" MinWidth="120" />
                                     <Grid ColumnSpacing="14">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -224,15 +231,15 @@
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <StackPanel>
-                                            <TextBlock Text="Today" Style="{StaticResource MetricLabelStyle}" />
+                                            <TextBlock x:Name="ActivityCountLabel" Text="Active days" Style="{StaticResource MetricLabelStyle}" />
                                             <TextBlock x:Name="TodayTokens" Style="{StaticResource MetricValueStyle}" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="1">
-                                            <TextBlock Text="Peak" Style="{StaticResource MetricLabelStyle}" />
+                                            <TextBlock x:Name="ActivityPeakLabel" Text="Daily peak" Style="{StaticResource MetricLabelStyle}" />
                                             <TextBlock x:Name="PeakTokens" Style="{StaticResource MetricValueStyle}" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="2">
-                                            <TextBlock Text="Peak day" Style="{StaticResource MetricLabelStyle}" />
+                                            <TextBlock x:Name="ActivityDateLabel" Text="Peak day" Style="{StaticResource MetricLabelStyle}" />
                                             <TextBlock x:Name="PeakDate" Style="{StaticResource MetricValueStyle}" />
                                         </StackPanel>
                                     </Grid>
@@ -259,7 +266,7 @@
                                     <FontIcon Glyph="&#xE777;" FontSize="12" Foreground="{ThemeResource SecondaryTextBrush}" />
                                     <TextBlock x:Name="ResetCredits" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
                                 </StackPanel>
-                                <TextBlock x:Name="CostEstimateCaption" TextTrimming="CharacterEllipsis" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" />
+                                <TextBlock x:Name="CostEstimateCaption" Visibility="Collapsed" TextTrimming="CharacterEllipsis" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" />
                                 <TextBlock x:Name="CodexUpdated" Grid.Column="1" HorizontalAlignment="Right" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="11" />
                             </Grid>
                         </StackPanel>

@@ -40,6 +40,7 @@ public sealed partial class SettingsWindow : Window
         CustomAccentBox.Text = settings.CustomAccent;
         DensityCombo.SelectedIndex = settings.Density == LayoutDensity.Compact ? 0 : 1;
         AnimationsToggle.IsOn = settings.Animations;
+        CodexExecutableBox.Text = settings.CodexExecutablePath;
         CostEstimateToggle.IsOn = settings.ShowCostEstimate;
         EstimateModelCombo.ItemsSource = ApiPriceCatalog.Models.Select(p => p.Model).ToArray();
         EstimateModelCombo.SelectedItem = settings.EstimateModel;
@@ -89,6 +90,7 @@ public sealed partial class SettingsWindow : Window
         }
         var next = _host.Settings.Current with
         {
+            CodexExecutablePath = CodexExecutableBox.Text.Trim(),
             ShowCostEstimate = CostEstimateToggle.IsOn,
             EstimateModel = EstimateModelCombo.SelectedItem as string ?? "gpt-5.6-sol",
             EstimateCachedPercent = (int)cached,

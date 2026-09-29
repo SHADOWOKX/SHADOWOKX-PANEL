@@ -26,6 +26,24 @@ public static class UsageAnalytics
         return UsagePace.Steady;
     }
 
+    public static (byte Red, byte Green, byte Blue) CapacityColor(double remaining)
+    {
+        if (!double.IsFinite(remaining)) return (156, 163, 175);
+        remaining = Math.Clamp(remaining, 0, 100);
+        (double Percent, byte Red, byte Green, byte Blue)[] stops =
+            [(0, 239, 68, 68), (15, 249, 115, 22), (30, 245, 158, 11), (60, 34, 197, 94), (100, 34, 197, 94)];
+        for (var i = 1; i < stops.Length; i++)
+        {
+            if (remaining > stops[i].Percent) continue;
+            var from = stops[i - 1]; var to = stops[i];
+            var fraction = (remaining - from.Percent) / (to.Percent - from.Percent);
+            return ((byte)Math.Round(from.Red + (to.Red - from.Red) * fraction),
+                (byte)Math.Round(from.Green + (to.Green - from.Green) * fraction),
+                (byte)Math.Round(from.Blue + (to.Blue - from.Blue) * fraction));
+        }
+        return (34, 197, 94);
+    }
+
     public static string CapacityLabel(double? remaining)
     {
         if (!remaining.HasValue || !double.IsFinite(remaining.Value))

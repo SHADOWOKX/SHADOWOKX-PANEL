@@ -54,7 +54,7 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
                     {
                         name = "shadowokx-panel",
                         title = "Shadowokx Panel",
-                        version = "2.0.0",
+                        version = "2.1.0",
                     },
                     capabilities = new
                     {
@@ -140,7 +140,7 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
         }
     }
 
-    private static ProcessStartInfo CreateStartInfo(CodexLaunchSpec launch)
+    internal static ProcessStartInfo CreateStartInfo(CodexLaunchSpec launch)
     {
         var info = new ProcessStartInfo
         {
@@ -153,17 +153,14 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
         if (launch.IsCommandShim)
         {
             info.FileName = Path.Combine(Environment.SystemDirectory, "cmd.exe");
-            info.ArgumentList.Add("/d");
-            info.ArgumentList.Add("/s");
-            info.ArgumentList.Add("/c");
-            info.ArgumentList.Add($"\"\"{launch.ExecutablePath}\" app-server --stdio\"");
+            info.Arguments = $"/d /s /c \"\"{launch.ExecutablePath}\" app-server\"";
         }
         else
         {
             info.FileName = launch.ExecutablePath;
             info.ArgumentList.Add("app-server");
-            info.ArgumentList.Add("--stdio");
         }
+        info.WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         return info;
     }
 

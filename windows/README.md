@@ -1,12 +1,20 @@
-## Version 2.0
+## Version 2.1
 
-The compact Linux-style dashboard, tray anchoring fixes and reduced background work are described in [the 2.0 release notes](docs/RELEASE-2.0.md).
+Windows now follows the current Linux dashboard: exact account token rows, a compact twelve-month activity heatmap with Days/Weeks switching, gradual allowance colors, and separate device cost estimates. The Codex panel does not scroll. Missing account dates stay pending or unavailable; they never become local totals or zero.
 
-Version 2.0.2 adds USD estimates to account-wide token activity using official model prices and a configurable, explicitly assumed token mix. Default: Sol, 100% uncached input. Change the reference model and cache/output shares in Settings → Codex. This is an API-price scenario, not measured account billing. See [pricing assumptions and release notes](docs/RELEASE-2.0.2.md). Share saves a PNG in Pictures/Shadowokx Panel and opens its folder.
+The connection uses Codex's default stdio transport. Discovery includes the current user's Microsoft Store packages, standalone and npm installations, and a manual CLI path in Settings. The desktop GUI executable is not used as a protocol server. Account checks only read limits/activity and never start model turns.
+
+Dollar estimates use actual recorded local input, cached input, output and model data, with the same rate table as Linux. They describe this device, not account billing. Missing or unpriced estimates show a dash without a hover popup. Share saves a PNG in Pictures/Shadowokx Panel.
 
 # Shadowokx Panel for Windows
 
 Shadowokx Panel is a native Windows 11 notification-area companion for Codex usage and Weather. It uses C#/.NET 8, WinUI 3, and the Windows App SDK—without embedding a browser, injecting into Explorer, or requiring administrator privileges.
+
+## Codex setup and troubleshooting
+
+Install Codex for the same Windows user who runs the panel. Sign in using your ChatGPT account (`codex login`); API-key-only authentication does not expose ChatGPT subscription limits. The panel does not read or copy credential files.
+
+If detection fails, enter the actual Codex CLI executable path in Settings → Codex and refresh. Use the bundled CLI inside the desktop app's resources, not the main desktop GUI executable. Errors distinguish missing installation, sign-in, startup, unsupported responses and timeouts. Read-only account methods are documented in [OpenAI's App Server reference](https://learn.chatgpt.com/docs/app-server).
 
 ## Install on Windows 11
 

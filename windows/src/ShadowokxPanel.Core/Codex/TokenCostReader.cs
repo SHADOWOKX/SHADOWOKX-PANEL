@@ -8,7 +8,10 @@ namespace ShadowokxPanel.Core.Codex;
 
 public sealed record CostAmount(decimal Dollars, long Tokens, long UnpricedTokens);
 public sealed record TokenCostSummary(CostAmount Today, CostAmount Yesterday, CostAmount Last30Days,
-    DateTimeOffset UpdatedAt, bool Partial);
+    DateTimeOffset UpdatedAt, bool Partial)
+{
+    public CostAmount? Last7Days { get; init; }
+}
 public sealed record CostRecord(DateTimeOffset Time, string Key, string Model, long Input, long Cached, long Output, long Writes);
 public sealed record CostFileCache(long Length, long Modified, IReadOnlyList<CostRecord> Records, bool Partial, long Offset = 0,
     string Model = "unknown", string Provider = "openai", string? Previous = null);
@@ -40,6 +43,7 @@ public sealed class TokenCostReader(ApplicationPaths paths, string? codexHome = 
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var totals = new CostAmount(0, 0, 0);
+        var week = totals;
         var current = totals;
         var yesterday = totals;
         var partial = false;
@@ -82,6 +86,7 @@ public sealed class TokenCostReader(ApplicationPaths paths, string? codexHome = 
                         var tokens = record.Input + record.Output;
                         var amount = new CostAmount(cost ?? 0, tokens, cost.HasValue ? 0 : tokens);
                         totals = Add(totals, amount);
+                        if (date >= today.AddDays(-6)) week = Add(week, amount);
                         if (date == today) current = Add(current, amount);
                         if (date == today.AddDays(-1)) yesterday = Add(yesterday, amount);
                     }
@@ -91,7 +96,7 @@ public sealed class TokenCostReader(ApplicationPaths paths, string? codexHome = 
             }
         }
         foreach (var file in _files.Keys.Where(key => !visited.Contains(key)).ToArray()) _files.Remove(file);
-        return new TokenCostSummary(current, yesterday, totals, DateTimeOffset.Now, partial || totals.UnpricedTokens > 0);
+        return new TokenCostSummary(current, yesterday, totals, DateTimeOffset.Now, partial || totals.UnpricedTokens > 0) { Last7Days = week };
     }
 
     private static bool Valid(CostRecord? record) => record is not null &&

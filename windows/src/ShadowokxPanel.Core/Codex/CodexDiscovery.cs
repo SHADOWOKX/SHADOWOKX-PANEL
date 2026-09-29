@@ -1,4 +1,5 @@
 using ShadowokxPanel.Core.Models;
+using System.Diagnostics;
 using Microsoft.Win32;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
@@ -15,7 +16,8 @@ public static class CodexDiscovery
         IEnumerable<string?>? additionalPathValues = null,
         IEnumerable<string?>? appPathCandidates = null,
         IEnumerable<string?>? additionalSearchRoots = null,
-        Func<string, IEnumerable<string>>? enumerateExecutables = null)
+        Func<string, IEnumerable<string>>? enumerateExecutables = null,
+        string? explicitExecutable = null)
     {
         string? Get(string name) => environment is null
             ? Environment.GetEnvironmentVariable(name)
@@ -23,6 +25,11 @@ public static class CodexDiscovery
         fileExists ??= File.Exists;
 
         var candidates = new List<string>();
+        if (!string.IsNullOrWhiteSpace(explicitExecutable))
+        {
+            var configured = FindFirst([explicitExecutable.Trim().Trim('"')], fileExists);
+            if (configured is not null) return configured;
+        }
         var pathValues = new List<string?> { Get("PATH") };
         if (additionalPathValues is not null)
             pathValues.AddRange(additionalPathValues);
@@ -75,16 +82,9 @@ public static class CodexDiscovery
             Join(roaming, "nvm"),
             Join(profile, "scoop", "shims"),
             Join(Get("ChocolateyInstall"), "bin"),
-            Join(local, "Microsoft", "WindowsApps"),
-            Join(local, "Programs", "Codex"),
-            Join(local, "OpenAI", "Codex"),
             Join(local, "Programs", "OpenAI", "Codex", "bin"),
-            Join(local, "Programs", "OpenAI", "Codex"),
             Join(local, "Programs", "ChatGPT", "resources", "codex"),
             Join(local, "Programs", "OpenAI", "ChatGPT", "resources", "codex"),
-            Join(programFiles, "Codex"),
-            Join(programFiles, "OpenAI", "Codex"),
-            Join(programFilesX86, "Codex"),
         };
         foreach (var directory in userDirectories.Where(value => value is not null))
             AddNames(candidates, directory!);
@@ -105,11 +105,17 @@ public static class CodexDiscovery
             Join(local, "Programs", "OpenAI", "Codex"),
             Join(local, "Programs", "ChatGPT"),
             Join(local, "Programs", "OpenAI", "ChatGPT"),
+            Join(programFiles, "Codex"),
+            Join(programFiles, "OpenAI", "Codex"),
+            Join(programFilesX86, "Codex"),
         };
         if (additionalSearchRoots is not null)
             searchRoots.AddRange(additionalSearchRoots);
         else if (environment is null && OperatingSystem.IsWindows())
+        {
             searchRoots.AddRange(ReadRegisteredInstallRoots());
+            searchRoots.AddRange(ReadStoreInstallRoots());
+        }
 
         enumerateExecutables ??= environment is null && OperatingSystem.IsWindows()
             ? EnumerateExecutables : null;
@@ -124,6 +130,7 @@ public static class CodexDiscovery
             nested.AddRange(enumerateExecutables(root));
         }
         return FindFirst(nested
+            .Where(path => !IsDesktopHost(path, searchRoots))
             .OrderBy(CandidateArchitectureRank)
             .ThenBy(CandidateKindRank)
             .ThenBy(path => path.Length), fileExists);
@@ -135,6 +142,8 @@ public static class CodexDiscovery
     {
         foreach (var path in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
         {
+            if (path.EndsWith(@"\Microsoft\WindowsApps\codex.exe", StringComparison.OrdinalIgnoreCase))
+                continue; // Desktop execution alias is not the bundled protocol CLI.
             if (!IsSafeAbsolutePath(path) || !fileExists(path))
                 continue;
             var extension = System.IO.Path.GetExtension(path);
@@ -145,6 +154,46 @@ public static class CodexDiscovery
             return new CodexLaunchSpec(path, shim);
         }
         return null;
+    }
+
+    private static bool IsDesktopHost(string path, IEnumerable<string?> roots) =>
+        roots.Where(root => !string.IsNullOrWhiteSpace(root)).Any(root =>
+            string.Equals(path, Join(root, "Codex.exe"), StringComparison.OrdinalIgnoreCase) &&
+            !root!.Contains("standalone", StringComparison.OrdinalIgnoreCase) &&
+            !root.Contains("node_modules", StringComparison.OrdinalIgnoreCase));
+
+    private static string[] ReadStoreInstallRoots()
+    {
+        // Only current-user package metadata is read. No administrator access or auth files.
+        try
+        {
+            var info = new ProcessStartInfo
+            {
+                FileName = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe"),
+                UseShellExecute = false, CreateNoWindow = true,
+                RedirectStandardOutput = true, RedirectStandardError = true,
+            };
+            info.ArgumentList.Add("-NoProfile");
+            info.ArgumentList.Add("-NonInteractive");
+            info.ArgumentList.Add("-Command");
+            info.ArgumentList.Add("Get-AppxPackage | Where-Object { $_.Name -match 'OpenAI|Codex|ChatGPT' } | Select-Object -ExpandProperty InstallLocation");
+            using var process = Process.Start(info);
+            if (process is null) return [];
+            var output = process.StandardOutput.ReadToEndAsync();
+            var errors = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(5000))
+            {
+                process.Kill(true);
+                return [];
+            }
+            _ = errors.GetAwaiter().GetResult();
+            return process.ExitCode == 0 ? output.GetAwaiter().GetResult()
+                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(IsSafeAbsolutePath).Take(16).ToArray() : [];
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or
+            System.ComponentModel.Win32Exception or InvalidOperationException)
+        { return []; }
     }
 
     private static int CandidateArchitectureRank(string path)

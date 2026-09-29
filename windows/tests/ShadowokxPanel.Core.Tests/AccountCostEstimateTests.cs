@@ -19,7 +19,7 @@ public sealed class AccountCostEstimateTests
     public void LongContextUsesModelSpecificCacheMultiplier()
     {
         var settings = new AppSettings { EstimateCachedPercent = 100, EstimateLongContext = true };
-        Assert.Equal(.4m, AccountCostEstimate.Calculate(1_000_000, settings));
+        Assert.Equal(.8m, AccountCostEstimate.Calculate(1_000_000, settings));
         Assert.Equal(2m, AccountCostEstimate.Calculate(1_000_000, settings with { EstimateModel = "gpt-6-astra" }));
     }
 

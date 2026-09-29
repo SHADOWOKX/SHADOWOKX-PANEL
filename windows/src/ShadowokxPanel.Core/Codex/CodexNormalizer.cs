@@ -111,7 +111,7 @@ public static class CodexNormalizer
             recent.Length > 0 ? recent.Sum(bucket => bucket.Tokens) : null)
         {
             AccountDailyBuckets = GetProperty(usage, "dailyUsageBuckets", out var reported) && reported.ValueKind == JsonValueKind.Array
-                ? buckets.Values.Where(b => today.DayNumber - b.Date.DayNumber is >= 0 and < 30).OrderBy(b => b.Date).ToArray()
+                ? buckets.Values.Where(b => today.DayNumber - b.Date.DayNumber is >= 0 and <= 366).OrderBy(b => b.Date).TakeLast(367).ToArray()
                 : null,
         };
     }

@@ -54,13 +54,8 @@ public sealed partial class MainWindow
         await Task.Delay(100);
         var output = Path.Combine(Path.GetTempPath(), "ShadowokxPanel-ui-smoke");
         Directory.CreateDirectory(output);
-        if (TodayCost.Text != Core.Presentation.AccountCostEstimate.Format(742900, _host.Settings.Current, System.Globalization.CultureInfo.CurrentCulture) || MonthCost.Text == "Not reported")
+        if (TodayCost.Text != ExactTokens(742900) || MonthCost.Text == "—")
             throw new InvalidOperationException("Account rows did not render remote tokens.");
-        var mix = _host.Settings.Current with { EstimateCachedPercent = 90, EstimateOutputPercent = 2, EstimateWritePercent = 1 };
-        RenderCodex(codex, mix);
-        if (!TodayCost.Text.StartsWith("≈$0.81", StringComparison.Ordinal))
-            throw new InvalidOperationException("Mixed-price account estimate did not update.");
-        RenderCodex(codex, _host.Settings.Current);
         var shared = await ShareUsageAsync(output, openFolder: false);
         if (shared is null || !CopyUsageButton.IsEnabled)
             throw new InvalidOperationException("Share export failed or button stayed disabled.");
@@ -92,7 +87,7 @@ public sealed partial class MainWindow
         await Task.Delay(3000);
         process.Refresh();
         await File.WriteAllTextAsync(Path.Combine(output, "report.json"), JsonSerializer.Serialize(new
-        { officialPriceEstimateRendered = true, accountRowsFromRemote = true, sharePngDecoded = true, shareErrorRecovered = true, progress = rows, codexOverflow, weatherOverflow, reopenCycles = 20, hiddenClockStopped = true,
+        { accountHistoryHeatmapRendered = true, accountRowsFromRemote = true, sharePngDecoded = true, shareErrorRecovered = true, progress = rows, codexOverflow, weatherOverflow, reopenCycles = 20, hiddenClockStopped = true,
             hiddenCpuMillisecondsOver3Seconds = (process.TotalProcessorTime - cpuBefore).TotalMilliseconds,
             privateBytes = process.PrivateMemorySize64, handles = process.HandleCount }));
     }

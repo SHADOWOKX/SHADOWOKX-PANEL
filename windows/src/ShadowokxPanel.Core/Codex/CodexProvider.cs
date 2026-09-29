@@ -17,6 +17,7 @@ public sealed class CodexProvider : IAsyncDisposable
 {
     private readonly Func<CodexLaunchSpec?> _discover;
     private readonly ICodexProtocolClient _client;
+    private readonly TokenCostReader _costReader;
     private readonly TokenHistoryStore _historyStore;
     private readonly JsonFileStore<CodexState> _cache;
     private readonly RedactingLogger? _logger;
@@ -52,6 +53,7 @@ public sealed class CodexProvider : IAsyncDisposable
         _ = Math.Clamp(refreshMinutes, 5, 120); // Retained for settings-file compatibility.
         _discover = discover ?? (() => CodexDiscovery.Find());
         _client = client ?? new CodexProtocolClient();
+        _costReader = new TokenCostReader(paths);
         _historyStore = new TokenHistoryStore(paths);
         _cache = new JsonFileStore<CodexState>(paths.CodexCacheFile);
         _logger = logger;
@@ -88,7 +90,7 @@ public sealed class CodexProvider : IAsyncDisposable
             Publish(cached with
             {
                 Status = stale ? ProviderStatus.Stale : ProviderStatus.Cached,
-                TokenUsage = TokenHistoryStore.Apply(cached.TokenUsage, _history, now),
+                TokenUsage = RebaseCachedUsage(cached.TokenUsage, now),
             });
         }
         _timerTask = RunTimerAsync(_lifetime.Token);
@@ -128,6 +130,11 @@ public sealed class CodexProvider : IAsyncDisposable
         }
     }
 
+    public void InvalidateDiscovery()
+    {
+        lock (_sync) _launchSpec = null;
+    }
+
     public void SetVisible(bool visible)
     {
         var refresh = false;
@@ -156,9 +163,22 @@ public sealed class CodexProvider : IAsyncDisposable
         _history = TokenHistoryDocument.Empty(DateTimeOffset.Now);
         Publish(State with
         {
-            TokenUsage = TokenHistoryStore.Apply(State.TokenUsage, _history, DateTimeOffset.Now),
+            TokenUsage = State.TokenUsage,
         });
         await RefreshAsync(true, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static TokenUsage? RebaseCachedUsage(TokenUsage? usage, DateTimeOffset now)
+    {
+        if (usage is null) return null;
+        var today = DateOnly.FromDateTime(now.LocalDateTime);
+        var buckets = (usage.AccountDailyBuckets ?? []).Where(bucket => bucket.Tokens >= 0 &&
+            today.DayNumber - bucket.Date.DayNumber is >= 0 and < 7).ToArray();
+        long? sum = null;
+        try { if (buckets.Length > 0) sum = buckets.Sum(bucket => bucket.Tokens); }
+        catch (OverflowException) { }
+        return usage with { TodayTokens = buckets.FirstOrDefault(bucket => bucket.Date == today)?.Tokens,
+            DailyBuckets = buckets, SevenDayTokens = sum };
     }
 
     private bool IsStale()
@@ -193,7 +213,7 @@ public sealed class CodexProvider : IAsyncDisposable
         {
             var launch = _launchSpec ?? await Task.Run(_discover, linked.Token).ConfigureAwait(false) ??
                 throw new CodexProviderException(
-                "not-installed", "Install Codex for this user, then sign in and retry.");
+                "not-installed", "Install Codex CLI for this Windows user, or select its executable in Settings. Sign in with ChatGPT, then retry.");
             _launchSpec = launch;
             var response = await _client.ReadAsync(launch, linked.Token).ConfigureAwait(false);
             var now = DateTimeOffset.Now;
@@ -214,7 +234,11 @@ public sealed class CodexProvider : IAsyncDisposable
             {
                 await LogAsync("codex.history.write.failed").ConfigureAwait(false);
             }
-            var state = live with { TokenUsage = TokenHistoryStore.Apply(live.TokenUsage, _history, now), Cost = null };
+            TokenCostSummary? cost = null;
+            try { cost = await _costReader.ReadAsync(linked.Token).ConfigureAwait(false); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException)
+            { await LogAsync("codex.cost.read.failed").ConfigureAwait(false); }
+            var state = live with { TokenUsage = live.TokenUsage, Cost = cost };
             try { await PersistCacheIfNeededAsync(state, now, linked.Token).ConfigureAwait(false); }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
@@ -232,7 +256,7 @@ public sealed class CodexProvider : IAsyncDisposable
         catch (Exception error)
         {
             _failures++;
-            if (error is CodexClientException { Failure: CodexClientFailure.StartFailed })
+            if (error is CodexClientException { Failure: CodexClientFailure.StartFailed or CodexClientFailure.AppServerFailed })
                 _launchSpec = null;
             var (code, message) = error switch
             {
@@ -240,7 +264,7 @@ public sealed class CodexProvider : IAsyncDisposable
                 CodexClientException { Failure: CodexClientFailure.StartFailed } =>
                     ("start-failed", "Codex was found but could not be started."),
                 CodexClientException { Failure: CodexClientFailure.AuthenticationRequired } =>
-                    ("authentication-required", "Open Codex, sign in, then retry."),
+                    ("authentication-required", "Sign in to Codex CLI with your ChatGPT account using codex login, then retry. API-key login does not expose ChatGPT limits."),
                 CodexClientException { Failure: CodexClientFailure.AppServerFailed } =>
                     ("app-server-failed", "Codex started, but its usage service was unavailable."),
                 CodexClientException { Failure: CodexClientFailure.UnsupportedResponse } =>

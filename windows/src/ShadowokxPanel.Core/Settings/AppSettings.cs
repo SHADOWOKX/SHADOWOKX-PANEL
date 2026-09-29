@@ -32,6 +32,7 @@ public enum LayoutDensity
 
 public sealed record AppSettings
 {
+    public string CodexExecutablePath { get; init; } = string.Empty;
     public bool StartWithWindows { get; init; }
     public bool ShowWeather { get; init; } = true;
     public bool ShowCodexStateIndicator { get; init; }
