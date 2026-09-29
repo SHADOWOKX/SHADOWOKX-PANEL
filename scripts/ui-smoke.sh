@@ -27,6 +27,9 @@ case ${SHADOW_EXPECT_SCROLL:-false} in
   *) shadow_expect_scroll=false ;;
 esac
 shadow_cleanup() {
+  if [ -n "${SHADOW_UI_SHELL_LOG:-}" ] && [ -f "$shadow_shell_log" ]; then
+    cp "$shadow_shell_log" "$SHADOW_UI_SHELL_LOG"
+  fi
   rm -rf -- "$shadow_runtime_dir"
 }
 trap shadow_cleanup EXIT HUP INT TERM

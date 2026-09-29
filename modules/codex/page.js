@@ -4,7 +4,7 @@ import St from 'gi://St';
 
 import {formatCountdown, formatRelativeAge, formatResetDate} from '../../lib/format.js';
 import {CODEX_TIMED_LABEL_INTERVAL} from '../../lib/constants.js';
-import {normalizeSparklineBuckets, sparklineDayLabels} from '../../lib/sparkline.js';
+import {accountActivityCalendar, weeklyAccountActivity} from '../../lib/activity.js';
 import {codexUsageStatus, codexLimitColor} from '../../lib/summary.js';
 import {launchUri} from '../../services/launcher.js';
 import {
@@ -26,7 +26,7 @@ import {BasePage} from '../basePage.js';
 import {exportCodexSummaryImage} from './shareImage.js';
 import {localUsageDateKey} from './normalize.js';
 import {costRow} from './costRow.js';
-import {tokenSparkline} from './sparkline.js';
+import {accountHeatmap} from './heatmap.js';
 
 function contentSignature(state) {
     const {updatedAt: _accountUpdatedAt, ...accountUsageData} = state?.accountTokenUsage ?? {};
@@ -65,7 +65,7 @@ export class CodexPage extends BasePage {
         this._stateDirty = true;
         this._renderedSignature = null;
         this._timedLabels = [];
-        this._graphHasAppeared = false;
+        this._activityView = 'daily';
         this._refreshButton = null;
         this._refreshState = null;
         this._accountStatusLabel = null;
@@ -405,102 +405,65 @@ export class CodexPage extends BasePage {
         }
 
         if (this.context.settings.get_boolean('show-codex-token-stats')) {
-            const visibleBuckets = normalizeSparklineBuckets(usage.dailyBuckets);
-            const sparkline = this._tokenSparkline(visibleBuckets);
-            if (sparkline)
-                card.add_child(sparkline);
-            else
-                card.add_child(new St.Label({
-                    text: 'Not enough history yet',
-                    style_class: 'shadow-token-history-empty shadow-muted',
-                }));
+            const calendar = accountActivityCalendar(usage.activityBuckets ?? usage.dailyBuckets,
+                localUsageDateKey(Date.now()));
+            const weekly = weeklyAccountActivity(calendar);
+            const toolbar = new St.BoxLayout({style_class: 'shadow-activity-toolbar', x_expand: true});
+            toolbar.add_child(new St.Label({text: 'Account history · 12 months',
+                style_class: 'shadow-activity-subtitle shadow-muted', x_expand: true,
+                y_align: Clutter.ActorAlign.CENTER}));
+            const buttons = new Map();
+            const views = new Map();
+            const select = view => {
+                this._activityView = view;
+                for (const [id, actor] of views)
+                    actor.visible = id === view;
+                for (const [id, button] of buttons) {
+                    button.checked = id === view;
+                    button.accessible_name = `${id === 'daily' ? 'Days' : 'Weeks'}${id === view ? ', selected' : ''}`;
+                    if (id === view)
+                        button.add_style_class_name('shadow-activity-view-active');
+                    else
+                        button.remove_style_class_name('shadow-activity-view-active');
+                }
+                const data = view === 'daily' ? calendar : weekly;
+                const peak = data.peak;
+                const values = [
+                    [view === 'daily' ? 'Active days' : 'Active weeks', String(data.activeDays)],
+                    [view === 'daily' ? 'Daily peak' : 'Weekly peak', peak ? this._formatCompactTokens(peak.tokens) : '—'],
+                    [view === 'daily' ? 'Peak day' : 'Week starting', peak ? this._formatUsageDate(peak.date)?.replace(/, \d{4}$/, '') : '—'],
+                ];
+                metrics.forEach((metric, index) => {
+                    metric.get_first_child().text = values[index][0];
+                    metric.get_last_child().text = values[index][1];
+                });
+            };
+            for (const [id, title] of [['daily', 'Days'], ['weekly', 'Weeks']]) {
+                const button = new St.Button({label: title, can_focus: true, reactive: true,
+                    toggle_mode: true, style_class: `shadow-activity-view shadow-activity-view-${id}`});
+                button.connect('clicked', () => select(id));
+                buttons.set(id, button);
+                toolbar.add_child(button);
+            }
+            card.add_child(toolbar);
+            for (const [id, data] of [['daily', calendar], ['weekly', weekly]]) {
+                const actor = accountHeatmap(data, resolveAccent(this.context.settings), bucket => {
+                    const date = this._formatUsageDate(bucket.date);
+                    const value = bucket.tokens === null ? 'Not reported' : `${this._formatTokens(bucket.tokens)} tokens`;
+                    return id === 'daily' ? `${date} · ${value}`
+                        : `${date} · ${value} · ${bucket.reportedDays}/${bucket.expectedDays} days`;
+                });
+                views.set(id, actor);
+                card.add_child(actor);
+            }
 
             const stats = new St.BoxLayout({style_class: 'shadow-token-row', x_expand: true});
-            const peak = visibleBuckets.reduce((best, bucket) =>
-                !best || bucket.tokens > best.tokens ? bucket : best, null);
-            if (peak)
-                stats.add_child(this._tokenMetric('Peak', this._formatCompactTokens(peak.tokens)));
-            const peakDate = this._formatUsageDate(peak?.date);
-            if (peakDate)
-                stats.add_child(this._tokenMetric('Peak day', peakDate));
-            if (stats.get_children().length > 0)
-                card.add_child(stats);
+            const metrics = Array.from({length: 3}, () => this._tokenMetric('', '—'));
+            metrics.forEach(metric => stats.add_child(metric));
+            card.add_child(stats);
+            select(this._activityView);
         }
         return card;
-    }
-
-    _tokenSparkline(buckets) {
-        const normalized = normalizeSparklineBuckets(buckets);
-        if (normalized.length < 2)
-            return null;
-        const sparkline = new St.BoxLayout({
-            vertical: true,
-            style_class: 'shadow-token-sparkline-wrap',
-            x_expand: true,
-        });
-        const scale = new St.BoxLayout({style_class: 'shadow-chart-scale', x_expand: true});
-        scale.add_child(new St.Label({
-            text: 'ACCOUNT TOKENS · LAST 7 DAYS', style_class: 'shadow-chart-caption shadow-muted', x_expand: true,
-        }));
-        scale.add_child(new St.Label({
-            text: `0 – ${this._formatCompactTokens(Math.max(...normalized.map(point => point.tokens)))}`,
-            style_class: 'shadow-chart-caption shadow-muted',
-        }));
-        sparkline.add_child(scale);
-        const shouldAnimate = this._popupOpen && !this._graphHasAppeared &&
-            animationsEnabled(this.context.settings);
-        const chart = tokenSparkline(
-            normalized,
-            resolveAccent(this.context.settings),
-            shouldAnimate,
-            bucket => `${this._formatUsageDate(bucket.date)}\n` +
-                `${this._formatTokens(bucket.tokens)} tokens`
-        );
-        if (this._popupOpen)
-            this._graphHasAppeared = true;
-        chart.accessible_name = normalized.map(bucket =>
-            `${this._formatUsageDate(bucket.date)}, ${this._formatTokens(bucket.tokens)} tokens`
-        ).join('; ');
-        sparkline.add_child(chart);
-        const dayLabels = this._sparklineDayLabels(normalized);
-        if (dayLabels.length) {
-            const timeline = new St.Widget({
-                style_class: 'shadow-spark-days',
-                x_expand: true,
-                height: 12,
-                layout_manager: new Clutter.FixedLayout(),
-            });
-            const labels = [];
-            for (const day of dayLabels) {
-                const actor = new St.Label({
-                    text: day.label,
-                    style_class: 'shadow-spark-day',
-                    accessible_name: this._formatUsageDate(day.date),
-                });
-                labels.push({actor, position: day.position});
-                timeline.add_child(actor);
-            }
-            timeline.connect('notify::allocation', () => {
-                const width = timeline.width;
-                if (width <= 16)
-                    return;
-                labels.forEach(({actor, position}) => {
-                    const [, labelWidth] = actor.get_preferred_width(-1);
-                    const center = 8 + position * (width - 16);
-                    const x = Math.max(0, Math.min(
-                        Math.round(center - labelWidth / 2),
-                        width - labelWidth
-                    ));
-                    actor.set_position(x, 0);
-                });
-            });
-            sparkline.add_child(timeline);
-        }
-        return sparkline;
-    }
-
-    _sparklineDayLabels(buckets) {
-        return sparklineDayLabels(buckets);
     }
 
     _tokenInsight(usage) {

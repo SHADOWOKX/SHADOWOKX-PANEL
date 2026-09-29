@@ -329,7 +329,7 @@ export default class UiSmokeExtension extends Extension {
         services.codexActivityMonitor.stop();
         services.codexActivityMonitor.start();
         await settle(80);
-        services.codexProvider.refresh = originalMascotRefresh;
+        // Keep the captured account snapshot stable during geometry assertions.
 
         indicator.menu.open();
         await settle();
@@ -360,27 +360,23 @@ export default class UiSmokeExtension extends Extension {
                         labels.includes(services?.weatherProvider?.getState()?.current?.condition?.label),
             });
             if (id === 'codex') {
-                report.graph = allocation(findStyle(page.actor, 'shadow-token-sparkline'));
+                const heatmaps = findStyles(page.actor, 'shadow-account-heatmap');
+                const daily = findStyle(page.actor, 'shadow-activity-view-daily');
+                const weekly = findStyle(page.actor, 'shadow-activity-view-weekly');
+                report.graph = allocation(heatmaps[0]);
+                report.heatmap = {daily: allocation(heatmaps[0]),
+                    monthCount: findStyles(page.actor, 'shadow-activity-months')[0]?.get_children().length ?? 0,
+                    interactive: heatmaps.every(actor => actor.reactive && actor.can_focus),
+                    dailyLabels: labelsIn(page.actor)};
+                weekly.emit('clicked', 1);
+                await settle(80);
+                report.heatmap.weekly = allocation(heatmaps[1]);
+                report.heatmap.weeklyLabels = labelsIn(page.actor);
+                await captureScreenshot(GLib.getenv('SHADOW_UI_WEEKLY_SCREENSHOT'));
+                report.heatmap.treePreserved = heatmaps[0] === findStyles(page.actor, 'shadow-account-heatmap')[0];
+                daily.emit('clicked', 1);
+                await settle(80);
                 await captureScreenshot(GLib.getenv('SHADOW_UI_GRAPH_SCREENSHOT'));
-                const dayLabels = findStyle(page.actor, 'shadow-spark-days');
-                report.graphDayLabels = {
-                    ...allocation(dayLabels),
-                    count: dayLabels?.get_children?.().length ?? 0,
-                    expectedCount: services?.codexProvider?.getState()
-                        ?.accountTokenUsage?.dailyBuckets?.length ?? 0,
-                    positions: dayLabels?.get_children?.().map(label => ({
-                        x: label.x,
-                        width: label.width,
-                    })) ?? [],
-                    texts: dayLabels?.get_children?.().map(label => label.text) ?? [],
-                };
-                const graphTargets = findStyles(page.actor, 'shadow-token-point-target');
-                report.graphPointTooltips = {
-                    count: graphTargets.length,
-                    expectedCount: services?.codexProvider?.getState()
-                        ?.accountTokenUsage?.dailyBuckets?.length ?? 0,
-                    interactive: graphTargets.every(target => target.reactive && target.track_hover),
-                };
                 const todayRow = findStyles(page.actor, 'shadow-cost-period')
                     .find(row => labelsIn(row).some(label => label.startsWith('Today')));
                 report.todayMetric = {
@@ -610,7 +606,11 @@ export default class UiSmokeExtension extends Extension {
             await settle(120);
         }
         report.reopened = indicator.menu.isOpen;
+        const [, popupY] = indicator._root.get_transformed_position();
+        const [, popupHeight] = indicator._root.get_transformed_size();
+        report.popupFitsScreen = popupY >= 0 && popupY + popupHeight <= global.stage.height;
         await captureScreenshot(GLib.getenv('SHADOW_UI_SCREENSHOT'));
+        services.codexProvider.refresh = originalMascotRefresh;
         indicator.menu.close();
         if (GLib.getenv('SHADOW_UI_LIFECYCLE') === 'true') {
             // Allow the intentionally short page/tab exit transitions to

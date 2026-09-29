@@ -100,6 +100,15 @@ export function recentUsageBuckets(buckets, nowMs) {
         .slice(-7);
 }
 
+function activityUsageBuckets(buckets, nowMs) {
+    const today = localUsageDateKey(nowMs);
+    const end = Date.parse(`${today}T00:00:00Z`);
+    return buckets.filter(bucket => {
+        const age = (end - Date.parse(`${bucket.date}T00:00:00Z`)) / 86_400_000;
+        return age >= 0 && age <= 366;
+    }).slice(-367);
+}
+
 function safeTokenSum(buckets) {
     const total = buckets.reduce((sum, bucket) => sum + bucket.tokens, 0);
     return Number.isSafeInteger(total) ? total : null;
@@ -144,6 +153,7 @@ export function normalizeAccountTokenUsage(response, nowMs = Date.now()) {
         peakDate,
         peakHour: null,
         granularity: 'daily',
+        activityBuckets: activityUsageBuckets(buckets, nowMs),
         dailyBuckets,
         sevenDayTokens: dailyBuckets.length
             ? safeTokenSum(dailyBuckets)
@@ -154,12 +164,14 @@ export function normalizeAccountTokenUsage(response, nowMs = Date.now()) {
 function normalizeCachedTokenUsage(value) {
     if (!value || typeof value !== 'object')
         return null;
-    const dailyBuckets = Array.isArray(value.dailyBuckets)
-        ? recentUsageBuckets(uniqueUsageBuckets(value.dailyBuckets.map(bucket => ({
+    const sourceBuckets = value.activityBuckets ?? value.dailyBuckets;
+    const activityBuckets = Array.isArray(sourceBuckets)
+        ? activityUsageBuckets(uniqueUsageBuckets(sourceBuckets.map(bucket => ({
             date: normalizeUsageDate(bucket?.date),
             tokens: normalizeTokenCount(bucket?.tokens),
         })).filter(bucket => bucket.date && bucket.tokens !== null)), Date.now())
         : [];
+    const dailyBuckets = recentUsageBuckets(activityBuckets, Date.now());
     const tokenUsage = {
         lifetimeTokens: normalizeTokenCount(value.lifetimeTokens),
         todayDate: localUsageDateKey(Date.now()),
@@ -170,6 +182,7 @@ function normalizeCachedTokenUsage(value) {
         peakDate: normalizeUsageDate(value.peakDate),
         peakHour: null,
         granularity: 'daily',
+        activityBuckets,
         dailyBuckets,
         sevenDayTokens: dailyBuckets.length
             ? safeTokenSum(dailyBuckets)

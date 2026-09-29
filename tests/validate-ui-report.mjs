@@ -57,15 +57,12 @@ const badLocation = expectWeatherPanel && (!report.weatherLocation ||
     report.weatherLocation.width <= 0 ||
     report.weatherLocation.width > report.weatherLocation.parentWidth ||
     report.weatherLocation.ellipsize === 0);
-const dayLabels = report.graphDayLabels;
-const badDayLabels = !dayLabels?.visible || dayLabels.count < 2 || dayLabels.count > 7 ||
-    dayLabels.count !== dayLabels.expectedCount || dayLabels.positions.some(label =>
-        label.x < 0 || label.x + label.width > dayLabels.width) ||
-    dayLabels.count <= 3 && dayLabels.texts.some(label =>
-        label.length <= 1 || !/\d/.test(label));
-const badGraphTooltips = !report.graphPointTooltips ||
-    report.graphPointTooltips.count !== report.graphPointTooltips.expectedCount ||
-    !report.graphPointTooltips.interactive;
+const heatmap = report.heatmap;
+const badHeatmap = !heatmap?.daily?.visible || !heatmap?.weekly?.visible ||
+    heatmap.daily.width < 250 || heatmap.weekly.width < 250 ||
+    heatmap.daily.height !== 54 || heatmap.weekly.height !== 54 ||
+    heatmap.monthCount !== 12 || !heatmap.interactive || !heatmap.treePreserved ||
+    !heatmap.dailyLabels.includes('Daily peak') || !heatmap.weeklyLabels.includes('Weekly peak');
 const badTodayMetric = !report.todayMetric?.labels?.some(label => label.startsWith('Today')) ||
     (Number.isSafeInteger(report.todayMetric.canonicalTokens)
         ? !report.todayMetric.accessibleName?.includes(
@@ -81,7 +78,7 @@ const badProgress = report.progressGeometry?.length !== 2 ||
 const badCostSummary = expect('SHADOW_UI_COST_SAMPLE') &&
     (!report.costSummary?.visible || report.costSummary.width <= 0);
 const badCodexPolish = badCostSummary || !report.codexFooter || report.codexFooter.width <= 300 ||
-    badDayLabels || badGraphTooltips ||
+    badHeatmap ||
     badTodayMetric || badProgress;
 const badPage = report.tabSwitches.length !== 4 || report.tabSwitches.some(item =>
     !item.hasExpectedContent || item.page.width <= 0 || item.page.height <= 0 ||
@@ -104,7 +101,8 @@ if (!report.reopened || !report.usageSettingUpdatedLive ||
     !report.refreshStateExercised || pageWidths.size !== 1 ||
     scrolling !== expectScroll || badPolicy || badLifecycle || badModules ||
     badWeatherTopBar || badUsageState || badMascot || badHourly || badUv || badLocation ||
-    badCodexPolish ||
+    badCodexPolish || (Number(GLib.getenv('SHADOW_UI_HEIGHT')) >= 768 &&
+        Number(GLib.getenv('SHADOW_TEXT_SCALE')) <= 1 && !report.popupFitsScreen) ||
     report.graph.width <= 0 || report.graph.height < 45 || badPage ||
     badCodexRefreshLifecycle) {
     throw new Error(JSON.stringify(report));

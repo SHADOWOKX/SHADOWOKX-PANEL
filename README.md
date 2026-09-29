@@ -6,7 +6,7 @@ Linux `2.3.5` · Windows `1.0.0`.
 
 - Weekly and 5-hour Codex limits
 - Original Shadowokx mascot with idle, awake, and active states
-- Token activity and seven-day history
+- Compact account activity heatmap with daily and weekly views
 - Local weather, UV, hourly forecast, and sunrise/sunset
 - Native Linux and Windows interfaces
 - Custom themes, colors, density, and panel width
@@ -115,7 +115,12 @@ Displayed token counts and allowance percentages come from the signed-in Codex
 account read endpoints. Missing current-day usage is shown as pending with the
 latest returned account date. The seven-day row states how many of its dates were
 reported. No local totals or lifetime deltas substitute for
-missing account dates. The account response does not provide a billed dollar value.
+missing account dates. The activity card keeps up to twelve months of returned
+account dates, with daily cells or weekly sums in the same compact space. Hover or
+use the arrow keys to inspect exact values; weekly details include reported-day
+coverage. Blank dates are unreported, not assumed zero. Peak labels refer to the
+displayed period and selected daily or weekly view. The account response does not
+provide a billed dollar value.
 
 A separate compact **device estimate** shows today's and the last seven days' USD
 value from recorded local Codex sessions, following the approach documented by

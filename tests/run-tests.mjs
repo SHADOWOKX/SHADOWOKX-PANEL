@@ -1,3 +1,4 @@
+import {accountActivityCalendar, weeklyAccountActivity} from '../lib/activity.js';
 import {weatherArtwork} from '../ui/weatherIcon.js';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
@@ -234,6 +235,36 @@ function testModuleConfiguration() {
         'removed pages safely fall back to Codex');
 }
 
+function testAccountActivityCalendar() {
+    const calendar = accountActivityCalendar([
+        {date: '2025-09-30', tokens: 9999},
+        {date: '2025-10-01', tokens: 0},
+        {date: '2026-09-27', tokens: 10},
+        {date: '2026-09-28', tokens: 20},
+        {date: '2026-09-30', tokens: 8888},
+    ], '2026-09-29');
+    equal(calendar.months.length, 12, 'calendar displays twelve months');
+    equal(calendar.months[0].label, 'Oct', 'calendar begins with correct month');
+    equal(calendar.reportedDays, 3, 'only reported dates in displayed period count');
+    equal(calendar.activeDays, 2, 'reported zero is not active');
+    equal(calendar.peak.tokens, 20, 'peak excludes dates outside displayed period');
+    equal(calendar.cells.find(cell => cell.date === '2026-09-29').tokens, null,
+        'unreported current day never becomes zero');
+    equal(calendar.cells.find(cell => cell.date === '2025-10-01').tokens, 0,
+        'reported zero remains a real zero');
+    const weekly = weeklyAccountActivity(calendar);
+    const current = weekly.cells.find(cell => cell.date === '2026-09-27');
+    equal(current.tokens, 30, 'weekly total sums exact account values');
+    equal(current.reportedDays, 2, 'weekly total exposes missing date coverage');
+    equal(current.expectedDays, 3, 'current week ends at today');
+    equal(weekly.cells.find(cell => cell.date === '2025-10-05').tokens, null,
+        'missing week is not assigned fake zero');
+    equal(accountActivityCalendar([], '2026-02-30').cells.length, 0,
+        'invalid calendar date rejected');
+    equal(accountActivityCalendar([{date: '2024-02-29', tokens: 12}], '2024-03-01')
+        .peak.date, '2024-02-29', 'leap day retains date');
+}
+
 function testSparklineData() {
     const normalized = normalizeSparklineBuckets([
         {date: '2026-08-30', tokens: 20},
@@ -377,6 +408,7 @@ function testCodexNormalization() {
     equal(state.tokenUsage.lifetimeTokens, 885_281_875, 'lifetime token usage is normalized');
     equal(state.tokenUsage.peakDate, '2026-08-09', 'peak token day keeps the real bucket date');
     equal(state.tokenUsage.peakHour, null, 'peak hour is not fabricated from daily buckets');
+    equal(state.tokenUsage.activityBuckets.length, 2, 'full activity history retained separately');
     equal(state.tokenUsage.dailyBuckets.length, 1,
         'only verified buckets from the current seven-day window are retained');
     equal(state.tokenUsage.sevenDayTokens, 5_822_658,
@@ -445,6 +477,18 @@ function testCodexNormalization() {
     });
     equal(accountCache.tokenUsage.todayTokens, 678,
         'account-reported daily usage survives a cached refresh');
+    const olderDate = localUsageDateKey(Date.now() - 30 * 86_400_000);
+    const activityCache = normalizeCachedRateLimits({
+        lastSuccessfulRefresh: Date.now(),
+        weekly: {usedPercent: 10, resetsAt: 2_000_000_000},
+        accountTokenUsage: {activityBuckets: [
+            {date: olderDate, tokens: 123}, {date: todayKey, tokens: 678},
+        ]},
+    });
+    equal(activityCache.tokenUsage.activityBuckets.length, 2, 'cache retains annual account activity');
+    equal(activityCache.tokenUsage.dailyBuckets.length, 1, 'annual cache does not expand seven-day totals');
+    equal(activityCache.tokenUsage.sevenDayTokens, 678, 'cached seven-day sum stays exact');
+
 }
 
 function testAccountAndCostAccuracy() {
@@ -1370,6 +1414,7 @@ testFormatting();
 testCodexActivitySignals();
 testModuleConfiguration();
 testSparklineData();
+testAccountActivityCalendar();
 testProgressGeometry();
 testSchedulerLifecycle();
 testCodexNormalization();
