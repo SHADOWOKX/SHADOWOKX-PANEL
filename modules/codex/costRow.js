@@ -129,9 +129,11 @@ export function costRow(accountUsage, localUsage, accountUsageStatus) {
         const amount = new St.Label({text: Number.isFinite(amounts[index])
             ? `≈${formatCost(amounts[index])}${incomplete[index] ? ' *' : ''}` : '—',
             style_class: 'shadow-spend-value'});
-        attachTooltip(amount, 'USD estimate for recorded sessions on this device, using model-specific input, cached input and output prices. Not an account bill. ' +
-            (incomplete[index] ? 'Partial: some models or records could not be priced. ' : '') +
-            `Standard rates; fast-mode premiums and tool fees excluded. Recorded tokens in this period: ${tokensFormatter.format(periodsCost[index]?.tokens ?? 0)}. Prices checked ${localUsage?.priceDate ?? 'unavailable'}.`);
+        if (Number.isFinite(amounts[index])) {
+            attachTooltip(amount, 'USD estimate for recorded sessions on this device, using model-specific input, cached input and output prices. Not an account bill. ' +
+                (incomplete[index] ? 'Partial: some models or records could not be priced. ' : '') +
+                `Standard rates; fast-mode premiums and tool fees excluded. Recorded tokens in this period: ${tokensFormatter.format(periodsCost[index]?.tokens ?? 0)}. Prices checked ${localUsage?.priceDate ?? 'unavailable'}.`);
+        }
         cell.add_child(amount);
         spend.add_child(cell);
     }
