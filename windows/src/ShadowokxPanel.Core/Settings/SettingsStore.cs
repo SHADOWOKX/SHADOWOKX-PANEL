@@ -50,6 +50,7 @@ public sealed class SettingsStore
             (long)settings.EstimateCachedPercent + settings.EstimateOutputPercent + settings.EstimateWritePercent <= 100;
         return settings with
         {
+            CodexExecutablePath = (settings.CodexExecutablePath ?? string.Empty).Trim(),
             EstimateModel = ApiPriceCatalog.Find(settings.EstimateModel)?.Model ?? "gpt-5.6-sol",
             EstimateCachedPercent = validMix ? settings.EstimateCachedPercent : 0,
             EstimateOutputPercent = validMix ? settings.EstimateOutputPercent : 0,

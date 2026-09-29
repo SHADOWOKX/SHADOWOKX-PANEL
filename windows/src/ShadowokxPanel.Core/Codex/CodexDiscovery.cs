@@ -131,7 +131,9 @@ public static class CodexDiscovery
         }
         return FindFirst(nested
             .Where(path => !IsDesktopHost(path, searchRoots))
-            .OrderBy(CandidateArchitectureRank)
+            .OrderBy(path => path.Contains(@"\resources\", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains(@"\vendor\", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(CandidateArchitectureRank)
             .ThenBy(CandidateKindRank)
             .ThenBy(path => path.Length), fileExists);
     }
