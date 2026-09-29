@@ -55,7 +55,8 @@ export function costRow(accountUsage, localUsage, accountUsageStatus) {
             tokens: accountTokensForDate(accountUsage, yesterdayDate),
         },
         {
-            title: 'Last 7 Days',
+            title: accountUsage?.dailyBuckets?.length
+                ? `Last 7 days · ${accountUsage.dailyBuckets.length} reported` : 'Last 7 days',
             tokens: accountUsage?.sevenDayTokens,
         },
     ];
@@ -102,27 +103,32 @@ export function costRow(accountUsage, localUsage, accountUsageStatus) {
         box.add_child(note);
     }
 
+    if (!localUsage?.available || localUsage.today !== todayDate) {
+        box.accessible_name = 'Token totals reported by your Codex account. Missing dates are not estimated.';
+        return box;
+    }
     const spend = new St.BoxLayout({style_class: 'shadow-spend-summary', x_expand: true});
     const weekStart = shiftDate(todayDate, -6);
-    const localDays = localUsage?.available && localUsage.today === todayDate
-        ? localUsage.days.filter(day => day.date >= weekStart && day.date <= todayDate) : null;
+    const localDays = localUsage.days.filter(day => day.date >= weekStart && day.date <= todayDate);
     const today = localDays?.find(day => day.date === todayDate);
     const periodsCost = [today, localDays ? {cost: localDays.reduce((sum, day) => sum + day.cost, 0),
         tokens: localDays.reduce((sum, day) => sum + day.tokens, 0),
-        unknownTokens: localDays.reduce((sum, day) => sum + day.unknownTokens, 0)} : null];
+        unknownTokens: localDays.reduce((sum, day) => sum + day.unknownTokens, 0),
+        invalidRecords: localDays.reduce((sum, day) => sum + (day.invalidRecords ?? 0), 0)} : null];
     const amounts = periodsCost.map(period => period &&
-        (period.tokens === 0 || period.tokens > period.unknownTokens) ? period.cost : null);
-    const incomplete = localUsage?.partial || localDays?.some(day => day.unknownTokens > 0);
+        period.tokens > period.unknownTokens ? period.cost : null);
+    const incomplete = periodsCost.map(period => Boolean(period && (
+        period.unknownTokens > 0 || period.invalidRecords > 0 || localUsage?.failedFiles > 0)));
     for (const [index, title] of ['Today', '7 days'].entries()) {
         const cell = new St.BoxLayout({vertical: true, x_expand: true,
             style_class: 'shadow-spend-cell'});
         cell.add_child(new St.Label({text: `${title} · device estimate`,
             style_class: 'shadow-muted shadow-spend-caption'}));
         const amount = new St.Label({text: Number.isFinite(amounts[index])
-            ? `≈${formatCost(amounts[index])}${incomplete ? ' *' : ''}` : '—',
+            ? `≈${formatCost(amounts[index])}${incomplete[index] ? ' *' : ''}` : '—',
             style_class: 'shadow-spend-value'});
         attachTooltip(amount, 'USD estimate for recorded sessions on this device, using model-specific input, cached input and output prices. Not an account bill. ' +
-            (incomplete ? 'Partial: some models or records could not be priced. ' : '') +
+            (incomplete[index] ? 'Partial: some models or records could not be priced. ' : '') +
             `Standard rates; fast-mode premiums and tool fees excluded. Recorded tokens in this period: ${tokensFormatter.format(periodsCost[index]?.tokens ?? 0)}. Prices checked ${localUsage?.priceDate ?? 'unavailable'}.`);
         cell.add_child(amount);
         spend.add_child(cell);

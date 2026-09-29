@@ -1,9 +1,9 @@
 import {localUsageDateKey} from './normalize.js';
 
 // Standard USD / million tokens: input, cached input, output, cache write.
-// Official OpenAI model pages, checked 2026-09-27.
+// Official OpenAI model pages, checked 2026-09-29.
 // https://developers.openai.com/api/docs/models/{model}
-export const PRICE_DATE = '2026-09-27';
+export const PRICE_DATE = '2026-09-29';
 export const PRICES = Object.freeze({
     'gpt-6-astra': [10, 1, 50, 12.5],
     'gpt-6-sol': [2, 0.2, 10, 2.5],
@@ -91,7 +91,7 @@ export function summarizeCosts(records, nowMs = Date.now()) {
     const today = localUsageDateKey(nowMs);
     const end = Date.parse(`${today}T00:00:00Z`);
     const days = Array.from({length: 30}, (_, i) => ({
-        date: new Date(end - (29 - i) * 86400000).toISOString().slice(0, 10), cost: 0, tokens: 0, unknownTokens: 0,
+        date: new Date(end - (29 - i) * 86400000).toISOString().slice(0, 10), cost: 0, tokens: 0, unknownTokens: 0, invalidRecords: 0,
     }));
     const byDay = new Map(days.map(day => [day.date, day]));
     const models = new Map();
@@ -107,6 +107,7 @@ export function summarizeCosts(records, nowMs = Date.now()) {
         const value = estimateTokens(record.model, record.usage);
         if (!value) {
             summary.invalidRecords++;
+            byDay.get(date).invalidRecords++;
             continue;
         }
         if (value.tokens === 0)

@@ -18,7 +18,7 @@ Gio._promisify(Gio.InputStream.prototype, 'read_bytes_async', 'read_bytes_finish
 const MAX_MESSAGE_BYTES = 1024 * 1024;
 
 function cacheValue(state) {
-    const {costUsage: _costUsage, ...capacity} = state;
+    const {costUsage: _costUsage, accountUsageStatus: _accountUsageStatus, ...capacity} = state;
     return {
         ...capacity,
         tokenUsage: state.accountTokenUsage ?? null,
@@ -37,7 +37,11 @@ function dataSignature(value) {
         lastSuccessfulRefresh: _lastSuccessfulRefresh,
         ...data
     } = value;
-    return JSON.stringify(data);
+    const account = data.accountTokenUsage
+        ? {...data.accountTokenUsage, updatedAt: null} : null;
+    const tokens = data.tokenUsage
+        ? {...data.tokenUsage, updatedAt: null} : null;
+    return JSON.stringify({...data, accountTokenUsage: account, tokenUsage: tokens});
 }
 
 export class CodexProvider extends Observable {

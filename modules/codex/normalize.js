@@ -100,6 +100,11 @@ export function recentUsageBuckets(buckets, nowMs) {
         .slice(-7);
 }
 
+function safeTokenSum(buckets) {
+    const total = buckets.reduce((sum, bucket) => sum + bucket.tokens, 0);
+    return Number.isSafeInteger(total) ? total : null;
+}
+
 function uniqueUsageBuckets(buckets) {
     const byDate = new Map();
     for (const bucket of buckets)
@@ -141,7 +146,7 @@ export function normalizeAccountTokenUsage(response, nowMs = Date.now()) {
         granularity: 'daily',
         dailyBuckets,
         sevenDayTokens: dailyBuckets.length
-            ? dailyBuckets.reduce((total, bucket) => total + bucket.tokens, 0)
+            ? safeTokenSum(dailyBuckets)
             : null,
     };
 }
@@ -167,7 +172,7 @@ function normalizeCachedTokenUsage(value) {
         granularity: 'daily',
         dailyBuckets,
         sevenDayTokens: dailyBuckets.length
-            ? dailyBuckets.reduce((total, bucket) => total + bucket.tokens, 0)
+            ? safeTokenSum(dailyBuckets)
             : null,
     };
     return tokenUsage.lifetimeTokens !== null || tokenUsage.todayTokens !== null ||

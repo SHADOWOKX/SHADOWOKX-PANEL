@@ -22,8 +22,8 @@ const expectWeatherTopBar = expect('SHADOW_SHOW_WEATHER_TOP_BAR');
 const pageWidths = new Set(report.tabSwitches.map(item => item.page.width));
 const scrolling = report.tabSwitches.some(item => item.scroll?.needsScroll);
 
-const badPolicy = report.tabSwitches.some(item =>
-    item.scroll?.needsScroll ? item.scroll.policy === 2 : item.scroll.policy !== 2);
+const badPolicy = report.tabSwitches.some(item => item.scroll && (
+    item.scroll.needsScroll ? item.scroll.policy === 2 : item.scroll.policy !== 2));
 const badLifecycle = expectLifecycle && (!report.disabledRemoved || !report.reenabled ||
     report.timerCountAfterReenable !== report.expectedTimerCount);
 const badModules = report.moduleIds.includes('weather') !== expectWeatherPanel ||
@@ -64,19 +64,22 @@ const badDayLabels = !dayLabels?.visible || dayLabels.count < 2 || dayLabels.cou
 const badGraphTooltips = !report.graphPointTooltips ||
     report.graphPointTooltips.count !== report.graphPointTooltips.expectedCount ||
     !report.graphPointTooltips.interactive;
-const badTodayMetric = !report.todayMetric?.labels?.includes('Today') ||
-    !Number.isSafeInteger(report.todayMetric.canonicalTokens) ||
-    !report.todayMetric.accessibleName?.includes(
-        new Intl.NumberFormat('en-US').format(report.todayMetric.canonicalTokens)
-    );
+const badTodayMetric = !report.todayMetric?.labels?.some(label => label.startsWith('Today')) ||
+    (Number.isSafeInteger(report.todayMetric.canonicalTokens)
+        ? !report.todayMetric.accessibleName?.includes(
+            new Intl.NumberFormat('en-US').format(report.todayMetric.canonicalTokens))
+        : !report.todayMetric.labels.includes('Pending') ||
+          !report.todayMetric.accessibleName?.includes('not reported'));
 const badProgress = report.progressGeometry?.length !== 2 ||
     report.progressGeometry.some(item => !Number.isFinite(item.usableWidth) ||
         item.usableWidth <= 0 || !Number.isFinite(item.fillWidth)) ||
     Math.abs(report.progressGeometry[0].fillWidth /
         report.progressGeometry[0].usableWidth - 0.98) > 0.005 ||
     report.progressGeometry[1].fillWidth !== report.progressGeometry[1].usableWidth;
-const badCodexPolish = !report.codexFooter || report.codexFooter.width <= 300 ||
-    !report.historyBadgeIcon?.visible || badDayLabels || badGraphTooltips ||
+const badCostSummary = expect('SHADOW_UI_COST_SAMPLE') &&
+    (!report.costSummary?.visible || report.costSummary.width <= 0);
+const badCodexPolish = badCostSummary || !report.codexFooter || report.codexFooter.width <= 300 ||
+    badDayLabels || badGraphTooltips ||
     badTodayMetric || badProgress;
 const badPage = report.tabSwitches.length !== 4 || report.tabSwitches.some(item =>
     !item.hasExpectedContent || item.page.width <= 0 || item.page.height <= 0 ||

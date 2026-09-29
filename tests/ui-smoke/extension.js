@@ -134,7 +134,8 @@ export default class UiSmokeExtension extends Extension {
         }
         const reportPath = GLib.getenv('SHADOW_UI_REPORT');
         const codexState = services?.codexProvider?.getState();
-        if (codexState?.tokenUsage && codexState.tokenUsage.dailyBuckets.length < 2) {
+        if (codexState && (!codexState.accountTokenUsage ||
+            codexState.accountTokenUsage.dailyBuckets.length < 2)) {
             const dailyBuckets = Array.from({length: 7}, (_value, index) => {
                 const date = new Date(Date.now() - (6 - index) * 86_400_000);
                 const year = date.getFullYear();
@@ -142,17 +143,41 @@ export default class UiSmokeExtension extends Extension {
                 const day = String(date.getDate()).padStart(2, '0');
                 return {date: `${year}-${month}-${day}`, tokens: [42000000, 26000000, 31000000, 18000000, 12000000, 17000000, 25000000][index]};
             });
-            services.codexProvider._setState({
-                ...codexState,
-                tokenUsage: {
-                    ...codexState.tokenUsage,
+            const accountTokenUsage = {
+                    ...codexState.accountTokenUsage,
                     dailyBuckets,
                     todayTokens: dailyBuckets.at(-1).tokens,
                     peakDailyTokens: dailyBuckets[0].tokens,
                     peakDate: dailyBuckets[0].date,
                     sevenDayTokens: dailyBuckets.reduce((sum, bucket) => sum + bucket.tokens, 0),
-                },
+                    todayDate: dailyBuckets.at(-1).date,
+                    latestReportedDate: dailyBuckets.at(-1).date,
+                    updatedAt: Date.now(),
+                };
+            services.codexProvider._setState({
+                ...codexState, tokenUsage: accountTokenUsage, accountTokenUsage,
             });
+        }
+        if (GLib.getenv('SHADOW_UI_COST_SAMPLE') === 'true') {
+            const current = services.codexProvider.getState();
+            const day = new Date();
+            const days = Array.from({length: 7}, (_value, index) => {
+                const date = new Date(day.getFullYear(), day.getMonth(),
+                    day.getDate() - 6 + index, 12);
+                return {
+                    date: `${date.getFullYear()}-` +
+                        `${String(date.getMonth() + 1).padStart(2, '0')}-` +
+                        String(date.getDate()).padStart(2, '0'),
+                    cost: index === 6 ? 1.23 : 0.50,
+                    tokens: 1000,
+                    unknownTokens: index === 2 ? 100 : 0,
+                    invalidRecords: 0,
+                };
+            });
+            services.codexProvider._setState({...current, costUsage: {
+                available: true, today: days.at(-1).date, days,
+                priceDate: '2026-09-29', failedFiles: 0,
+            }});
         }
         const displayLocation = GLib.getenv('SHADOW_TEST_DISPLAY_LOCATION');
         if (displayLocation && services?.weatherProvider) {
@@ -322,7 +347,7 @@ export default class UiSmokeExtension extends Extension {
                     ...allocation(dayLabels),
                     count: dayLabels?.get_children?.().length ?? 0,
                     expectedCount: services?.codexProvider?.getState()
-                        ?.tokenUsage?.dailyBuckets?.length ?? 0,
+                        ?.accountTokenUsage?.dailyBuckets?.length ?? 0,
                     positions: dayLabels?.get_children?.().map(label => ({
                         x: label.x,
                         width: label.width,
@@ -333,21 +358,16 @@ export default class UiSmokeExtension extends Extension {
                 report.graphPointTooltips = {
                     count: graphTargets.length,
                     expectedCount: services?.codexProvider?.getState()
-                        ?.tokenUsage?.dailyBuckets?.length ?? 0,
+                        ?.accountTokenUsage?.dailyBuckets?.length ?? 0,
                     interactive: graphTargets.every(target => target.reactive && target.track_hover),
                 };
-                const tokenRow = findStyle(page.actor, 'shadow-token-row');
+                const todayRow = findStyles(page.actor, 'shadow-cost-period')
+                    .find(row => labelsIn(row).some(label => label.startsWith('Today')));
                 report.todayMetric = {
-                    labels: labelsIn(tokenRow),
-                    accessibleName: tokenRow?.get_first_child?.()?.accessible_name ?? null,
-                    canonicalTokens: services?.codexProvider?.getState()?.tokenUsage
-                        ?.dailyBuckets?.find(bucket => {
-                            const now = new Date();
-                            const key = `${now.getFullYear()}-` +
-                                `${String(now.getMonth() + 1).padStart(2, '0')}-` +
-                                String(now.getDate()).padStart(2, '0');
-                            return bucket.date === key;
-                        })?.tokens ?? null,
+                    labels: labelsIn(todayRow),
+                    accessibleName: todayRow?.accessible_name ?? null,
+                    canonicalTokens: services?.codexProvider?.getState()
+                        ?.accountTokenUsage?.todayTokens ?? null,
                 };
                 if (!report.progressGeometry) {
                     const provider = services.codexProvider;
@@ -373,6 +393,7 @@ export default class UiSmokeExtension extends Extension {
                     provider._setState(originalState);
                     await settle();
                 }
+                report.costSummary = allocation(findStyle(page.actor, 'shadow-spend-summary'));
                 report.codexFooter = allocation(findStyle(page.actor, 'shadow-codex-footer'));
                 report.historyBadgeIcon = allocation(findStyle(page.actor, 'shadow-status-icon'));
             } else {

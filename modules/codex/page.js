@@ -144,13 +144,13 @@ export class CodexPage extends BasePage {
                 content.add_child(this._weeklyHero(state.weekly, state.accountTokenUsage, state.costUsage, state.accountUsageStatus));
                 sectionCount++;
             }
-            if (this.context.settings.get_boolean('show-codex-five-hour')) {
+            if (this.context.settings.get_boolean('show-codex-five-hour') && state.fiveHour) {
                 content.add_child(this._fiveHourSection(state.fiveHour));
                 sectionCount++;
             }
             if (sectionCount === 0) {
                 content.add_child(new St.Label({
-                    text: 'Enable a usage window in Codex settings.',
+                    text: 'No usage window reported by Codex.',
                     style_class: 'shadow-inline-empty shadow-muted',
                 }));
             }
@@ -553,6 +553,8 @@ export class CodexPage extends BasePage {
                 () => {
                     const current = this._provider.getState();
                     const tokens = current?.accountTokenUsage;
+                    if (current?.accountUsageStatus === 'refreshing')
+                        return 'Checking account tokens…';
                     const label = current?.stale ? 'Cached' : tokens ? 'Tokens checked' : 'Limits checked';
                     return `${label} ${formatRelativeAge(tokens?.updatedAt ?? current?.lastSuccessfulRefresh)}`;
                 },

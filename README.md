@@ -113,7 +113,8 @@ gnome-extensions enable shadow-panel@shadowokx
 
 Displayed token counts and allowance percentages come from the signed-in Codex
 account read endpoints. Missing current-day usage is shown as pending with the
-latest returned account date. No local totals or lifetime deltas substitute for
+latest returned account date. The seven-day row states how many of its dates were
+reported. No local totals or lifetime deltas substitute for
 missing account dates. The account response does not provide a billed dollar value.
 
 A separate compact **device estimate** shows today's and the last seven days' USD
@@ -122,7 +123,8 @@ value from recorded local Codex sessions, following the approach documented by
 It applies [official model prices](https://developers.openai.com/api/docs/pricing)
 to recorded uncached input, cached input, cache writes and output, including the
 long-context premium. It never multiplies account totals by a guessed model mix.
-Unknown models remain unpriced; partial estimates carry an asterisk. These values
+Unknown models remain unpriced; only affected periods carry a partial asterisk.
+The dollar section appears when local session data is available. These values
 cover this device's recorded sessions, not an account bill. Standard rates exclude
 fast-mode premiums and tool fees. Hover a value for its scope and pricing date.
 
