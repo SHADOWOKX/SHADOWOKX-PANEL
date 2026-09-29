@@ -15,6 +15,10 @@ export class TabStrip {
             x_expand: true,
         });
         this.actor.layout_manager.homogeneous = true;
+        this.actor.connect('destroy', () => {
+            this.actor = null;
+            this._buttons.clear();
+        });
 
         for (const id of moduleIds) {
             const meta = MODULE_META[id];
@@ -117,7 +121,7 @@ export class TabStrip {
     }
 
     destroy() {
-        this.actor.destroy();
+        this.actor?.destroy();
         this._buttons.clear();
     }
 }

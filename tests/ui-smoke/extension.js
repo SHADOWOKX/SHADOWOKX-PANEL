@@ -129,10 +129,23 @@ export default class UiSmokeExtension extends Extension {
         // become ready. Exercise the stable status-area actor, never the
         // instance Shell just retired during that initialization window.
         await settle(220);
-        const stableIndicator = Main.panel.statusArea['shadow-panel@shadowokx'];
-        if (stableIndicator && stableIndicator !== indicator) {
-            indicator = stableIndicator;
-            services = indicator._extension.getRuntimeServices();
+        let previousIndicator = null;
+        let stablePolls = 0;
+        for (let attempt = 0; attempt < 20; attempt++) {
+            const current = Main.panel.statusArea['shadow-panel@shadowokx'];
+            if (current && !current._destroyed && current.mapped &&
+                !current._extension._rebuildId && !current._extension._rebuildPending) {
+                stablePolls = current === previousIndicator ? stablePolls + 1 : 1;
+                previousIndicator = current;
+                if (stablePolls >= 3) {
+                    indicator = current;
+                    services = current._extension.getRuntimeServices();
+                    break;
+                }
+            } else {
+                stablePolls = 0;
+            }
+            await settle(80);
         }
         const reportPath = GLib.getenv('SHADOW_UI_REPORT');
         const codexState = services?.codexProvider?.getState();
@@ -322,6 +335,8 @@ export default class UiSmokeExtension extends Extension {
         await settle();
         report.tabWidths = [...(indicator._tabs?._buttons?.values?.() ?? [])]
             .map(({button}) => button.width);
+        report.weatherWarmedBeforeSwitch =
+            Boolean(indicator._pages.get('weather')?._styleWarmed);
         const sequence = report.moduleIds.includes('weather')
             ? ['codex', 'weather', 'codex', 'weather']
             : ['codex', 'codex', 'codex', 'codex'];

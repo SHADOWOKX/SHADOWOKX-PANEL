@@ -698,6 +698,8 @@ export class CodexPage extends BasePage {
         this._destroyed = true;
         this._shareCancellable?.cancel();
         this._shareCancellable = null;
+        if (this._actorDestroyed)
+            this._refreshIcon = null;
         this._stopRefreshAnimation();
         this.context.scheduler.cancel('codex-timed-labels');
         super.destroy();

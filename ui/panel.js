@@ -102,6 +102,9 @@ class ShadowIndicator extends PanelMenu.Button {
             else
                 this._onPopupClosed();
         });
+        // Shell can destroy an actor through C during status-area replacement,
+        // bypassing the JavaScript destroy() method.
+        this.connect('destroy', () => this._disposeResources());
     }
 
     _buildIndicator() {
@@ -325,6 +328,7 @@ class ShadowIndicator extends PanelMenu.Button {
     }
 
     _moduleErrorPage(id) {
+        let actorDestroyed = false;
         const actor = new St.BoxLayout({
             vertical: true,
             style_class: `shadow-page shadow-page-${id}`,
@@ -332,6 +336,7 @@ class ShadowIndicator extends PanelMenu.Button {
             x_align: Clutter.ActorAlign.FILL,
             y_expand: true,
         });
+        actor.connect('destroy', () => { actorDestroyed = true; });
         actor.add_child(pageTitle(MODULE_META[id].name));
         actor.add_child(stateMessage(
             'dialog-warning-symbolic',
@@ -348,7 +353,10 @@ class ShadowIndicator extends PanelMenu.Button {
             activate() {},
             onPopupOpened() {},
             onPopupClosed() {},
-            destroy() { actor.destroy(); },
+            destroy() {
+                if (!actorDestroyed)
+                    actor.destroy();
+            },
         };
     }
 
@@ -621,7 +629,7 @@ class ShadowIndicator extends PanelMenu.Button {
         this._notificationSource.addNotification(notification);
     }
 
-    destroy() {
+    _disposeResources() {
         if (this._destroyed)
             return;
         this._destroyed = true;
@@ -649,6 +657,12 @@ class ShadowIndicator extends PanelMenu.Button {
         this._fallbackIcon = null;
         this._notificationSource?.destroy();
         this._notificationSource = null;
+    }
+
+    destroy() {
+        if (this._destroyed)
+            return;
+        this._disposeResources();
         super.destroy();
     }
 });

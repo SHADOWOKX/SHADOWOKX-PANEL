@@ -35,6 +35,8 @@ export class WeatherPage extends BasePage {
         this._refreshState = null;
         this._openRefreshId = 0;
         this._fitSourceId = 0;
+        this._styleWarmupId = 0;
+        this._styleWarmed = false;
         this._renderedSignature = null;
         this.track(this._provider.subscribe(state => {
             const signature = this._contentSignature(state);
@@ -188,8 +190,27 @@ export class WeatherPage extends BasePage {
             this._refreshState = this._popupOpen
                 ? state.status === 'refreshing' || state.status === 'loading'
                 : null;
+            this._queueStyleWarmup();
         }
         this.fit();
+    }
+
+    _queueStyleWarmup() {
+        if (this._styleWarmed || this._styleWarmupId || !this._scrollContent ||
+            this.context.isPopupOpen?.())
+            return;
+        this._styleWarmupId = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 250, () => {
+            this._styleWarmupId = 0;
+            if (this._pageDestroyed || this.context.isPopupOpen?.() ||
+                this.actor?.mapped || !this._scrollContent)
+                return GLib.SOURCE_REMOVE;
+            // A hidden preferred-size pass populates St's style cache. Its
+            // height is discarded because final sizing requires a mapped page.
+            this._scrollContent.get_preferred_height(
+                Math.max(1, (this.context.pageWidth ?? 386) - 4));
+            this._styleWarmed = true;
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     _actions(state) {
@@ -547,6 +568,11 @@ export class WeatherPage extends BasePage {
         if (this._fitSourceId)
             GLib.Source.remove(this._fitSourceId);
         this._fitSourceId = 0;
+        if (this._styleWarmupId)
+            GLib.Source.remove(this._styleWarmupId);
+        this._styleWarmupId = 0;
+        if (this._actorDestroyed)
+            this._refreshIcon = null;
         this._stopRefreshAnimation();
         super.destroy();
         this._scroll = null;

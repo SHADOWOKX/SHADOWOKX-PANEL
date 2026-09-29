@@ -6,6 +6,7 @@ export class BasePage {
         this.context = context;
         this.id = id;
         this._pageDestroyed = false;
+        this._actorDestroyed = false;
         this.actor = new St.BoxLayout({
             vertical: true,
             style_class: `shadow-page shadow-page-${id}`,
@@ -20,6 +21,12 @@ export class BasePage {
         this.track(() => {
             if (this.actor && mappedId)
                 this.actor.disconnect(mappedId);
+        });
+        this.actor.connect('destroy', () => {
+            this._actorDestroyed = true;
+            this.actor = null;
+            if (!this._pageDestroyed)
+                this.destroy();
         });
     }
 
