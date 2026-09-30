@@ -23,9 +23,9 @@ export function accountHeatmap(calendar, accent, describe) {
         const rows = calendar.rows ?? 7;
         const columns = Math.max(1, calendar.columns);
         const weekly = calendar.mode === 'weekly';
-        const gap = weekly ? 2 : 1.5;
+        const gap = 1.5;
         const size = Math.max(1, Math.min(weekly ? 11 : 6.5, (width - 2 - gap * (columns - 1)) / columns));
-        const stepX = weekly ? Math.max(size + gap, (width - size - 2) / Math.max(1, columns - 1)) : size + gap;
+        const stepX = size + gap;
         return {size, gap, stepX, x: (width - stepX * (columns - 1) - size) / 2,
             y: (54 - rows * size - (rows - 1) * gap) / 2};
     };
