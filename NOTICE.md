@@ -2,7 +2,7 @@
 
 ## Shadowokx Panel mascot
 
-The Shadowokx robot mascot under `icons/mascot/` is original project artwork.
+The robot, Codex-style companion, orange octopus and penguin under `icons/mascot/` are original project artwork. Companion labels describe the visual inspiration, not official brand mascots.
 It contains no OpenAI, ChatGPT, Codex, or other third-party logo and is covered by the project's GPL-3.0-or-later license.
 
 ## OpenAI / ChatGPT trademarks

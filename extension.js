@@ -19,6 +19,7 @@ const REBUILD_KEYS = Object.freeze([
     'panel-width',
     'theme',
     'background-theme',
+    'mascot-character',
     'accent-color',
     'custom-accent',
     'show-codex-weekly',

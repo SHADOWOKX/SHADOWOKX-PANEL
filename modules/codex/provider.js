@@ -134,6 +134,7 @@ export class CodexProvider extends Observable {
             return Promise.resolve(this.getState());
         if (!this._started && this._startPromise)
             return this._startPromise;
+        this._refreshCost(force);
         if (this._inFlight) {
             this._refreshCost();
             return this._inFlight;
@@ -148,9 +149,9 @@ export class CodexProvider extends Observable {
         return this._inFlight;
     }
 
-    _refreshCost() {
+    _refreshCost(force = false) {
         if (this._destroyed || !this._viewVisible || this._costInFlight ||
-            Date.now() - this._lastCostScan < 60_000)
+            Date.now() - this._lastCostScan < (force ? 5_000 : 60_000))
             return;
         this._lastCostScan = Date.now();
         this._costInFlight = this._costReader.read().then(costUsage => {

@@ -120,7 +120,8 @@ jobs:
             "Shadowokx Panel for Linux v$VERSION" \
             "" \
             "- GNOME Shell 50 package for Ubuntu 26.04.1 / Wayland." \
-            "- Compact daily/weekly account heatmap with uniform cell spacing, smooth panel UI, and current Codex account-data fixes." \
+            "- Four animated companions: Robot, Codex Companion, orange Octopus and Penguin; Terminal, Clay and Glacier themes." \
+            "- GPT-6.1 Sol pricing fixes missing current-day device estimates; compact daily/weekly account heatmaps remain." \
             "- Today is shown as not reported when the Codex account has not returned a current-day bucket; local session totals are not substituted." \
             "" \
             "Install or update with one command:" \

@@ -22,6 +22,16 @@
       <default>true</default>
       <summary>Animate the Shadowokx mascot while Codex is working</summary>
     </key>
+    <key name="mascot-character" type="s">
+      <choices>
+        <choice value="robot"/>
+        <choice value="codex"/>
+        <choice value="octopus"/>
+        <choice value="penguin"/>
+      </choices>
+      <default>'robot'</default>
+      <summary>Animated companion character</summary>
+    </key>
     <key name="show-codex-remaining" type="b">
       <default>true</default>
       <summary>Show weekly remaining capacity in the top bar</summary>
@@ -113,6 +123,9 @@
         <choice value="midnight"/>
         <choice value="nord"/>
         <choice value="amoled"/>
+        <choice value="terminal"/>
+        <choice value="clay"/>
+        <choice value="glacier"/>
       </choices>
       <default>'claude-gray'</default>
       <summary>Dashboard surface treatment</summary>
