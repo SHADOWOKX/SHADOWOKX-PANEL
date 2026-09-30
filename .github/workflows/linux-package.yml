@@ -17,6 +17,7 @@ on:
       - 'services/**'
       - 'ui/**'
       - 'scripts/package.sh'
+      - 'scripts/install-linux.sh'
       - 'scripts/validate-json.mjs'
       - 'scripts/validate-release.mjs'
       - 'README.md'
@@ -38,6 +39,7 @@ on:
       - 'services/**'
       - 'ui/**'
       - 'scripts/package.sh'
+      - 'scripts/install-linux.sh'
       - 'scripts/validate-json.mjs'
       - 'scripts/validate-release.mjs'
       - 'README.md'
@@ -78,6 +80,7 @@ jobs:
           set -euo pipefail
           output_dir="$RUNNER_TEMP/shadow-panel-package"
           ./scripts/package.sh "$output_dir"
+          cp scripts/install-linux.sh "$output_dir/install-linux.sh"
           package="$output_dir/shadow-panel@shadowokx.shell-extension.zip"
           unzip -tq "$package"
           unzip -Z1 "$package" | grep -qx 'modules/codex/costWorker.js'
@@ -94,6 +97,7 @@ jobs:
           path: |
             ${{ runner.temp }}/shadow-panel-package/shadow-panel@shadowokx.shell-extension.zip
             ${{ runner.temp }}/shadow-panel-package/checksums-linux.txt
+            ${{ runner.temp }}/shadow-panel-package/install-linux.sh
           if-no-files-found: error
           retention-days: 30
 
@@ -109,24 +113,42 @@ jobs:
           output_dir="$RUNNER_TEMP/shadow-panel-package"
           package="$output_dir/shadow-panel@shadowokx.shell-extension.zip"
           checksums="$output_dir/checksums-linux.txt"
+          installer="$output_dir/install-linux.sh"
           notes_file="$RUNNER_TEMP/linux-release-notes.md"
 
           printf '%s\n' \
             "Shadowokx Panel for Linux v$VERSION" \
             "" \
             "- GNOME Shell 50 package for Ubuntu 26.04.1 / Wayland." \
-            "- Includes the latest Codex account token totals, seven-day activity, date handling, and Linux packaging fixes." \
+            "- Compact daily/weekly account heatmap with uniform cell spacing, smooth panel UI, and current Codex account-data fixes." \
             "- Today is shown as not reported when the Codex account has not returned a current-day bucket; local session totals are not substituted." \
             "" \
-            "Install the downloaded ZIP, then log out and back in once so GNOME Shell reloads the extension." \
+            "Install or update with one command:" \
+            '```bash' \
+            'curl -fsSL https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/linux-latest/install-linux.sh | sh' \
+            '```' \
+            "" \
+            "The installer verifies the package SHA-256 before installation. Log out and back in once to load the new version." \
             > "$notes_file"
 
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" "$package" "$checksums" --clobber
+            gh release upload "$tag" "$package" "$checksums" "$installer" --clobber
           else
-            gh release create "$tag" "$package" "$checksums" \
+            gh release create "$tag" "$package" "$checksums" "$installer" \
               --target "$GITHUB_SHA" \
               --title "Shadowokx Panel for Linux v$VERSION" \
               --prerelease \
+              --latest=false \
               --notes-file "$notes_file"
+          fi
+
+          if gh release view linux-latest >/dev/null 2>&1; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/linux-latest" \
+              -f sha="$GITHUB_SHA" -F force=true
+            gh release upload linux-latest "$package" "$checksums" "$installer" --clobber
+            gh release edit linux-latest --title "Linux latest · v$VERSION" --notes-file "$notes_file"
+          else
+            gh release create linux-latest "$package" "$checksums" "$installer" \
+              --target "$GITHUB_SHA" --title "Linux latest · v$VERSION" \
+              --prerelease --latest=false --notes-file "$notes_file"
           fi

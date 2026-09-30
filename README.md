@@ -2,7 +2,7 @@
 
 A lightweight cross-platform panel for checking **ChatGPT Codex usage** and **local weather** from one place.
 
-Linux `2.3.5` · Windows `1.0.0`.
+Linux `2.3.6` · Windows `2.1 Preview 2`.
 
 - Weekly and 5-hour Codex limits
 - Original Shadowokx mascot with idle, awake, and active states
@@ -16,6 +16,21 @@ Linux `2.3.5` · Windows `1.0.0`.
 ## Linux (GNOME)
 
 Tested on Ubuntu 26.04.1 LTS, GNOME Shell 50.x and Wayland.
+
+### Install or update — one command
+
+Requires **GNOME Shell 50**, GJS 1.88+ and `curl` (Ubuntu 26.04.1 / Wayland).
+Codex usage requires the local Codex client signed in with your ChatGPT account.
+
+Run the same command for a fresh install or an update:
+
+```bash
+curl -fsSL https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/linux-latest/install-linux.sh | sh
+```
+
+Downloads the ready-built Linux package, verifies its SHA-256 checksum and installs it for your user. No Git clone or `sudo` is needed. **Log out and back in** to load the new version. If the panel is not visible afterward, enable it with `gnome-extensions enable shadow-panel@shadowokx`.
+
+[**Download ZIP**](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/linux-latest/shadow-panel@shadowokx.shell-extension.zip) · [Release notes](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/tag/linux-latest) · [SHA-256](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/linux-latest/checksums-linux.txt)
 
 ### Screenshots
 
@@ -42,72 +57,6 @@ Tested on Ubuntu 26.04.1 LTS, GNOME Shell 50.x and Wayland.
     <img src="assets/linux-tray.png" alt="Shadowokx Panel indicators in the Linux GNOME top bar" width="155">
   </a>
 </p>
-
-### Requirements
-
-- Ubuntu 26.04.1 LTS
-- GNOME Shell 50.x
-- Wayland
-- GJS 1.88 or newer
-- Git
-
-### Download Linux package
-
-[**Download Shadowokx Panel 2.3.5 for Linux (GNOME Shell 50)**](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/linux-v2.3.5/shadow-panel@shadowokx.shell-extension.zip)
-
-[SHA-256 checksum](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/linux-v2.3.5/checksums-linux.txt)
-
-Install the downloaded ZIP with:
-
-```bash
-gnome-extensions install --force ./shadow-panel@shadowokx.shell-extension.zip
-```
-
-Then log out and back in once and enable the extension:
-
-```bash
-gnome-extensions enable shadow-panel@shadowokx
-```
-
-### Quick install from source
-
-```bash
-git clone https://github.com/SHADOWOKX/SHADOWOKX-PANEL.git && cd SHADOWOKX-PANEL && ./install.sh
-```
-
-When the installer finishes, **log out and back in once** so GNOME Shell can load the extension.
-
-Then enable it:
-
-```bash
-gnome-extensions enable shadow-panel@shadowokx
-```
-
-### Open preferences
-
-```bash
-gnome-extensions prefs shadow-panel@shadowokx
-```
-
-### Update
-
-```bash
-cd SHADOWOKX-PANEL
-git pull
-./install.sh
-```
-
-Then log out and back in once to load the updated version. If needed, enable it again with:
-
-```bash
-gnome-extensions enable shadow-panel@shadowokx
-```
-
-### Uninstall
-
-```bash
-./uninstall.sh
-```
 
 ### Linux account usage
 
@@ -141,12 +90,11 @@ Refresh sends only initialization and account read requests. It does not start a
 thread or model turn. Remaining allowance colors follow a shared red → orange →
 amber → green scale across the percentage, progress bar, and top-bar summary.
 
-The Linux GNOME package is built and attached as an artifact by the `Linux GNOME package`
-GitHub Actions workflow for pushes to `main` and pull requests.
+Linux packages are built by GitHub Actions. Versioned releases preserve each package; the `linux-latest` download always points to the newest published Linux build.
 
 ## Windows 11
 
-### [Download the latest Windows Setup (x64)](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/latest/download/ShadowokxPanel-Setup-x64.exe)
+### [Download the latest Windows Setup (x64)](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/windows-v2.1.0-preview.2/ShadowokxPanel-Setup-x64.exe)
 
 Download the Setup, open it, and install. It is self-contained and does not require the .NET SDK, Visual Studio, or administrator privileges.
 
