@@ -81,8 +81,8 @@ public sealed class TokenGraphControl : Canvas
         var groups = Enumerable.Range(0, 8).Select(_ => new GeometryGroup()).ToArray();
         var columns = Math.Max(1, Activity.Columns);
         _size = Math.Max(1, Math.Min(_weekly ? 11 : 6.5, (ActualWidth - 2 - 1.5 * (columns - 1)) / columns));
-        _stepX = _weekly ? (ActualWidth - _size - 2) / Math.Max(1, columns - 1) : _size + 1.5;
-        _stepY = _size + (_weekly ? 2 : 1.5);
+        _stepX = _size + 1.5;
+        _stepY = _size + 1.5;
         _left = (ActualWidth - _stepX * (columns - 1) - _size) / 2;
         _top = 17 + (54 - Activity.Rows * _stepY + (_stepY - _size)) / 2;
         var peak = Activity.Peak?.Tokens ?? 0;
