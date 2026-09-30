@@ -3,8 +3,10 @@ import {localUsageDateKey} from './normalize.js';
 // Standard USD / million tokens: input, cached input, output, cache write.
 // Official OpenAI model pages, checked 2026-09-29.
 // https://developers.openai.com/api/docs/models/{model}
-export const PRICE_DATE = '2026-09-29';
+export const PRICE_DATE = '2026-09-30';
 export const PRICES = Object.freeze({
+    // https://developers.openai.com/api/docs/models/gpt-6.1-sol
+    'gpt-6.1-sol': [2, 0.1, 10, 2.5],
     'gpt-6-astra': [10, 1, 50, 12.5],
     'gpt-6-sol': [2, 0.2, 10, 2.5],
     'gpt-6-luna': [0.1, 0.01, 0.5, 0.125],

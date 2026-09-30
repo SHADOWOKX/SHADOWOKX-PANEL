@@ -2,10 +2,11 @@
 
 A lightweight cross-platform panel for checking **ChatGPT Codex usage** and **local weather** from one place.
 
-Linux `2.3.6` · Windows `2.1 Preview 2`.
+Linux `2.3.7` · Windows `2.1 Preview 2`.
 
 - Weekly and 5-hour Codex limits
-- Original Shadowokx mascot with idle, awake, and active states
+- Four animated companions: Shadow Robot, Codex Companion, orange Octopus and Penguin
+- Terminal, Clay and Glacier themes alongside the existing surface presets
 - Compact account activity heatmap with daily and weekly views
 - Local weather, UV, hourly forecast, and sunrise/sunset
 - Native Linux and Windows interfaces
@@ -74,7 +75,7 @@ provide a billed dollar value.
 A separate compact **device estimate** shows today's and the last seven days' USD
 value from recorded local Codex sessions, following the approach documented by
 [CodexBar](https://github.com/steipete/CodexBar/blob/main/docs/providers.md).
-It applies [official model prices](https://developers.openai.com/api/docs/pricing)
+Includes GPT-6.1 Sol pricing (input $2, cached input $0.10, output $10 per million tokens), checked September 30, 2026 on the [official model page](https://developers.openai.com/api/docs/models/gpt-6.1-sol). It applies [official model prices](https://developers.openai.com/api/docs/pricing)
 to recorded uncached input, cached input, cache writes and output, including the
 long-context premium. It never multiplies account totals by a guessed model mix.
 Unknown models remain unpriced; only affected periods carry a partial asterisk.

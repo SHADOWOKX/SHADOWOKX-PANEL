@@ -108,6 +108,16 @@ try {
     )) {
         throw new Error('the retired third-party ChatGPT icon is still bundled');
     }
+    for (const character of ['codex', 'octopus', 'penguin']) {
+        for (const frame of ['sleep', 'sleep-breathe', 'sleep-twitch', 'awake',
+            'wake-antenna', 'wake-half', 'sleepy', 'sleep-relax', 'blink',
+            ...Array.from({length: 13}, (_, i) => `active-${String(i + 1).padStart(2, '0')}`)]) {
+            const path = GLib.build_filenamev([projectDirectory, 'icons', 'mascot',
+                character, `robot-${frame}.svg`]);
+            if (!GLib.file_test(path, GLib.FileTest.IS_REGULAR))
+                throw new Error(`companion frame missing: ${character}/${frame}`);
+        }
+    }
 } catch (error) {
     printerr(`Release validation failed: ${error.message}`);
     System.exit(1);

@@ -77,8 +77,15 @@ const SLEEP_SEQUENCE = Object.freeze([
     ['robot-sleep.svg', 70],
 ]);
 
-function mascotPath(extension, name) {
-    return GLib.build_filenamev([extension.path, 'icons', 'mascot', name]);
+function selectedCharacter(extension, settings = null) {
+    const value = (settings ?? extension.getSettings?.())?.get_string('mascot-character');
+    return ['codex', 'octopus', 'penguin'].includes(value) ? value : 'robot';
+}
+
+function mascotPath(extension, name, character = selectedCharacter(extension)) {
+    return character === 'robot'
+        ? GLib.build_filenamev([extension.path, 'icons', 'mascot', name])
+        : GLib.build_filenamev([extension.path, 'icons', 'mascot', character, name]);
 }
 
 function mascotIcon(extension, name, size, styleClass) {
@@ -119,8 +126,9 @@ export class MascotController {
         this._sleepId = 0;
         this._postCloseId = 0;
         this._icons = new Map();
+        this._character = selectedCharacter(extension, settings);
         for (const name of FRAME_NAMES)
-            this._icons.set(name, Gio.icon_new_for_string(mascotPath(extension, name)));
+            this._icons.set(name, Gio.icon_new_for_string(mascotPath(extension, name, this._character)));
 
         this.actor = mascotIcon(
             extension,
@@ -302,7 +310,7 @@ export class MascotController {
             this._show(frame);
             this._activeId = GLib.timeout_add(
                 GLib.PRIORITY_DEFAULT,
-                duration,
+                Math.round(duration * ({codex: 0.90, octopus: 1.35, penguin: 1.15}[this._character] ?? 1)),
                 () => {
                     this._activeId = 0;
                     advance();
@@ -320,7 +328,15 @@ export class MascotController {
         if (ACTIVE_SEQUENCES.length > 1 && sequenceIndex === this._lastActiveSequence)
             sequenceIndex = (sequenceIndex + 1) % ACTIVE_SEQUENCES.length;
         this._lastActiveSequence = sequenceIndex;
-        this._playSequence(ACTIVE_SEQUENCES[sequenceIndex], () => {
+        const custom = {
+            codex: [1, 2, 3, 4, 5, 4, 3, 2],
+            octopus: [1, 3, 5, 7, 9, 11, 13, 11, 9, 7, 5, 3],
+            penguin: [1, 4, 7, 10, 13, 10, 7, 4],
+        }[this._character];
+        const sequence = custom
+            ? custom.map(frame => [`robot-active-${String(frame).padStart(2, '0')}.svg`, 150])
+            : ACTIVE_SEQUENCES[sequenceIndex];
+        this._playSequence(sequence, () => {
             if (this._codexActive && this._state === MascotState.ACTIVE && this._canMove())
                 this._startActiveSequence();
         });
@@ -360,7 +376,7 @@ export class MascotController {
     }
 
     _show(name) {
-        if (!this._destroyed && this.actor) {
+        if (!this._destroyed && this.actor && this._currentFrame !== name) {
             this.actor.gicon = this._icons.get(name);
             this._currentFrame = name;
         }

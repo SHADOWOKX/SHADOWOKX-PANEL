@@ -32,6 +32,18 @@ const PALETTES = Object.freeze({
         canvas: '#15171a', card: '#1f2226', panel: '#292d32', text: '#f5f6f7',
         muted: '#a5abb3', track: '#3a3f46', border: '#343941',
     },
+    terminal: {
+        canvas: '#111e19', card: '#182722', panel: '#22352c', text: '#f4f4f4',
+        muted: '#b3b5b2', track: '#394c42', border: '#33463c',
+    },
+    clay: {
+        canvas: '#241b17', card: '#302520', panel: '#40332b', text: '#f4f4f4',
+        muted: '#b3b5b2', track: '#56473d', border: '#4b3c33',
+    },
+    glacier: {
+        canvas: '#17212b', card: '#202a34', panel: '#2b3845', text: '#f4f4f4',
+        muted: '#b3b5b2', track: '#425363', border: '#374958',
+    },
     'light-neutral': {
         canvas: '#e4e5e3', card: '#f5f5f2', panel: '#eaeae6', text: '#242523',
         muted: '#696d68', track: '#d5d6d1', border: '#d1d2cd',

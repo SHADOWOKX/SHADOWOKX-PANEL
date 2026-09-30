@@ -41,6 +41,12 @@
 .shadow-theme-light.shadow-bg-nord { background-color: #eceff4; }
 .shadow-theme-dark.shadow-bg-amoled { background-color: #08090a; }
 .shadow-theme-light.shadow-bg-amoled { background-color: #f8f8f8; }
+.shadow-theme-dark.shadow-bg-terminal { background-color: #182722; }
+.shadow-theme-light.shadow-bg-terminal { background-color: #eaf1e9; }
+.shadow-theme-dark.shadow-bg-clay { background-color: #302520; }
+.shadow-theme-light.shadow-bg-clay { background-color: #f3e9de; }
+.shadow-theme-dark.shadow-bg-glacier { background-color: #202a34; }
+.shadow-theme-light.shadow-bg-glacier { background-color: #e9f0f5; }
 
 /* Surface tokens */
 .shadow-card {

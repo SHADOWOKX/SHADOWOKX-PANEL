@@ -118,7 +118,8 @@ export function costRow(accountUsage, localUsage, accountUsageStatus) {
         unknownTokens: localDays.reduce((sum, day) => sum + day.unknownTokens, 0),
         invalidRecords: localDays.reduce((sum, day) => sum + (day.invalidRecords ?? 0), 0)} : null];
     const amounts = periodsCost.map(period => period &&
-        period.tokens > period.unknownTokens ? period.cost : null);
+        (period.tokens > period.unknownTokens || (period.tokens === 0 &&
+            !period.invalidRecords && !localUsage.failedFiles)) ? period.cost : null);
     const incomplete = periodsCost.map(period => Boolean(period && (
         period.unknownTokens > 0 || period.invalidRecords > 0 || localUsage?.failedFiles > 0)));
     for (const [index, title] of ['Today', '7 days'].entries()) {
@@ -127,7 +128,8 @@ export function costRow(accountUsage, localUsage, accountUsageStatus) {
         cell.add_child(new St.Label({text: `${title} · device estimate`,
             style_class: 'shadow-muted shadow-spend-caption'}));
         const amount = new St.Label({text: Number.isFinite(amounts[index])
-            ? `≈${formatCost(amounts[index])}${incomplete[index] ? ' *' : ''}` : '—',
+            ? `≈${formatCost(amounts[index])}${incomplete[index] ? ' *' : ''}`
+            : periodsCost[index]?.unknownTokens > 0 ? 'Unpriced' : '—',
             style_class: 'shadow-spend-value'});
         if (Number.isFinite(amounts[index])) {
             attachTooltip(amount, 'USD estimate for recorded sessions on this device, using model-specific input, cached input and output prices. Not an account bill. ' +

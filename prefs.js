@@ -131,6 +131,12 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
         page.add(panel);
 
         const codex = new Adw.PreferencesGroup({title: 'Top bar · Codex'});
+        codex.add(comboRow(settings, 'mascot-character', 'Companion', [
+            {value: 'robot', label: 'Shadow Robot'},
+            {value: 'codex', label: 'Codex Companion'},
+            {value: 'octopus', label: 'Claude-style Octopus'},
+            {value: 'penguin', label: 'Penguin'},
+        ], 'Each companion has its own wake, work and sleep motions.'));
         codex.add(switchRow(settings, 'show-codex-icon', 'Show Shadowokx mascot'));
         codex.add(switchRow(
             settings,
@@ -196,6 +202,9 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
             {value: 'midnight', label: 'Midnight'},
             {value: 'nord', label: 'Nord'},
             {value: 'amoled', label: 'AMOLED'},
+            {value: 'terminal', label: 'Terminal'},
+            {value: 'clay', label: 'Clay'},
+            {value: 'glacier', label: 'Glacier'},
         ], 'Semantic surfaces remain readable in both light and dark modes.'));
         interfaceGroup.add(comboRow(settings, 'density', 'Density', [
             {value: 'comfortable', label: 'Comfortable'},
