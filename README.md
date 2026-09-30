@@ -2,11 +2,11 @@
 
 A lightweight cross-platform panel for checking **ChatGPT Codex usage** and **local weather** from one place.
 
-Linux `2.3.4` · Windows `1.0.0`.
+Linux `2.3.6` · Windows `2.1 Preview 2`.
 
 - Weekly and 5-hour Codex limits
 - Original Shadowokx mascot with idle, awake, and active states
-- Token activity and seven-day history
+- Compact account activity heatmap with daily and weekly views
 - Local weather, UV, hourly forecast, and sunrise/sunset
 - Native Linux and Windows interfaces
 - Custom themes, colors, density, and panel width
@@ -16,6 +16,21 @@ Linux `2.3.4` · Windows `1.0.0`.
 ## Linux (GNOME)
 
 Tested on Ubuntu 26.04.1 LTS, GNOME Shell 50.x and Wayland.
+
+### Install or update — one command
+
+Requires **GNOME Shell 50**, GJS 1.88+ and `curl` (Ubuntu 26.04.1 / Wayland).
+Codex usage requires the local Codex client signed in with your ChatGPT account.
+
+Run the same command for a fresh install or an update:
+
+```bash
+curl -fsSL https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/linux-latest/install-linux.sh | sh
+```
+
+Downloads the ready-built Linux package, verifies its SHA-256 checksum and installs it for your user. No Git clone or `sudo` is needed. **Log out and back in** to load the new version. If the panel is not visible afterward, enable it with `gnome-extensions enable shadow-panel@shadowokx`.
+
+[**Download ZIP**](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/linux-latest/shadow-panel@shadowokx.shell-extension.zip) · [Release notes](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/tag/linux-latest) · [SHA-256](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/linux-latest/checksums-linux.txt)
 
 ### Screenshots
 
@@ -43,94 +58,43 @@ Tested on Ubuntu 26.04.1 LTS, GNOME Shell 50.x and Wayland.
   </a>
 </p>
 
-### Requirements
+### Linux account usage
 
-- Ubuntu 26.04.1 LTS
-- GNOME Shell 50.x
-- Wayland
-- GJS 1.88 or newer
-- Git
+Displayed token counts and allowance percentages come from the signed-in Codex
+account read endpoints. Missing current-day usage is shown as pending with the
+latest returned account date. The seven-day row states how many of its dates were
+reported. No local totals or lifetime deltas substitute for
+missing account dates. The activity card keeps up to twelve months of returned
+account dates, with daily cells or weekly sums in the same compact space. Hover or
+use the arrow keys to inspect exact values; weekly details include reported-day
+coverage. Blank dates are unreported, not assumed zero. Peak labels refer to the
+displayed period and selected daily or weekly view. The account response does not
+provide a billed dollar value.
 
-### Download Linux package
+A separate compact **device estimate** shows today's and the last seven days' USD
+value from recorded local Codex sessions, following the approach documented by
+[CodexBar](https://github.com/steipete/CodexBar/blob/main/docs/providers.md).
+It applies [official model prices](https://developers.openai.com/api/docs/pricing)
+to recorded uncached input, cached input, cache writes and output, including the
+long-context premium. It never multiplies account totals by a guessed model mix.
+Unknown models remain unpriced; only affected periods carry a partial asterisk.
+The dollar section appears when local session data is available. These values
+cover this device's recorded sessions, not an account bill. Standard rates exclude
+fast-mode premiums and tool fees. Hover a value for its scope and pricing date.
 
-[**Download Shadowokx Panel 2.3.4 for Linux (GNOME Shell 50)**](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/linux-v2.3.4/shadow-panel@shadowokx.shell-extension.zip)
+The cost scan runs in a low-priority worker while the Codex page is visible, at
+most once a minute, and reuses unchanged session-file metadata from a private
+cache. It does not block account limit refreshes.
 
-[SHA-256 checksum](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/linux-v2.3.4/checksums-linux.txt)
+Refresh sends only initialization and account read requests. It does not start a
+thread or model turn. Remaining allowance colors follow a shared red → orange →
+amber → green scale across the percentage, progress bar, and top-bar summary.
 
-Install the downloaded ZIP with:
-
-```bash
-gnome-extensions install --force ./shadow-panel@shadowokx.shell-extension.zip
-```
-
-Then log out and back in once and enable the extension:
-
-```bash
-gnome-extensions enable shadow-panel@shadowokx
-```
-
-### Quick install from source
-
-```bash
-git clone https://github.com/SHADOWOKX/SHADOWOKX-PANEL.git && cd SHADOWOKX-PANEL && ./install.sh
-```
-
-When the installer finishes, **log out and back in once** so GNOME Shell can load the extension.
-
-Then enable it:
-
-```bash
-gnome-extensions enable shadow-panel@shadowokx
-```
-
-### Open preferences
-
-```bash
-gnome-extensions prefs shadow-panel@shadowokx
-```
-
-### Update
-
-```bash
-cd SHADOWOKX-PANEL
-git pull
-./install.sh
-```
-
-Then log out and back in once to load the updated version. If needed, enable it again with:
-
-```bash
-gnome-extensions enable shadow-panel@shadowokx
-```
-
-### Uninstall
-
-```bash
-./uninstall.sh
-```
-
-### Linux token totals and API-equivalent estimate
-
-The Codex page shows exact **Today**, **Yesterday**, and **Last 7 Days** token counts
-from the signed-in Codex account usage response. The token activity chart and its
-daily statistics use those same account-reported buckets. When Codex has not returned
-an account bucket for today, the panel labels it as not reported and does not substitute
-local session totals. Codex returns daily dates without a published timezone/day-boundary
-rule; the panel preserves those date strings and shows them beside Today/Yesterday labels.
-Weekly allowance percentages are a
-separate server-reported measure and cannot be converted to tokens. USD values are
-approximate API-equivalent estimates: the locally observed model and cache mix is
-applied to those exact account totals. This is not a Codex or ChatGPT subscription
-charge; unsupported local models make the estimate partial.
-
-Bundled standard API prices were checked on 2026-09-23 against the official
-[OpenAI model pricing pages](https://developers.openai.com/api/docs/pricing). The
-Linux GNOME package is built and attached as an artifact by the `Linux GNOME package`
-GitHub Actions workflow for pushes to `main` and pull requests.
+Linux packages are built by GitHub Actions. Versioned releases preserve each package; the `linux-latest` download always points to the newest published Linux build.
 
 ## Windows 11
 
-### [Download the latest Windows Setup (x64)](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/latest/download/ShadowokxPanel-Setup-x64.exe)
+### [Download the latest Windows Setup (x64)](https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/windows-v2.1.0-preview.2/ShadowokxPanel-Setup-x64.exe)
 
 Download the Setup, open it, and install. It is self-contained and does not require the .NET SDK, Visual Studio, or administrator privileges.
 

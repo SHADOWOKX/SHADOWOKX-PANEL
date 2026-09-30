@@ -4,22 +4,19 @@ import St from 'gi://St';
 
 import {formatCountdown, formatRelativeAge, formatResetDate} from '../../lib/format.js';
 import {CODEX_TIMED_LABEL_INTERVAL} from '../../lib/constants.js';
-import {normalizeSparklineBuckets, sparklineDayLabels} from '../../lib/sparkline.js';
-import {codexUsageStatus} from '../../lib/summary.js';
+import {accountActivityCalendar, weeklyAccountActivity} from '../../lib/activity.js';
+import {codexUsageStatus, codexLimitColor} from '../../lib/summary.js';
 import {launchUri} from '../../services/launcher.js';
 import {
     ProgressMeter,
     animationsEnabled,
     animateRefreshButton,
     attachTooltip,
-    fitScrollToContent,
     iconButton,
     moduleIconButton,
     moduleIcon,
     pageTitle,
     resolveAccent,
-    resetScrollPosition,
-    scrollContainer,
     sectionTitle,
     stateMessage,
     statusPill,
@@ -29,28 +26,29 @@ import {BasePage} from '../basePage.js';
 import {exportCodexSummaryImage} from './shareImage.js';
 import {localUsageDateKey} from './normalize.js';
 import {costRow} from './costRow.js';
-import {tokenSparkline} from './sparkline.js';
+import {accountHeatmap} from './heatmap.js';
 
 function contentSignature(state) {
-    const {updatedAt: _updatedAt, days: _days, ...costUsage} = state?.costUsage ?? {};
     const {updatedAt: _accountUpdatedAt, ...accountUsageData} = state?.accountTokenUsage ?? {};
     const accountTokenUsage = state?.accountTokenUsage ? accountUsageData : null;
+    const {updatedAt: _costUpdatedAt, ...costUsageData} = state?.costUsage ?? {};
+    const costUsage = state?.costUsage ? costUsageData : null;
     if (!state?.lastSuccessfulRefresh) {
         return JSON.stringify({
             status: state?.status ?? null,
             errorCode: state?.errorCode ?? null,
             error: state?.error ?? null,
             accountTokenUsage,
-            costUsage,
         });
     }
     return JSON.stringify({
         weekly: state.weekly,
         fiveHour: state.fiveHour,
         resetCreditsAvailable: state.resetCreditsAvailable,
-        tokenUsage: state.tokenUsage,
         accountTokenUsage,
         costUsage,
+        stale: state.stale,
+        calendarDate: localUsageDateKey(Date.now()),
     });
 }
 
@@ -63,20 +61,27 @@ export class CodexPage extends BasePage {
         this._popupOpen = false;
         this._lastWeeklyPercent = null;
         this._hasRendered = false;
+        this._hasUsageContent = false;
         this._stateDirty = true;
         this._renderedSignature = null;
         this._timedLabels = [];
-        this._graphHasAppeared = false;
+        this._activityView = 'daily';
         this._refreshButton = null;
+        this._refreshState = null;
+        this._accountStatusLabel = null;
         this._shareCancellable = null;
         this.track(this._provider.subscribe(state => {
             const nextSignature = contentSignature(state);
             const contentChanged = nextSignature !== this._renderedSignature;
             this._stateDirty ||= contentChanged;
-            if (!this._hasRendered || this._popupOpen && contentChanged) {
+            const primeFirstUsage = !this._hasUsageContent && state.lastSuccessfulRefresh &&
+                !this.context.isPopupOpen?.();
+            if (!this._hasRendered || primeFirstUsage ||
+                this._popupOpen && contentChanged) {
                 this._render();
             } else if (this._popupOpen) {
                 this._setRefreshState(state.status === 'refreshing' || state.status === 'loading');
+                this._syncAccountStatus(state.accountUsageStatus);
                 this._refreshTimedLabels();
             }
         }));
@@ -88,8 +93,10 @@ export class CodexPage extends BasePage {
             this._lastWeeklyPercent = null;
             this._render();
         } else {
+            const state = this._provider.getState();
+            this._setRefreshState(state.status === 'refreshing' || state.status === 'loading');
+            this._syncAccountStatus(state.accountUsageStatus);
             this._refreshTimedLabels();
-            this.fit();
         }
         this.context.scheduler.every('codex-timed-labels', CODEX_TIMED_LABEL_INTERVAL, () =>
             this._refreshTimedLabels());
@@ -98,31 +105,18 @@ export class CodexPage extends BasePage {
     onPopupClosed() {
         this._popupOpen = false;
         this._stopRefreshAnimation();
+        this._refreshState = null;
         this.context.scheduler.cancel('codex-timed-labels');
-    }
-
-    activate() {
-        if (this._destroyed || this._pageDestroyed)
-            return;
-        this.fit();
-        resetScrollPosition(this._scroll);
-    }
-
-    fit() {
-        if (this._destroyed || this._pageDestroyed)
-            return;
-        fitScrollToContent(this._scroll, this._scrollContent, this.context, this.actor);
     }
 
     _render() {
         if (this._destroyed || this._pageDestroyed || !this.actor)
             return;
         const state = this._provider.getState();
-        let nextScroll = null;
-        let nextScrollContent = null;
         let nextRefreshButton = null;
         const nextTimedLabels = [];
         this._buildingTimedLabels = nextTimedLabels;
+        this._buildingAccountStatusLabel = null;
         const rendered = this.replaceContent(page => {
             const actions = this._actions(state);
             nextRefreshButton = actions._shadowRefreshButton;
@@ -159,22 +153,22 @@ export class CodexPage extends BasePage {
             });
             let sectionCount = 0;
             if (this.context.settings.get_boolean('show-codex-weekly')) {
-                content.add_child(this._weeklyHero(state.weekly, state.costUsage, state.accountTokenUsage));
+                content.add_child(this._weeklyHero(state.weekly, state.accountTokenUsage, state.costUsage, state.accountUsageStatus));
                 sectionCount++;
             }
-            if (this.context.settings.get_boolean('show-codex-five-hour')) {
+            if (this.context.settings.get_boolean('show-codex-five-hour') && state.fiveHour) {
                 content.add_child(this._fiveHourSection(state.fiveHour));
                 sectionCount++;
             }
             if (sectionCount === 0) {
                 content.add_child(new St.Label({
-                    text: 'Enable a usage window in Codex settings.',
+                    text: 'No usage window reported by Codex.',
                     style_class: 'shadow-inline-empty shadow-muted',
                 }));
             }
 
             if (!this.context.settings.get_boolean('show-codex-weekly'))
-                content.add_child(costRow(state.costUsage, state.accountTokenUsage));
+                content.add_child(this._costRow(state.accountTokenUsage, state.costUsage, state.accountUsageStatus));
 
             content.add_child(this._tokenActivity(state.accountTokenUsage));
 
@@ -187,21 +181,22 @@ export class CodexPage extends BasePage {
             const facts = this._facts(state);
             if (facts)
                 content.add_child(facts);
-            nextScrollContent = content;
-            nextScroll = scrollContainer(content, 'shadow-codex-scroll');
-            page.add_child(nextScroll);
+            page.add_child(content);
         });
         this._buildingTimedLabels = null;
         if (rendered) {
-            this._scrollContent = nextScrollContent;
-            this._scroll = nextScroll;
             this._hasRendered = true;
+            this._hasUsageContent ||= Boolean(state.lastSuccessfulRefresh);
             this._stateDirty = false;
             this._renderedSignature = contentSignature(state);
             this._refreshButton = nextRefreshButton;
+            this._refreshState = this._popupOpen
+                ? state.status === 'refreshing' || state.status === 'loading'
+                : null;
+            this._accountStatusLabel = this._buildingAccountStatusLabel;
             this._timedLabels = nextTimedLabels;
         }
-        this.fit();
+        this._buildingAccountStatusLabel = null;
     }
 
     _actions(state) {
@@ -243,7 +238,7 @@ export class CodexPage extends BasePage {
         return actions;
     }
 
-    _weeklyHero(window, costUsage, accountTokenUsage) {
+    _weeklyHero(window, accountTokenUsage, costUsage, accountUsageStatus) {
         const card = new St.BoxLayout({
             vertical: true,
             style_class: 'shadow-card shadow-weekly-hero',
@@ -256,7 +251,9 @@ export class CodexPage extends BasePage {
             const tone = window.remainingPercent >= 60
                 ? 'accent'
                 : window.remainingPercent >= 30 ? 'warning' : 'danger';
-            heading.add_child(statusPill(this.context.settings, status.label, tone));
+            const pill = statusPill(this.context.settings, status.label, tone);
+            pill.get_first_child().style = `background-color: ${codexLimitColor(window.remainingPercent)};`;
+            heading.add_child(pill);
         }
         card.add_child(heading);
         if (!window) {
@@ -270,7 +267,7 @@ export class CodexPage extends BasePage {
                 style_class: 'shadow-muted',
                 x_align: Clutter.ActorAlign.START,
             }));
-            card.add_child(costRow(costUsage, accountTokenUsage));
+            card.add_child(this._costRow(accountTokenUsage, costUsage, accountUsageStatus));
             return card;
         }
 
@@ -281,28 +278,14 @@ export class CodexPage extends BasePage {
         value.add_child(new St.Label({
             text: `${window.remainingPercent}%`,
             style_class: 'shadow-weekly-value',
-            style: `color: ${resolveAccent(this.context.settings)};`,
+            style: `color: ${codexLimitColor(window.remainingPercent)};`,
         }));
         value.add_child(new St.Label({
             text: 'remaining',
             style_class: 'shadow-weekly-unit',
             y_align: Clutter.ActorAlign.END,
         }));
-        const summary = new St.BoxLayout({
-            style_class: 'shadow-limit-summary', x_expand: true,
-        });
-        value.x_expand = true;
-        summary.add_child(value);
-        const consumed = new St.BoxLayout({
-            vertical: true, style_class: 'shadow-limit-consumed',
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        consumed.add_child(new St.Label({
-            text: `${100 - window.remainingPercent}%`, style_class: 'shadow-limit-used-value',
-        }));
-        consumed.add_child(new St.Label({text: 'used', style_class: 'shadow-metric-label'}));
-        summary.add_child(consumed);
-        card.add_child(summary);
+        card.add_child(value);
 
         const animate = this._popupOpen && this._lastWeeklyPercent !== null &&
             this._lastWeeklyPercent !== window.remainingPercent &&
@@ -310,27 +293,12 @@ export class CodexPage extends BasePage {
         this._lastWeeklyPercent = window.remainingPercent;
         card.add_child(new ProgressMeter(
             window.remainingPercent,
-            resolveAccent(this.context.settings),
+            codexLimitColor(window.remainingPercent),
             'remaining',
             animate
         ).actor);
 
-        const legend = new St.BoxLayout({
-            style_class: 'shadow-progress-legend',
-            x_expand: true,
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        legend.add_child(new St.Label({
-            text: 'Remaining allowance',
-            style_class: 'shadow-muted',
-            x_expand: true,
-        }));
-        legend.add_child(new St.Label({
-            text: '100% total',
-            style_class: 'shadow-progress-available',
-        }));
-        card.add_child(legend);
-        card.add_child(costRow(costUsage, accountTokenUsage));
+        card.add_child(this._costRow(accountTokenUsage, costUsage, accountUsageStatus));
 
         if (this.context.settings.get_boolean('show-codex-reset-time')) {
             const reset = new St.BoxLayout({style_class: 'shadow-weekly-reset', x_expand: true});
@@ -348,6 +316,22 @@ export class CodexPage extends BasePage {
             card.add_child(reset);
         }
         return card;
+    }
+
+    _costRow(accountTokenUsage, costUsage, accountUsageStatus) {
+        const row = costRow(accountTokenUsage, costUsage, accountUsageStatus);
+        this._buildingAccountStatusLabel = row._shadowAccountStatusLabel;
+        return row;
+    }
+
+    _syncAccountStatus(accountUsageStatus) {
+        const label = this._accountStatusLabel;
+        if (!label)
+            return;
+        const text = accountUsageStatus === 'refreshing'
+            ? 'ACCOUNT TOKENS · CHECKING' : 'ACCOUNT TOKENS';
+        if (label.text !== text)
+            label.text = text;
     }
 
     _fiveHourSection(window) {
@@ -385,7 +369,7 @@ export class CodexPage extends BasePage {
         section.add_child(new St.Label({
             text: `${window.remainingPercent}% remaining`,
             style_class: 'shadow-five-hour-value',
-            style: `color: ${resolveAccent(this.context.settings)};`,
+            style: `color: ${codexLimitColor(window.remainingPercent)};`,
             y_align: Clutter.ActorAlign.CENTER,
         }));
         return section;
@@ -399,14 +383,6 @@ export class CodexPage extends BasePage {
         });
         const heading = new St.BoxLayout({style_class: 'shadow-token-heading', x_expand: true});
         heading.add_child(sectionTitle('Token activity'));
-        if (usage?.dailyBuckets?.length >= 2) {
-            heading.add_child(statusPill(
-                this.context.settings,
-                '7-day history',
-                'neutral',
-                'document-open-recent-symbolic'
-            ));
-        }
         card.add_child(heading);
         if (!usage) {
             card.add_child(new St.Label({
@@ -419,127 +395,75 @@ export class CodexPage extends BasePage {
 
         if (this.context.settings.get_boolean('show-codex-token-lifetime') &&
             Number.isSafeInteger(usage.lifetimeTokens)) {
-            const lifetime = this._tokenMetric(
-                'Lifetime tokens',
-                this._formatCompactTokens(usage.lifetimeTokens),
-                true
-            );
+            const lifetime = new St.Label({
+                text: `${this._formatCompactTokens(usage.lifetimeTokens)} lifetime`,
+                style_class: 'shadow-token-lifetime',
+            });
             lifetime.accessible_name = `Lifetime tokens ${this._formatTokens(usage.lifetimeTokens)}`;
-            attachTooltip(lifetime, `${this._formatTokens(usage.lifetimeTokens)} tokens`);
-            card.add_child(lifetime);
+            attachTooltip(lifetime, `${this._formatTokens(usage.lifetimeTokens)} account tokens`);
+            heading.add_child(lifetime);
         }
 
         if (this.context.settings.get_boolean('show-codex-token-stats')) {
-            const visibleBuckets = normalizeSparklineBuckets(usage.dailyBuckets);
-            const sparkline = this._tokenSparkline(visibleBuckets);
-            if (sparkline)
-                card.add_child(sparkline);
-            else
-                card.add_child(new St.Label({
-                    text: 'Not enough history yet',
-                    style_class: 'shadow-token-history-empty shadow-muted',
-                }));
+            const calendar = accountActivityCalendar(usage.activityBuckets ?? usage.dailyBuckets,
+                localUsageDateKey(Date.now()));
+            const weekly = weeklyAccountActivity(calendar);
+            const toolbar = new St.BoxLayout({style_class: 'shadow-activity-toolbar', x_expand: true});
+            toolbar.add_child(new St.Label({text: 'Account history · 12 months',
+                style_class: 'shadow-activity-subtitle shadow-muted', x_expand: true,
+                y_align: Clutter.ActorAlign.CENTER}));
+            const buttons = new Map();
+            const views = new Map();
+            const select = view => {
+                this._activityView = view;
+                for (const [id, actor] of views)
+                    actor.visible = id === view;
+                for (const [id, button] of buttons) {
+                    button.checked = id === view;
+                    button.accessible_name = `${id === 'daily' ? 'Days' : 'Weeks'}${id === view ? ', selected' : ''}`;
+                    if (id === view)
+                        button.add_style_class_name('shadow-activity-view-active');
+                    else
+                        button.remove_style_class_name('shadow-activity-view-active');
+                }
+                const data = view === 'daily' ? calendar : weekly;
+                const peak = data.peak;
+                const values = [
+                    [view === 'daily' ? 'Active days' : 'Active weeks', String(data.activeDays)],
+                    [view === 'daily' ? 'Daily peak' : 'Weekly peak', peak ? this._formatCompactTokens(peak.tokens) : '—'],
+                    [view === 'daily' ? 'Peak day' : 'Week starting', peak ? this._formatUsageDate(peak.date)?.replace(/, \d{4}$/, '') : '—'],
+                ];
+                metrics.forEach((metric, index) => {
+                    metric.get_first_child().text = values[index][0];
+                    metric.get_last_child().text = values[index][1];
+                });
+            };
+            for (const [id, title] of [['daily', 'Days'], ['weekly', 'Weeks']]) {
+                const button = new St.Button({label: title, can_focus: true, reactive: true,
+                    toggle_mode: true, style_class: `shadow-activity-view shadow-activity-view-${id}`});
+                button.connect('clicked', () => select(id));
+                buttons.set(id, button);
+                toolbar.add_child(button);
+            }
+            card.add_child(toolbar);
+            for (const [id, data] of [['daily', calendar], ['weekly', weekly]]) {
+                const actor = accountHeatmap(data, resolveAccent(this.context.settings), bucket => {
+                    const date = this._formatUsageDate(bucket.date);
+                    const value = bucket.tokens === null ? 'Not reported' : `${this._formatTokens(bucket.tokens)} tokens`;
+                    return id === 'daily' ? `${date} · ${value}`
+                        : `${date} · ${value} · ${bucket.reportedDays}/${bucket.expectedDays} days`;
+                });
+                views.set(id, actor);
+                card.add_child(actor);
+            }
 
             const stats = new St.BoxLayout({style_class: 'shadow-token-row', x_expand: true});
-            const today = visibleBuckets.find(
-                bucket => bucket.date === localUsageDateKey(Date.now())
-            );
-            const todayMetric = this._tokenMetric(
-                'Today',
-                Number.isSafeInteger(today?.tokens)
-                    ? this._formatCompactTokens(today.tokens)
-                    : 'Unavailable'
-            );
-            if (Number.isSafeInteger(today?.tokens)) {
-                attachTooltip(todayMetric, `${this._formatTokens(today.tokens)} tokens`);
-                todayMetric.accessible_name = `Today ${this._formatTokens(today.tokens)} tokens`;
-            }
-            stats.add_child(todayMetric);
-            const peak = visibleBuckets.reduce((best, bucket) =>
-                !best || bucket.tokens > best.tokens ? bucket : best, null);
-            if (peak)
-                stats.add_child(this._tokenMetric('Peak', this._formatCompactTokens(peak.tokens)));
-            const peakDate = this._formatUsageDate(peak?.date);
-            if (peakDate)
-                stats.add_child(this._tokenMetric('Peak day', peakDate));
-            if (stats.get_children().length > 0)
-                card.add_child(stats);
+            const metrics = Array.from({length: 3}, () => this._tokenMetric('', '—'));
+            metrics.forEach(metric => stats.add_child(metric));
+            card.add_child(stats);
+            select(this._activityView);
         }
         return card;
-    }
-
-    _tokenSparkline(buckets) {
-        const normalized = normalizeSparklineBuckets(buckets);
-        if (normalized.length < 2)
-            return null;
-        const sparkline = new St.BoxLayout({
-            vertical: true,
-            style_class: 'shadow-token-sparkline-wrap',
-            x_expand: true,
-        });
-        const scale = new St.BoxLayout({style_class: 'shadow-chart-scale', x_expand: true});
-        scale.add_child(new St.Label({
-            text: 'DAILY TOKENS', style_class: 'shadow-chart-caption shadow-muted', x_expand: true,
-        }));
-        scale.add_child(new St.Label({
-            text: `0 – ${this._formatCompactTokens(Math.max(...normalized.map(point => point.tokens)))}`,
-            style_class: 'shadow-chart-caption shadow-muted',
-        }));
-        sparkline.add_child(scale);
-        const shouldAnimate = this._popupOpen && !this._graphHasAppeared &&
-            animationsEnabled(this.context.settings);
-        const chart = tokenSparkline(
-            normalized,
-            resolveAccent(this.context.settings),
-            shouldAnimate,
-            bucket => `${this._formatUsageDate(bucket.date)}\n` +
-                `${this._formatTokens(bucket.tokens)} tokens`
-        );
-        if (this._popupOpen)
-            this._graphHasAppeared = true;
-        chart.accessible_name = normalized.map(bucket =>
-            `${this._formatUsageDate(bucket.date)}, ${this._formatTokens(bucket.tokens)} tokens`
-        ).join('; ');
-        sparkline.add_child(chart);
-        const dayLabels = this._sparklineDayLabels(normalized);
-        if (dayLabels.length) {
-            const timeline = new St.Widget({
-                style_class: 'shadow-spark-days',
-                x_expand: true,
-                height: 12,
-                layout_manager: new Clutter.FixedLayout(),
-            });
-            const labels = [];
-            for (const day of dayLabels) {
-                const actor = new St.Label({
-                    text: day.label,
-                    style_class: 'shadow-spark-day',
-                    accessible_name: this._formatUsageDate(day.date),
-                });
-                labels.push({actor, position: day.position});
-                timeline.add_child(actor);
-            }
-            timeline.connect('notify::allocation', () => {
-                const width = timeline.width;
-                if (width <= 16)
-                    return;
-                labels.forEach(({actor, position}) => {
-                    const [, labelWidth] = actor.get_preferred_width(-1);
-                    const center = 8 + position * (width - 16);
-                    const x = Math.max(0, Math.min(
-                        Math.round(center - labelWidth / 2),
-                        width - labelWidth
-                    ));
-                    actor.set_position(x, 0);
-                });
-            });
-            sparkline.add_child(timeline);
-        }
-        return sparkline;
-    }
-
-    _sparklineDayLabels(buckets) {
-        return sparklineDayLabels(buckets);
     }
 
     _tokenInsight(usage) {
@@ -568,24 +492,12 @@ export class CodexPage extends BasePage {
         return row;
     }
 
-    _tokenMetric(label, value, primary = false) {
+    _tokenMetric(label, value) {
         const metric = new St.BoxLayout({
-            vertical: true,
-            style_class: primary ? 'shadow-token-metric shadow-token-primary' : 'shadow-token-metric',
-            x_expand: true,
+            vertical: true, style_class: 'shadow-token-metric', x_expand: true,
         });
-        const labelActor = new St.Label({text: label, style_class: 'shadow-token-label'});
-        const valueActor = new St.Label({
-            text: value,
-            style_class: primary ? 'shadow-token-primary-value' : 'shadow-token-value',
-        });
-        if (primary) {
-            metric.add_child(valueActor);
-            metric.add_child(labelActor);
-        } else {
-            metric.add_child(labelActor);
-            metric.add_child(valueActor);
-        }
+        metric.add_child(new St.Label({text: label, style_class: 'shadow-token-label'}));
+        metric.add_child(new St.Label({text: value, style_class: 'shadow-token-value'}));
         return metric;
     }
 
@@ -635,9 +547,14 @@ export class CodexPage extends BasePage {
         row.add_child(credits);
         if (hasUpdate) {
             row.add_child(this._timedLabel(
-                () => `Updated ${formatRelativeAge(
-                    this._provider.getState()?.lastSuccessfulRefresh
-                )}`,
+                () => {
+                    const current = this._provider.getState();
+                    const tokens = current?.accountTokenUsage;
+                    if (current?.accountUsageStatus === 'refreshing')
+                        return 'Checking account tokens…';
+                    const label = current?.stale ? 'Cached' : tokens ? 'Tokens checked' : 'Limits checked';
+                    return `${label} ${formatRelativeAge(tokens?.updatedAt ?? current?.lastSuccessfulRefresh)}`;
+                },
                 {
                 style_class: 'shadow-footer-updated',
                 x_align: Clutter.ActorAlign.END,
@@ -657,15 +574,19 @@ export class CodexPage extends BasePage {
         if (this._destroyed || this._pageDestroyed || !this._popupOpen)
             return;
         for (const {actor, textProvider} of this._timedLabels) {
-            if (actor && !actor.is_finalized?.())
-                actor.text = textProvider();
+            if (actor && !actor.is_finalized?.()) {
+                const text = textProvider();
+                if (actor.text !== text)
+                    actor.text = text;
+            }
         }
     }
 
     _setRefreshState(refreshing) {
         const button = this._refreshButton;
-        if (!button)
+        if (!button || this._refreshState === refreshing)
             return;
+        this._refreshState = refreshing;
         this._stopRefreshAnimation();
         button.reactive = !refreshing;
         button.can_focus = !refreshing;
@@ -740,12 +661,13 @@ export class CodexPage extends BasePage {
         this._destroyed = true;
         this._shareCancellable?.cancel();
         this._shareCancellable = null;
+        if (this._actorDestroyed)
+            this._refreshIcon = null;
         this._stopRefreshAnimation();
         this.context.scheduler.cancel('codex-timed-labels');
         super.destroy();
-        this._scroll = null;
-        this._scrollContent = null;
         this._refreshButton = null;
+        this._accountStatusLabel = null;
         this._timedLabels = [];
     }
 }

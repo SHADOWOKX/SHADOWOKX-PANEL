@@ -48,6 +48,8 @@ try {
         throw new Error('extension revision is invalid');
     if (packageMetadata.version !== APP_VERSION)
         throw new Error('semantic version declarations are inconsistent');
+    if (!readText('scripts/install-linux.sh').includes(`shadow_version='${APP_VERSION}'`))
+        throw new Error('one-command installer release version is inconsistent');
     const readme = readText('README.md');
     if (!readme.includes(`Release \`${APP_VERSION}\``) &&
         !readme.includes(`Linux \`${APP_VERSION}\``)) {

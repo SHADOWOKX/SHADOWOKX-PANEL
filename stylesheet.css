@@ -139,7 +139,7 @@
 /* Product header */
 .shadow-header {
   min-height: 32px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   spacing: 8px;
 }
 
@@ -205,7 +205,7 @@
 /* Two-page segmented control — deliberately no ScrollView or separator. */
 .shadow-tab-strip {
   min-height: 46px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   padding: 4px;
   spacing: 4px;
   border-radius: 16px;
@@ -309,7 +309,11 @@
   font-weight: 700;
 }
 
-.shadow-codex-content,
+.shadow-codex-content {
+  padding: 0 2px 2px 0;
+  spacing: 9px;
+}
+
 .shadow-weather-content {
   padding: 0 2px 4px 0;
   spacing: 12px;
@@ -410,8 +414,8 @@
 
 /* Codex */
 .shadow-weekly-hero {
-  padding: 14px 16px;
-  spacing: 8px;
+  padding: 12px 15px;
+  spacing: 6px;
 }
 
 .shadow-usage-heading {
@@ -491,7 +495,7 @@
 }
 
 .shadow-codex-footer {
-  min-height: 25px;
+  min-height: 12px;
   margin-top: 2px;
   padding: 3px 3px 3px;
   spacing: 12px;
@@ -523,17 +527,43 @@
 }
 
 .shadow-token-activity {
-  padding: 12px 14px;
-  spacing: 6px;
+  padding: 10px 14px;
+  spacing: 4px;
+}
+
+.shadow-activity-toolbar { spacing: 4px; }
+.shadow-activity-subtitle { font-size: 10px; }
+.shadow-activity-view {
+  padding: 3px 7px;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #999e99;
+  background-color: transparent;
+}
+.shadow-activity-view:hover { background-color: rgba(128, 128, 128, 0.10); }
+.shadow-activity-view-active {
+  color: #f0f1ed;
+  background-color: rgba(128, 128, 128, 0.18);
+}
+.shadow-theme-light .shadow-activity-view-active { color: #252a26; }
+.shadow-activity-calendar { spacing: 3px; }
+.shadow-account-heatmap { height: 54px; }
+.shadow-account-heatmap:focus { border-radius: 5px; background-color: rgba(128, 128, 128, 0.06); }
+
+.shadow-token-lifetime {
+  font-size: 11px;
+  font-weight: 650;
+  font-feature-settings: "tnum";
 }
 
 .shadow-token-heading {
-  min-height: 20px;
+  min-height: 18px;
 }
 
 .shadow-token-row {
   spacing: 8px;
-  padding-top: 8px;
+  padding-top: 6px;
   border-top: 1px solid rgba(128, 128, 128, 0.12);
 }
 
@@ -577,7 +607,7 @@
 }
 
 .shadow-token-sparkline {
-  height: 68px;
+  height: 54px;
   border-radius: 10px;
   background-color: rgba(128, 128, 128, 0.025);
 }
@@ -892,7 +922,14 @@
   spacing: 9px;
 }
 
-/* Exact account token totals and compact API-equivalent estimates. */
-.shadow-cost-row { spacing: 4px; padding-top: 4px; font-size: 11px; }
-.shadow-cost-period { spacing: 10px; min-height: 16px; }
-.shadow-cost-amount { font-weight: 600; font-feature-settings: "tnum"; }
+/* Exact account-reported token totals. */
+.shadow-cost-row { spacing: 4px; padding-top: 3px; font-size: 11px; }
+.shadow-cost-caption { font-size: 9px; font-weight: 650; letter-spacing: 0.2px; }
+.shadow-cost-period { spacing: 8px; min-height: 16px; }
+.shadow-cost-amount { font-weight: 650; font-feature-settings: "tnum"; }
+.shadow-cost-note { font-size: 10px; }
+
+.shadow-spend-summary { margin-top: 5px; padding-top: 7px; border-top: 1px solid rgba(128,128,128,0.16); spacing: 16px; }
+.shadow-spend-cell { spacing: 2px; }
+.shadow-spend-caption { font-size: 9px; }
+.shadow-spend-value { font-size: 16px; font-weight: 700; font-feature-settings: "tnum"; }

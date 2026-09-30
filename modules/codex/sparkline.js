@@ -48,11 +48,11 @@ export function tokenSparkline(buckets, accent, animate = false, tooltipForPoint
     const chart = new St.Widget({
         style_class: 'shadow-token-sparkline',
         x_expand: true,
-        height: 68,
+        height: 54,
         opacity: animate ? 0 : 255,
         layout_manager: new Clutter.FixedLayout(),
     });
-    const area = new St.DrawingArea({height: 68});
+    const area = new St.DrawingArea({height: 54});
     chart.add_child(area);
     const targets = normalizePointTargets(chart, buckets, tooltipForPoint);
     let hoveredIndex = -1;

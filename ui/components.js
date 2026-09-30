@@ -315,8 +315,12 @@ export function fitScrollToContent(scroll, child, context, pageActor = null) {
     if (pageActor && !pageActor.mapped)
         return;
     const width = Math.max(1, (context.pageWidth ?? 386) - 4);
-    const [, naturalHeight] = child.get_preferred_height(width);
-    scroll._shadowNaturalHeight = Math.max(1, Math.ceil(naturalHeight));
+    if (scroll._shadowMeasuredWidth !== width ||
+        !Number.isFinite(scroll._shadowNaturalHeight)) {
+        const [, naturalHeight] = child.get_preferred_height(width);
+        scroll._shadowNaturalHeight = Math.max(1, Math.ceil(naturalHeight));
+        scroll._shadowMeasuredWidth = width;
+    }
     if (typeof context.fitPageScroll === 'function')
         context.fitPageScroll(scroll, pageActor);
     else

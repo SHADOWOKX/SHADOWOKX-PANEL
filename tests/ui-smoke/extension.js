@@ -41,6 +41,8 @@ function scrollState(page) {
     const naturalHeight = scroll._shadowNaturalHeight ?? null;
     const adjustment = scroll.vadjustment ?? scroll.vscroll?.adjustment;
     return {
+        pageMapped: Boolean(page?.actor?.mapped),
+        fitPending: Boolean(page?._fitSourceId),
         viewportHeight: scroll.height,
         measuredNaturalHeight: naturalHeight,
         needsScroll: Number.isFinite(naturalHeight) && naturalHeight > scroll.height + 1,
@@ -127,14 +129,28 @@ export default class UiSmokeExtension extends Extension {
         // become ready. Exercise the stable status-area actor, never the
         // instance Shell just retired during that initialization window.
         await settle(220);
-        const stableIndicator = Main.panel.statusArea['shadow-panel@shadowokx'];
-        if (stableIndicator && stableIndicator !== indicator) {
-            indicator = stableIndicator;
-            services = indicator._extension.getRuntimeServices();
+        let previousIndicator = null;
+        let stablePolls = 0;
+        for (let attempt = 0; attempt < 20; attempt++) {
+            const current = Main.panel.statusArea['shadow-panel@shadowokx'];
+            if (current && !current._destroyed && current.mapped &&
+                !current._extension._rebuildId && !current._extension._rebuildPending) {
+                stablePolls = current === previousIndicator ? stablePolls + 1 : 1;
+                previousIndicator = current;
+                if (stablePolls >= 3) {
+                    indicator = current;
+                    services = current._extension.getRuntimeServices();
+                    break;
+                }
+            } else {
+                stablePolls = 0;
+            }
+            await settle(80);
         }
         const reportPath = GLib.getenv('SHADOW_UI_REPORT');
         const codexState = services?.codexProvider?.getState();
-        if (codexState?.tokenUsage && codexState.tokenUsage.dailyBuckets.length < 2) {
+        if (codexState && (!codexState.accountTokenUsage ||
+            codexState.accountTokenUsage.dailyBuckets.length < 2)) {
             const dailyBuckets = Array.from({length: 7}, (_value, index) => {
                 const date = new Date(Date.now() - (6 - index) * 86_400_000);
                 const year = date.getFullYear();
@@ -142,17 +158,41 @@ export default class UiSmokeExtension extends Extension {
                 const day = String(date.getDate()).padStart(2, '0');
                 return {date: `${year}-${month}-${day}`, tokens: [42000000, 26000000, 31000000, 18000000, 12000000, 17000000, 25000000][index]};
             });
-            services.codexProvider._setState({
-                ...codexState,
-                tokenUsage: {
-                    ...codexState.tokenUsage,
+            const accountTokenUsage = {
+                    ...codexState.accountTokenUsage,
                     dailyBuckets,
                     todayTokens: dailyBuckets.at(-1).tokens,
                     peakDailyTokens: dailyBuckets[0].tokens,
                     peakDate: dailyBuckets[0].date,
                     sevenDayTokens: dailyBuckets.reduce((sum, bucket) => sum + bucket.tokens, 0),
-                },
+                    todayDate: dailyBuckets.at(-1).date,
+                    latestReportedDate: dailyBuckets.at(-1).date,
+                    updatedAt: Date.now(),
+                };
+            services.codexProvider._setState({
+                ...codexState, tokenUsage: accountTokenUsage, accountTokenUsage,
             });
+        }
+        if (GLib.getenv('SHADOW_UI_COST_SAMPLE') === 'true') {
+            const current = services.codexProvider.getState();
+            const day = new Date();
+            const days = Array.from({length: 7}, (_value, index) => {
+                const date = new Date(day.getFullYear(), day.getMonth(),
+                    day.getDate() - 6 + index, 12);
+                return {
+                    date: `${date.getFullYear()}-` +
+                        `${String(date.getMonth() + 1).padStart(2, '0')}-` +
+                        String(date.getDate()).padStart(2, '0'),
+                    cost: index === 6 ? 1.23 : 0.50,
+                    tokens: 1000,
+                    unknownTokens: index === 2 ? 100 : 0,
+                    invalidRecords: 0,
+                };
+            });
+            services.codexProvider._setState({...current, costUsage: {
+                available: true, today: days.at(-1).date, days,
+                priceDate: '2026-09-29', failedFiles: 0,
+            }});
         }
         const displayLocation = GLib.getenv('SHADOW_TEST_DISPLAY_LOCATION');
         if (displayLocation && services?.weatherProvider) {
@@ -289,22 +329,27 @@ export default class UiSmokeExtension extends Extension {
         services.codexActivityMonitor.stop();
         services.codexActivityMonitor.start();
         await settle(80);
-        services.codexProvider.refresh = originalMascotRefresh;
+        // Keep the captured account snapshot stable during geometry assertions.
 
         indicator.menu.open();
         await settle();
         report.tabWidths = [...(indicator._tabs?._buttons?.values?.() ?? [])]
             .map(({button}) => button.width);
+        report.weatherWarmedBeforeSwitch =
+            Boolean(indicator._pages.get('weather')?._styleWarmed);
         const sequence = report.moduleIds.includes('weather')
             ? ['codex', 'weather', 'codex', 'weather']
             : ['codex', 'codex', 'codex', 'codex'];
         for (const id of sequence) {
+            const switchStart = GLib.get_monotonic_time();
             indicator._select(id);
+            const switchMs = (GLib.get_monotonic_time() - switchStart) / 1000;
             await settle();
             const page = indicator._pages.get(id);
             const labels = labelsIn(page.actor);
             report.tabSwitches.push({
                 id,
+                switchMs,
                 page: allocation(page.actor),
                 stack: allocation(indicator._pageStack),
                 scroll: scrollState(page),
@@ -315,39 +360,30 @@ export default class UiSmokeExtension extends Extension {
                         labels.includes(services?.weatherProvider?.getState()?.current?.condition?.label),
             });
             if (id === 'codex') {
-                report.graph = allocation(findStyle(page.actor, 'shadow-token-sparkline'));
+                const heatmaps = findStyles(page.actor, 'shadow-account-heatmap');
+                const daily = findStyle(page.actor, 'shadow-activity-view-daily');
+                const weekly = findStyle(page.actor, 'shadow-activity-view-weekly');
+                report.graph = allocation(heatmaps[0]);
+                report.heatmap = {daily: allocation(heatmaps[0]),
+                    monthCount: findStyles(page.actor, 'shadow-activity-months')[0]?.get_children().length ?? 0,
+                    interactive: heatmaps.every(actor => actor.reactive && actor.can_focus),
+                    dailyLabels: labelsIn(page.actor)};
+                weekly.emit('clicked', 1);
+                await settle(80);
+                report.heatmap.weekly = allocation(heatmaps[1]);
+                report.heatmap.weeklyLabels = labelsIn(page.actor);
+                await captureScreenshot(GLib.getenv('SHADOW_UI_WEEKLY_SCREENSHOT'));
+                report.heatmap.treePreserved = heatmaps[0] === findStyles(page.actor, 'shadow-account-heatmap')[0];
+                daily.emit('clicked', 1);
+                await settle(80);
                 await captureScreenshot(GLib.getenv('SHADOW_UI_GRAPH_SCREENSHOT'));
-                const dayLabels = findStyle(page.actor, 'shadow-spark-days');
-                report.graphDayLabels = {
-                    ...allocation(dayLabels),
-                    count: dayLabels?.get_children?.().length ?? 0,
-                    expectedCount: services?.codexProvider?.getState()
-                        ?.tokenUsage?.dailyBuckets?.length ?? 0,
-                    positions: dayLabels?.get_children?.().map(label => ({
-                        x: label.x,
-                        width: label.width,
-                    })) ?? [],
-                    texts: dayLabels?.get_children?.().map(label => label.text) ?? [],
-                };
-                const graphTargets = findStyles(page.actor, 'shadow-token-point-target');
-                report.graphPointTooltips = {
-                    count: graphTargets.length,
-                    expectedCount: services?.codexProvider?.getState()
-                        ?.tokenUsage?.dailyBuckets?.length ?? 0,
-                    interactive: graphTargets.every(target => target.reactive && target.track_hover),
-                };
-                const tokenRow = findStyle(page.actor, 'shadow-token-row');
+                const todayRow = findStyles(page.actor, 'shadow-cost-period')
+                    .find(row => labelsIn(row).some(label => label.startsWith('Today')));
                 report.todayMetric = {
-                    labels: labelsIn(tokenRow),
-                    accessibleName: tokenRow?.get_first_child?.()?.accessible_name ?? null,
-                    canonicalTokens: services?.codexProvider?.getState()?.tokenUsage
-                        ?.dailyBuckets?.find(bucket => {
-                            const now = new Date();
-                            const key = `${now.getFullYear()}-` +
-                                `${String(now.getMonth() + 1).padStart(2, '0')}-` +
-                                String(now.getDate()).padStart(2, '0');
-                            return bucket.date === key;
-                        })?.tokens ?? null,
+                    labels: labelsIn(todayRow),
+                    accessibleName: todayRow?.accessible_name ?? null,
+                    canonicalTokens: services?.codexProvider?.getState()
+                        ?.accountTokenUsage?.todayTokens ?? null,
                 };
                 if (!report.progressGeometry) {
                     const provider = services.codexProvider;
@@ -373,6 +409,7 @@ export default class UiSmokeExtension extends Extension {
                     provider._setState(originalState);
                     await settle();
                 }
+                report.costSummary = allocation(findStyle(page.actor, 'shadow-spend-summary'));
                 report.codexFooter = allocation(findStyle(page.actor, 'shadow-codex-footer'));
                 report.historyBadgeIcon = allocation(findStyle(page.actor, 'shadow-status-icon'));
             } else {
@@ -450,9 +487,8 @@ export default class UiSmokeExtension extends Extension {
             services = indicator._extension.getRuntimeServices();
         }
 
-        // Exercise the popup-to-provider policy only after any intentionally
-        // deferred startup rebuild has settled. Stub refresh here so the smoke
-        // helper verifies signals/timers without spawning extra Codex helpers.
+        // Exercise the popup-to-provider policy after any startup rebuild.
+        // Refresh is stubbed so timing checks cover the UI scheduling path.
         const codexProvider = services.codexProvider;
         const originalRefresh = codexProvider.refresh.bind(codexProvider);
         let immediateRefreshes = 0;
@@ -462,15 +498,21 @@ export default class UiSmokeExtension extends Extension {
         };
         if (report.moduleIds.includes('weather'))
             indicator._select('weather');
+        const popupStart = GLib.get_monotonic_time();
         indicator.menu.open();
-        await settle();
-        report.popupRefreshImmediate = immediateRefreshes === 1;
+        report.popupOpenCallMs = (GLib.get_monotonic_time() - popupStart) / 1000;
+        report.popupRefreshDeferred = immediateRefreshes === 0;
+        await settle(240);
+        report.popupRefreshAfterPaint = immediateRefreshes ===
+            (report.moduleIds.includes('weather') ? 0 : 1);
         report.codexVisibleAfterPopupOpen = codexProvider._viewVisible;
+        const beforeCodexTab = immediateRefreshes;
+        const codexTabStart = GLib.get_monotonic_time();
         indicator._select('codex');
-        await settle();
-        report.codexTabRefreshImmediate = report.moduleIds.includes('weather')
-            ? immediateRefreshes === 2
-            : immediateRefreshes === 1;
+        report.codexTabCallMs = (GLib.get_monotonic_time() - codexTabStart) / 1000;
+        report.codexTabRefreshDeferred = immediateRefreshes === beforeCodexTab;
+        await settle(240);
+        report.codexTabRefreshAfterPaint = immediateRefreshes === 1;
         report.codexVisibleAfterTab = codexProvider._viewVisible;
         indicator._select('codex');
         await settle();
@@ -480,6 +522,11 @@ export default class UiSmokeExtension extends Extension {
         await settle();
         report.codexBackgroundAfterClose = !codexProvider._viewVisible;
         report.timerCountAfterFocusedClose = services.scheduler._sources.size;
+        const beforeQuickClose = immediateRefreshes;
+        indicator.menu.open();
+        indicator.menu.close();
+        await settle(240);
+        report.quickCloseCancelsRefresh = immediateRefreshes === beforeQuickClose;
         codexProvider.refresh = originalRefresh;
 
         const originalCodexState = codexProvider.getState();
@@ -504,11 +551,44 @@ export default class UiSmokeExtension extends Extension {
             report.topBarAutomaticUpdate = true;
         }
 
+        indicator.menu.open();
+        const stableCodexPage = indicator._pages.get('codex');
+        const originalAccountState = codexProvider.getState();
+        const stableTree = stableCodexPage.actor.get_first_child();
+        const nextAccountUsage = originalAccountState.accountTokenUsage
+            ? {...originalAccountState.accountTokenUsage, updatedAt: Date.now()}
+            : null;
+        const nextCostUsage = originalAccountState.costUsage
+            ? {...originalAccountState.costUsage, updatedAt: Date.now()}
+            : null;
+        codexProvider._setState({
+            ...originalAccountState,
+            status: 'refreshing',
+            accountUsageStatus: 'refreshing',
+            accountTokenUsage: nextAccountUsage,
+            tokenUsage: nextAccountUsage,
+            costUsage: nextCostUsage,
+        });
+        report.accountRefreshTreePreserved =
+            stableCodexPage.actor.get_first_child() === stableTree;
+        report.accountCheckingCaption = labelsIn(stableCodexPage.actor)
+            .includes('ACCOUNT TOKENS · CHECKING');
+        codexProvider._setState(originalAccountState);
+        const restoredCaption = originalAccountState.accountUsageStatus === 'refreshing'
+            ? 'ACCOUNT TOKENS · CHECKING' : 'ACCOUNT TOKENS';
+        report.accountRefreshCaptionRestored = labelsIn(stableCodexPage.actor)
+            .includes(restoredCaption);
+        await settle();
+        indicator.menu.close();
+
         for (let cycle = 0; cycle < 20; cycle++) {
+            const cycleStart = GLib.get_monotonic_time();
             indicator.menu.open();
             if (indicator.menu.isOpen)
                 report.openCloseCycles++;
             indicator.menu.close();
+            report.openCloseCallMsMax = Math.max(report.openCloseCallMsMax ?? 0,
+                (GLib.get_monotonic_time() - cycleStart) / 1000);
         }
         const hiddenChildren = new Map([...indicator._pages]
             .map(([id, page]) => [id, page.actor.get_first_child()]));
@@ -526,7 +606,11 @@ export default class UiSmokeExtension extends Extension {
             await settle(120);
         }
         report.reopened = indicator.menu.isOpen;
+        const [, popupY] = indicator._root.get_transformed_position();
+        const [, popupHeight] = indicator._root.get_transformed_size();
+        report.popupFitsScreen = popupY >= 0 && popupY + popupHeight <= global.stage.height;
         await captureScreenshot(GLib.getenv('SHADOW_UI_SCREENSHOT'));
+        services.codexProvider.refresh = originalMascotRefresh;
         indicator.menu.close();
         if (GLib.getenv('SHADOW_UI_LIFECYCLE') === 'true') {
             // Allow the intentionally short page/tab exit transitions to

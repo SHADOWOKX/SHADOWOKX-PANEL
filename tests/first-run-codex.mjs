@@ -95,14 +95,16 @@ try {
     if (scenario === 'authenticated') {
         equal(state.status, 'success', 'authenticated first run loads current limits');
         equal(state.weekly.remainingPercent, 89, 'authenticated first run shows current capacity');
-        equal(state.tokenUsage.dailyBuckets.length, 1,
-            'authenticated first run does not import older account-side history');
-        equal(state.tokenUsage.dailyBuckets[0].date, dateKey(),
-            'authenticated first run records only its first current-day sample');
-        ok(GLib.file_test(
+        equal(state.tokenUsage.dailyBuckets.length, 2,
+            'authenticated first run keeps both account-reported daily buckets');
+        equal(state.tokenUsage.dailyBuckets[0].date, dateKey(-1),
+            'yesterday remains dated as the account reported it');
+        equal(state.tokenUsage.dailyBuckets[1].date, dateKey(),
+            'today remains dated as the account reported it');
+        ok(!GLib.file_test(
             GLib.build_filenamev([dataDirectory, 'codex-history.json']),
-            GLib.FileTest.IS_REGULAR
-        ), 'local history is created under the isolated user data directory');
+            GLib.FileTest.EXISTS
+        ), 'account usage does not create a synthetic local history');
         ok(GLib.file_test(
             GLib.build_filenamev([cacheDirectory, 'codex.json']),
             GLib.FileTest.IS_REGULAR
@@ -119,8 +121,8 @@ try {
         equal(state.status, 'success', 'existing history loads with current limits');
         equal(state.tokenUsage.dailyBuckets.length, 2,
             'existing history gains exactly one current-day entry');
-        equal(state.tokenUsage.dailyBuckets[0].tokens, 100,
-            'older local history is not replaced by account-side history');
+        equal(state.tokenUsage.dailyBuckets[0].tokens, 999,
+            'old local history does not override account-reported tokens');
         const refreshed = await provider.refresh(true);
         equal(refreshed.tokenUsage.dailyBuckets.length, 2,
             'repeated refresh does not duplicate same-day history');
@@ -129,8 +131,8 @@ try {
         );
         ok(loaded, 'the current-limit cache is readable');
         const cached = JSON.parse(new TextDecoder().decode(cacheBytes));
-        equal(cached.tokenUsage.dailyBuckets.length, 0,
-            'current-limit cache remains separate from local graph history');
+        equal(cached.accountTokenUsage.dailyBuckets.length, 2,
+            'cache preserves only the reported account buckets');
     }
 } finally {
     provider.destroy();

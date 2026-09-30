@@ -1,8 +1,8 @@
 import Clutter from 'gi://Clutter';
 import St from 'gi://St';
 import {attachTooltip} from '../../ui/components.js';
-import {localUsageDateKey} from './normalize.js';
 import {formatCost} from './cost.js';
+import {localUsageDateKey} from './normalize.js';
 
 const tokensFormatter = new Intl.NumberFormat('en-US', {maximumFractionDigits: 0});
 
@@ -35,79 +35,69 @@ function accountTokensForDate(accountUsage, date) {
     return Number.isSafeInteger(bucket?.tokens) ? bucket.tokens : null;
 }
 
-function estimateAccountCost(accountTokens, localCost, localPricedTokens) {
-    if (!Number.isSafeInteger(accountTokens) || !Number.isFinite(localCost) ||
-        !Number.isSafeInteger(localPricedTokens) || localPricedTokens <= 0)
-        return null;
-    return localCost / localPricedTokens * accountTokens;
-}
-
-function localTotal(days, field) {
-    return days.reduce((total, day) => total + (Number.isFinite(day[field]) ? day[field] : 0), 0);
-}
-
-export function costRow(usage, accountUsage) {
+export function costRow(accountUsage, localUsage, accountUsageStatus) {
     const box = new St.BoxLayout({vertical: true, style_class: 'shadow-cost-row', x_expand: true});
-    const localDays = usage?.days ?? [];
     const todayDate = localUsageDateKey(Date.now());
     const yesterdayDate = shiftDate(todayDate, -1);
-    const weekStartDate = shiftDate(todayDate, -6);
-    const localDayForDate = date => localDays.find(day => day.date === date);
-    const week = localDays.filter(day => day.date >= weekStartDate && day.date <= todayDate);
     const todayTokens = accountTokensForDate(accountUsage, todayDate);
+    const caption = new St.BoxLayout({style_class: 'shadow-cost-caption', x_expand: true});
+    const accountStatusLabel = new St.Label({
+        text: accountUsageStatus === 'refreshing' ? 'ACCOUNT TOKENS · CHECKING' : 'ACCOUNT TOKENS', style_class: 'shadow-muted', x_expand: true,
+    });
+    caption.add_child(accountStatusLabel);
+    box._shadowAccountStatusLabel = accountStatusLabel;
+    box.add_child(caption);
     const periods = [
         {
             title: `Today · ${formatDate(todayDate)}`,
             tokens: todayTokens,
-            localCost: localDayForDate(todayDate)?.cost,
-            pricedTokens: localDayForDate(todayDate)?.pricedTokens,
         },
         {
             title: `Yesterday · ${formatDate(yesterdayDate)}`,
             tokens: accountTokensForDate(accountUsage, yesterdayDate),
-            localCost: localDayForDate(yesterdayDate)?.cost,
-            pricedTokens: localDayForDate(yesterdayDate)?.pricedTokens,
         },
         {
-            title: 'Last 7 Days',
+            title: accountUsage?.dailyBuckets?.length
+                ? `Last 7 days · ${accountUsage.dailyBuckets.length} reported` : 'Last 7 days',
             tokens: accountUsage?.sevenDayTokens,
-            localCost: localTotal(week, 'cost'),
-            pricedTokens: localTotal(week, 'pricedTokens'),
         },
     ];
     for (const period of periods) {
         const row = new St.BoxLayout({style_class: 'shadow-cost-period', x_expand: true,
             y_align: Clutter.ActorAlign.CENTER});
         row.add_child(new St.Label({text: period.title, style_class: 'shadow-muted', x_expand: true}));
-        const cost = usage?.available
-            ? estimateAccountCost(period.tokens, period.localCost, period.pricedTokens) : null;
-        const amount = Number.isSafeInteger(period.tokens)
-            ? `${cost === null ? '—' : `≈${formatCost(cost)}`} · ${tokensFormatter.format(period.tokens)} tokens`
-            : period.title.startsWith('Today') && accountUsage ? 'Not reported yet' : '—';
-        const value = new St.Label({text: amount, style_class: 'shadow-cost-amount'});
-        row.add_child(value);
+        if (Number.isSafeInteger(period.tokens)) {
+            row.add_child(new St.Label({
+                text: tokensFormatter.format(period.tokens),
+                style_class: 'shadow-cost-amount',
+            }));
+        } else {
+            row.add_child(new St.Label({
+                text: period.title.startsWith('Today') && accountUsage
+                    ? 'Pending' : '—',
+                style_class: 'shadow-cost-amount',
+            }));
+        }
         row.accessible_name = `${period.title}: ${Number.isSafeInteger(period.tokens)
             ? `${tokensFormatter.format(period.tokens)} account tokens`
             : period.title.startsWith('Today') && accountUsage
                 ? 'Codex account has not reported this date yet'
-                : 'account token total unavailable'}` +
-            `${cost === null ? '' : `, estimated API-equivalent cost ${formatCost(cost)}`}`;
-        value.accessible_name = row.accessible_name;
+                : 'account token total unavailable'}`;
         box.add_child(row);
     }
 
     const latestDate = accountUsage?.latestReportedDate ?? accountUsage?.dailyBuckets?.at(-1)?.date ?? null;
     if (!accountUsage) {
         const note = new St.Label({
-            text: 'Waiting for Codex account token data. Local session totals are not substituted.',
+            text: 'Account token data unavailable',
             style_class: 'shadow-cost-note shadow-muted', x_expand: true,
         });
         note.clutter_text.set_line_wrap(true);
         box.add_child(note);
     } else if (!Number.isSafeInteger(todayTokens)) {
-        const latest = latestDate ? ` · Latest account data: ${formatDate(latestDate)}` : '';
+        const status = latestDate ? `Account data through ${formatDate(latestDate)}` : 'Today pending from account';
         const note = new St.Label({
-            text: `Today's usage isn't available yet${latest}`,
+            text: status,
             style_class: 'shadow-cost-note shadow-muted', x_expand: true,
         });
         note.clutter_text.set_line_wrap(true);
@@ -115,27 +105,39 @@ export function costRow(usage, accountUsage) {
         box.add_child(note);
     }
 
-    box.accessible_name = 'Exact Codex account token totals with approximate API-equivalent cost';
-    attachTooltip(box, () => {
-        if (!accountUsage)
-            return 'Account token totals are unavailable. Refresh Codex usage to load them.';
-        const updated = Number.isFinite(accountUsage.updatedAt)
-            ? `Account response read ${new Date(accountUsage.updatedAt).toLocaleString()}.\n`
-            : '';
-        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'device local time';
-        const latest = latestDate ? `Latest account date returned: ${latestDate}.\n` : '';
-        const todayNote = Number.isSafeInteger(todayTokens) ? ''
-            : `No account bucket for ${todayDate}; today's account total is not reported yet.\n`;
-        const models = usage?.models?.map(model =>
-            `${model.model}: ${model.priced ? formatCost(model.cost) : 'Unpriced'}`).join('\n') ?? '';
-        return `${updated}${latest}${todayNote}` +
-            'Token totals come from the Codex account usage response. Its daily buckets contain date-only startDate values, but the response does not provide a timezone or day-boundary rule; the panel preserves those dates and compares them with the device calendar.' +
-            ` Device time zone: ${timezone}.\n` +
-            'USD is a standard API-equivalent estimate: it applies the locally recorded, priced model/cache mix to the exact account token totals. Fast-mode premiums and tool-call fees are excluded; it is not a Codex or ChatGPT subscription charge.\n' +
-            `${usage?.partial ? 'Some local token records or models are unpriced, so the estimate extrapolates from the priced session mix.' : 'Local session pricing data is complete for recognized models.'}` +
-            `${usage?.stale ? '\nThe local model/cache scan is using its last available result.' : ''}` +
-            `${models ? `\n\nLocal session models\n${models}` : ''}` +
-            `\nPrices checked ${usage?.priceDate ?? '—'} · USD. Allowance percentages are separate from token totals.`;
-    });
+    if (!localUsage?.available || localUsage.today !== todayDate) {
+        box.accessible_name = 'Token totals reported by your Codex account. Missing dates are not estimated.';
+        return box;
+    }
+    const spend = new St.BoxLayout({style_class: 'shadow-spend-summary', x_expand: true});
+    const weekStart = shiftDate(todayDate, -6);
+    const localDays = localUsage.days.filter(day => day.date >= weekStart && day.date <= todayDate);
+    const today = localDays?.find(day => day.date === todayDate);
+    const periodsCost = [today, localDays ? {cost: localDays.reduce((sum, day) => sum + day.cost, 0),
+        tokens: localDays.reduce((sum, day) => sum + day.tokens, 0),
+        unknownTokens: localDays.reduce((sum, day) => sum + day.unknownTokens, 0),
+        invalidRecords: localDays.reduce((sum, day) => sum + (day.invalidRecords ?? 0), 0)} : null];
+    const amounts = periodsCost.map(period => period &&
+        period.tokens > period.unknownTokens ? period.cost : null);
+    const incomplete = periodsCost.map(period => Boolean(period && (
+        period.unknownTokens > 0 || period.invalidRecords > 0 || localUsage?.failedFiles > 0)));
+    for (const [index, title] of ['Today', '7 days'].entries()) {
+        const cell = new St.BoxLayout({vertical: true, x_expand: true,
+            style_class: 'shadow-spend-cell'});
+        cell.add_child(new St.Label({text: `${title} · device estimate`,
+            style_class: 'shadow-muted shadow-spend-caption'}));
+        const amount = new St.Label({text: Number.isFinite(amounts[index])
+            ? `≈${formatCost(amounts[index])}${incomplete[index] ? ' *' : ''}` : '—',
+            style_class: 'shadow-spend-value'});
+        if (Number.isFinite(amounts[index])) {
+            attachTooltip(amount, 'USD estimate for recorded sessions on this device, using model-specific input, cached input and output prices. Not an account bill. ' +
+                (incomplete[index] ? 'Partial: some models or records could not be priced. ' : '') +
+                `Standard rates; fast-mode premiums and tool fees excluded. Recorded tokens in this period: ${tokensFormatter.format(periodsCost[index]?.tokens ?? 0)}. Prices checked ${localUsage?.priceDate ?? 'unavailable'}.`);
+        }
+        cell.add_child(amount);
+        spend.add_child(cell);
+    }
+    box.add_child(spend);
+    box.accessible_name = 'Token totals reported by your Codex account. Missing dates are not estimated.';
     return box;
 }

@@ -1,3 +1,4 @@
+import {accountActivityCalendar, weeklyAccountActivity} from '../lib/activity.js';
 import {weatherArtwork} from '../ui/weatherIcon.js';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
@@ -41,6 +42,7 @@ import {
     normalizeCodexHistory,
     withoutCodexHistory,
 } from '../modules/codex/history.js';
+import {estimateTokens, summarizeCosts} from '../modules/codex/cost.js';
 import {CodexProvider} from '../modules/codex/provider.js';
 import {
     CodexActivityMonitor,
@@ -233,6 +235,36 @@ function testModuleConfiguration() {
         'removed pages safely fall back to Codex');
 }
 
+function testAccountActivityCalendar() {
+    const calendar = accountActivityCalendar([
+        {date: '2025-09-30', tokens: 9999},
+        {date: '2025-10-01', tokens: 0},
+        {date: '2026-09-27', tokens: 10},
+        {date: '2026-09-28', tokens: 20},
+        {date: '2026-09-30', tokens: 8888},
+    ], '2026-09-29');
+    equal(calendar.months.length, 12, 'calendar displays twelve months');
+    equal(calendar.months[0].label, 'Oct', 'calendar begins with correct month');
+    equal(calendar.reportedDays, 3, 'only reported dates in displayed period count');
+    equal(calendar.activeDays, 2, 'reported zero is not active');
+    equal(calendar.peak.tokens, 20, 'peak excludes dates outside displayed period');
+    equal(calendar.cells.find(cell => cell.date === '2026-09-29').tokens, null,
+        'unreported current day never becomes zero');
+    equal(calendar.cells.find(cell => cell.date === '2025-10-01').tokens, 0,
+        'reported zero remains a real zero');
+    const weekly = weeklyAccountActivity(calendar);
+    const current = weekly.cells.find(cell => cell.date === '2026-09-27');
+    equal(current.tokens, 30, 'weekly total sums exact account values');
+    equal(current.reportedDays, 2, 'weekly total exposes missing date coverage');
+    equal(current.expectedDays, 3, 'current week ends at today');
+    equal(weekly.cells.find(cell => cell.date === '2025-10-05').tokens, null,
+        'missing week is not assigned fake zero');
+    equal(accountActivityCalendar([], '2026-02-30').cells.length, 0,
+        'invalid calendar date rejected');
+    equal(accountActivityCalendar([{date: '2024-02-29', tokens: 12}], '2024-03-01')
+        .peak.date, '2024-02-29', 'leap day retains date');
+}
+
 function testSparklineData() {
     const normalized = normalizeSparklineBuckets([
         {date: '2026-08-30', tokens: 20},
@@ -376,6 +408,7 @@ function testCodexNormalization() {
     equal(state.tokenUsage.lifetimeTokens, 885_281_875, 'lifetime token usage is normalized');
     equal(state.tokenUsage.peakDate, '2026-08-09', 'peak token day keeps the real bucket date');
     equal(state.tokenUsage.peakHour, null, 'peak hour is not fabricated from daily buckets');
+    equal(state.tokenUsage.activityBuckets.length, 2, 'full activity history retained separately');
     equal(state.tokenUsage.dailyBuckets.length, 1,
         'only verified buckets from the current seven-day window are retained');
     equal(state.tokenUsage.sevenDayTokens, 5_822_658,
@@ -434,10 +467,67 @@ function testCodexNormalization() {
             peakDate: '2026-08-20',
         },
     });
-    equal(cachedUsage.tokenUsage.todayTokens, 678,
-        'validated token activity survives a cached refresh');
-    equal(cachedUsage.tokenUsage.dailyBuckets.length, 0,
-        'older caches without history remain compatible');
+    equal(cachedUsage.tokenUsage, null,
+        'legacy token totals cannot silently replace account-reported usage');
+    const todayKey = localUsageDateKey(Date.now());
+    const accountCache = normalizeCachedRateLimits({
+        lastSuccessfulRefresh: Date.now(),
+        weekly: {usedPercent: 10, resetsAt: 2_000_000_000},
+        accountTokenUsage: {dailyBuckets: [{date: todayKey, tokens: 678}]},
+    });
+    equal(accountCache.tokenUsage.todayTokens, 678,
+        'account-reported daily usage survives a cached refresh');
+    const olderDate = localUsageDateKey(Date.now() - 30 * 86_400_000);
+    const activityCache = normalizeCachedRateLimits({
+        lastSuccessfulRefresh: Date.now(),
+        weekly: {usedPercent: 10, resetsAt: 2_000_000_000},
+        accountTokenUsage: {activityBuckets: [
+            {date: olderDate, tokens: 123}, {date: todayKey, tokens: 678},
+        ]},
+    });
+    equal(activityCache.tokenUsage.activityBuckets.length, 2, 'cache retains annual account activity');
+    equal(activityCache.tokenUsage.dailyBuckets.length, 1, 'annual cache does not expand seven-day totals');
+    equal(activityCache.tokenUsage.sevenDayTokens, 678, 'cached seven-day sum stays exact');
+
+}
+
+function testAccountAndCostAccuracy() {
+    const nowMs = new Date(2026, 8, 29, 12).getTime();
+    const day = localUsageDateKey(nowMs);
+    const yesterday = localUsageDateKey(new Date(2026, 8, 28, 12).getTime());
+    const usage = normalizeAccountTokenUsage({dailyUsageBuckets: [
+        {startDate: yesterday, tokens: 12},
+    ]}, nowMs);
+    equal(usage.todayTokens, null, 'a missing current account day stays unavailable');
+    equal(usage.latestReportedDate, yesterday, 'latest report date stays attached to its bucket');
+    equal(usage.sevenDayTokens, 12, 'seven-day value uses only reported account buckets');
+    const unsafe = normalizeAccountTokenUsage({dailyUsageBuckets: [
+        {startDate: yesterday, tokens: Number.MAX_SAFE_INTEGER},
+        {startDate: day, tokens: 1},
+    ]}, nowMs);
+    equal(unsafe.sevenDayTokens, null, 'unsafe token sums are not displayed as exact');
+    const normal = estimateTokens('gpt-6-sol', {
+        input_tokens: 1000, cached_input_tokens: 500,
+        output_tokens: 200, total_tokens: 1200,
+    });
+    ok(Math.abs(normal.cost - 0.0031) < 1e-12,
+        'USD estimate applies official input, cached input, and output prices');
+    const long = estimateTokens('gpt-6-sol', {
+        input_tokens: 272001, cached_input_tokens: 0,
+        output_tokens: 1, total_tokens: 272002,
+    });
+    ok(Math.abs(long.cost - ((272001 * 4 + 15) / 1e6)) < 1e-12,
+        'long-context premium applies above the official input threshold');
+    equal(estimateTokens('unknown-model', {
+        input_tokens: 10, cached_input_tokens: 0,
+        output_tokens: 2, total_tokens: 12,
+    }).cost, null, 'unknown models remain unpriced');
+    const summary = summarizeCosts([{model: 'unknown-model',
+        timestamp: new Date(nowMs).toISOString(), key: 'unknown',
+        usage: {input_tokens: 10, cached_input_tokens: 0,
+            output_tokens: 2, total_tokens: 12}}], nowMs);
+    equal(summary.days.at(-1).unknownTokens, 12,
+        'unpriced device tokens are marked on the affected day');
 }
 
 function testCodexPortability() {
@@ -983,21 +1073,23 @@ async function testPersistenceAndRefreshCoalescing() {
     equal((await firstRunStore.read(null)).ready, true,
         'first-run storage creates and reads its file without manual setup');
 
+    const baseDate = new Date();
     const dates = Array.from({length: 10}, (_value, index) => ({
-        date: `2026-08-${String(index + 1).padStart(2, '0')}`,
+        date: localUsageDateKey(new Date(baseDate.getFullYear(),
+            baseDate.getMonth(), baseDate.getDate() - 9 + index, 12).getTime()),
         tokens: index + 1,
     }));
     const cached = normalizeCachedRateLimits({
         lastSuccessfulRefresh: Date.now(),
         weekly: {usedPercent: 10, resetsAt: 2_000_000_000},
-        tokenUsage: {
+        accountTokenUsage: {
             lifetimeTokens: 100,
             dailyBuckets: [...dates, {...dates.at(-1), tokens: 99}],
         },
     });
     equal(cached.tokenUsage.dailyBuckets.length, 7,
         'cached token history remains bounded to seven daily buckets');
-    equal(cached.tokenUsage.dailyBuckets[0].date, '2026-08-04',
+    equal(cached.tokenUsage.dailyBuckets[0].date, dates[3].date,
         'history bounds retain the newest chronological days');
     equal(cached.tokenUsage.dailyBuckets.at(-1).tokens, 99,
         'duplicate cached days keep the latest valid value');
@@ -1094,9 +1186,7 @@ async function testAdaptiveCodexRefreshLifecycle() {
     const scheduler = new RecordingScheduler();
     const provider = new CodexProvider(new FakeSettings(), scheduler, null);
     provider._cache.read = async () => null;
-    provider._historyStore.read = async () => null;
     provider._cache.write = async () => {};
-    provider._historyStore.write = async () => {};
     let refreshes = 0;
     provider._refresh = async () => {
         refreshes++;
@@ -1139,7 +1229,6 @@ async function testAdaptiveCodexRefreshLifecycle() {
     const startupProvider = new CodexProvider(new FakeSettings(), startupScheduler, null);
     let finishCacheRead = null;
     startupProvider._cache.read = () => new Promise(resolve => { finishCacheRead = resolve; });
-    startupProvider._historyStore.read = async () => null;
     let startupRefreshes = 0;
     startupProvider._refresh = async () => {
         startupRefreshes++;
@@ -1161,15 +1250,15 @@ async function testFrequentCodexRefreshIntegrity() {
     const scheduler = new RecordingScheduler();
     const provider = new CodexProvider(new FakeSettings(), scheduler, null);
     provider._cache.read = async () => null;
-    provider._historyStore.read = async () => null;
     let cacheWrites = 0;
-    let historyWrites = 0;
     provider._cache.write = async () => { cacheWrites++; };
-    provider._historyStore.write = async () => { historyWrites++; };
     let usedPercent = 94;
+    let accountTokens = 200;
+    let accountReads = 0;
     let fail = false;
     const today = localUsageDateKey(Date.now());
     provider._readAppServer = async () => {
+        accountReads++;
         if (fail)
             throw new Error('temporary failure');
         return {
@@ -1185,7 +1274,7 @@ async function testFrequentCodexRefreshIntegrity() {
             },
             usageResponse: {
                 summary: {lifetimeTokens: 5_000},
-                dailyUsageBuckets: [{startDate: today, tokens: 200}],
+                dailyUsageBuckets: [{startDate: today, tokens: accountTokens}],
             },
         };
     };
@@ -1199,21 +1288,24 @@ async function testFrequentCodexRefreshIntegrity() {
     let state = await provider.start();
     equal(state.weekly.remainingPercent, 6, 'initial live Codex value is truthful');
     equal(cacheWrites, 1, 'first live limit sample is cached once');
-    equal(historyWrites, 1, 'first current-day token sample is stored once');
 
     usedPercent = 95;
+    accountTokens = 225;
     state = await scheduler.run('codex-refresh');
     equal(state.weekly.remainingPercent, 5, 'automatic refresh publishes a changed percentage');
+    equal(state.accountTokenUsage.todayTokens, 225,
+        'every refresh publishes the newest account-reported token bucket');
+    equal(accountReads, 2, 'account read runs on each refresh');
     equal(observedRemaining.at(-1), 5,
         'provider subscribers receive automatic changes for the top bar');
     equal(state.tokenUsage.dailyBuckets.length, 1,
         'frequent refresh keeps one real history bucket for the current day');
-    equal(historyWrites, 1, 'unchanged same-day activity is not written again');
 
     const writesAfterChange = cacheWrites;
     state = await scheduler.run('codex-refresh');
     equal(cacheWrites, writesAfterChange,
-        'unchanged limits do not cause another cache write');
+        'unchanged account buckets do not cause another cache write');
+    equal(accountReads, 3, 'unchanged account data is still reread on refresh');
 
     fail = true;
     const previousReset = state.weekly.resetsAt;
@@ -1322,9 +1414,11 @@ testFormatting();
 testCodexActivitySignals();
 testModuleConfiguration();
 testSparklineData();
+testAccountActivityCalendar();
 testProgressGeometry();
 testSchedulerLifecycle();
 testCodexNormalization();
+testAccountAndCostAccuracy();
 testCodexPortability();
 testCodexLocalHistory();
 testTopBarSummaries();

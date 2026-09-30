@@ -22,8 +22,10 @@ const expectWeatherTopBar = expect('SHADOW_SHOW_WEATHER_TOP_BAR');
 const pageWidths = new Set(report.tabSwitches.map(item => item.page.width));
 const scrolling = report.tabSwitches.some(item => item.scroll?.needsScroll);
 
-const badPolicy = report.tabSwitches.some(item =>
-    item.scroll?.needsScroll ? item.scroll.policy === 2 : item.scroll.policy !== 2);
+const badPolicy = report.tabSwitches.some(item => item.scroll && (
+    !item.scroll.pageMapped || item.scroll.fitPending ||
+    !Number.isFinite(item.scroll.measuredNaturalHeight) ||
+    (item.scroll.needsScroll ? item.scroll.policy === 2 : item.scroll.policy !== 2)));
 const badLifecycle = expectLifecycle && (!report.disabledRemoved || !report.reenabled ||
     report.timerCountAfterReenable !== report.expectedTimerCount);
 const badModules = report.moduleIds.includes('weather') !== expectWeatherPanel ||
@@ -55,36 +57,39 @@ const badLocation = expectWeatherPanel && (!report.weatherLocation ||
     report.weatherLocation.width <= 0 ||
     report.weatherLocation.width > report.weatherLocation.parentWidth ||
     report.weatherLocation.ellipsize === 0);
-const dayLabels = report.graphDayLabels;
-const badDayLabels = !dayLabels?.visible || dayLabels.count < 2 || dayLabels.count > 7 ||
-    dayLabels.count !== dayLabels.expectedCount || dayLabels.positions.some(label =>
-        label.x < 0 || label.x + label.width > dayLabels.width) ||
-    dayLabels.count <= 3 && dayLabels.texts.some(label =>
-        label.length <= 1 || !/\d/.test(label));
-const badGraphTooltips = !report.graphPointTooltips ||
-    report.graphPointTooltips.count !== report.graphPointTooltips.expectedCount ||
-    !report.graphPointTooltips.interactive;
-const badTodayMetric = !report.todayMetric?.labels?.includes('Today') ||
-    !Number.isSafeInteger(report.todayMetric.canonicalTokens) ||
-    !report.todayMetric.accessibleName?.includes(
-        new Intl.NumberFormat('en-US').format(report.todayMetric.canonicalTokens)
-    );
+const heatmap = report.heatmap;
+const badHeatmap = !heatmap?.daily?.visible || !heatmap?.weekly?.visible ||
+    heatmap.daily.width < 250 || heatmap.weekly.width < 250 ||
+    heatmap.daily.height !== 54 || heatmap.weekly.height !== 54 ||
+    heatmap.monthCount !== 12 || !heatmap.interactive || !heatmap.treePreserved ||
+    !heatmap.dailyLabels.includes('Daily peak') || !heatmap.weeklyLabels.includes('Weekly peak');
+const badTodayMetric = !report.todayMetric?.labels?.some(label => label.startsWith('Today')) ||
+    (Number.isSafeInteger(report.todayMetric.canonicalTokens)
+        ? !report.todayMetric.accessibleName?.includes(
+            new Intl.NumberFormat('en-US').format(report.todayMetric.canonicalTokens))
+        : !report.todayMetric.labels.includes('Pending') ||
+          !report.todayMetric.accessibleName?.includes('not reported'));
 const badProgress = report.progressGeometry?.length !== 2 ||
     report.progressGeometry.some(item => !Number.isFinite(item.usableWidth) ||
         item.usableWidth <= 0 || !Number.isFinite(item.fillWidth)) ||
     Math.abs(report.progressGeometry[0].fillWidth /
         report.progressGeometry[0].usableWidth - 0.98) > 0.005 ||
     report.progressGeometry[1].fillWidth !== report.progressGeometry[1].usableWidth;
-const badCodexPolish = !report.codexFooter || report.codexFooter.width <= 300 ||
-    !report.historyBadgeIcon?.visible || badDayLabels || badGraphTooltips ||
+const badCostSummary = expect('SHADOW_UI_COST_SAMPLE') &&
+    (!report.costSummary?.visible || report.costSummary.width <= 0);
+const badCodexPolish = badCostSummary || !report.codexFooter || report.codexFooter.width <= 300 ||
+    badHeatmap ||
     badTodayMetric || badProgress;
 const badPage = report.tabSwitches.length !== 4 || report.tabSwitches.some(item =>
     !item.hasExpectedContent || item.page.width <= 0 || item.page.height <= 0 ||
     item.stack.height <= 0 || item.childCount < 2);
-const badCodexRefreshLifecycle = !report.popupRefreshImmediate ||
+const badCodexRefreshLifecycle = !report.popupRefreshDeferred ||
+    !report.popupRefreshAfterPaint ||
     report.codexVisibleAfterPopupOpen !== !expectWeatherPanel ||
-    !report.codexTabRefreshImmediate || !report.codexVisibleAfterTab ||
-    report.sameTabRefreshes !== (expectWeatherPanel ? 2 : 1) ||
+    !report.codexTabRefreshDeferred || !report.codexTabRefreshAfterPaint ||
+    !report.codexVisibleAfterTab || report.sameTabRefreshes !== 1 ||
+    !report.quickCloseCancelsRefresh || !report.accountRefreshTreePreserved ||
+    !report.accountCheckingCaption || !report.accountRefreshCaptionRestored ||
     !report.codexBackgroundAfterClose || !report.topBarAutomaticUpdate ||
     report.timerCountWhileCodexVisible !== report.expectedTimerCount + 1 ||
     report.timerCountAfterFocusedClose !== report.expectedTimerCount;
@@ -96,7 +101,8 @@ if (!report.reopened || !report.usageSettingUpdatedLive ||
     !report.refreshStateExercised || pageWidths.size !== 1 ||
     scrolling !== expectScroll || badPolicy || badLifecycle || badModules ||
     badWeatherTopBar || badUsageState || badMascot || badHourly || badUv || badLocation ||
-    badCodexPolish ||
+    badCodexPolish || (Number(GLib.getenv('SHADOW_UI_HEIGHT')) >= 768 &&
+        Number(GLib.getenv('SHADOW_TEXT_SCALE')) <= 1 && !report.popupFitsScreen) ||
     report.graph.width <= 0 || report.graph.height < 45 || badPage ||
     badCodexRefreshLifecycle) {
     throw new Error(JSON.stringify(report));
