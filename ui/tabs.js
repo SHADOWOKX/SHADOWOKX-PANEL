@@ -2,7 +2,7 @@ import Clutter from 'gi://Clutter';
 import St from 'gi://St';
 
 import {MODULE_META} from '../lib/constants.js';
-import {accentRgba, animationsEnabled, moduleIcon} from './components.js';
+import {accentRgba, animationsEnabled, attachTooltip, moduleIcon} from './components.js';
 
 export class TabStrip {
     constructor(extension, settings, moduleIds, onSelected) {
@@ -11,7 +11,8 @@ export class TabStrip {
         this._buttons = new Map();
         this._activeId = null;
         this.actor = new St.BoxLayout({
-            style_class: 'shadow-tab-strip shadow-segmented-control',
+            style_class: 'shadow-tab-strip shadow-segmented-control' +
+                (moduleIds.length > 2 ? ' shadow-provider-strip' : ''),
             x_expand: true,
         });
         this.actor.layout_manager.homogeneous = true;
@@ -37,7 +38,10 @@ export class TabStrip {
                 style_class: 'shadow-tab-icon-tile',
                 y_align: Clutter.ActorAlign.CENTER,
             }));
-            content.add_child(label);
+            if (moduleIds.length <= 2)
+                content.add_child(label);
+            else
+                label.destroy();
             const button = new St.Button({
                 child: new St.Bin({
                     child: content,
@@ -57,6 +61,7 @@ export class TabStrip {
             });
             button.connect('key-press-event', (_button, event) =>
                 this._onKeyPress(id, event));
+            attachTooltip(button, meta.name);
             this.actor.add_child(button);
             this._buttons.set(id, {button, content, icon, label});
         }

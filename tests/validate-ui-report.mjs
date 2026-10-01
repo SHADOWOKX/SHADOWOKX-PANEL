@@ -29,23 +29,22 @@ const badPolicy = report.tabSwitches.some(item => item.scroll && (
 const badLifecycle = expectLifecycle && (!report.disabledRemoved || !report.reenabled ||
     report.timerCountAfterReenable !== report.expectedTimerCount);
 const badModules = report.moduleIds.includes('weather') !== expectWeatherPanel ||
-    (expectWeatherPanel
-        ? report.tabWidths.length !== 2 || report.tabWidths[0] !== report.tabWidths[1]
-        : report.tabWidths.length !== 0);
+    report.tabWidths.length !== report.moduleIds.length ||
+    report.tabWidths.some(width => width <= 0 || Math.abs(width - report.tabWidths[0]) > 1);
 const badWeatherTopBar = report.weatherTopBarVisible !== expectWeatherTopBar;
 const badUsageState = report.usageStateVisible !== Boolean(report.usageStateKey) ||
     (!report.usageStateSetting && report.usageStateVisible);
-const badMascot = !report.mascotSleepingIdle || !report.mascotWakingTransition ||
+const badMascot = !report.mascotSleepingIdle || !report.mascotPopupStatic ||
     !report.mascotPopupAwake ||
     !report.mascotAwakeDuringCloseDelay || !report.mascotSleepsAfterClose ||
-    !report.mascotGoingToSleepTransition || !report.mascotSleepingToActive ||
+    !report.mascotIdleStatic || !report.mascotSleepingToActive ||
     !report.mascotAwakeToActive || !report.mascotActiveToAwake ||
     !report.mascotActiveLoop || !report.mascotActivePriority ||
     !report.mascotSettingStopsAnimation || !report.mascotAnimationsDisabledSemantic ||
     !report.mascotReducedMotion ||
     !report.mascotLabelStable || report.mascotLabelGap < 6 || report.mascotLabelGap > 8 ||
     report.mascotPostCloseDelayMs < 2000 || report.mascotPostCloseDelayMs > 4000 ||
-    report.mascotSleepDelayMs < 8000 || report.mascotSleepDelayMs > 15000 ||
+    report.mascotSleepDelayMs !== 0 ||
     report.mascotSize?.width !== 20 || report.mascotSize?.height !== 20 ||
     report.mascotSize?.indicatorHeight > report.mascotSize?.panelHeight;
 const badHourly = expectWeatherPanel && (!report.hourly ||
@@ -94,7 +93,8 @@ const badCodexRefreshLifecycle = !report.popupRefreshDeferred ||
     report.timerCountWhileCodexVisible !== report.expectedTimerCount + 1 ||
     report.timerCountAfterFocusedClose !== report.expectedTimerCount;
 
-if (!report.reopened || !report.usageSettingUpdatedLive ||
+if (!report.octopusScenes || !report.octopusFixedSize || !report.octopusStopsWhenIdle || !report.mascotIdleDespiteVariety || !report.mascotApplicationStatic || report.aiPages?.length !== 6 || report.aiPages.some(page => !page.ready || page.width <= 0 || page.height <= 0) ||
+    !report.aiAllowanceRendered || !report.focusKeepsSelectedAllowance || !report.selectedProviderSummary || !report.reopened || !report.usageSettingUpdatedLive ||
     !report.unchangedCodexStateIgnored ||
     !report.hiddenPageTreesPreserved || !report.refreshTreesPreserved ||
     report.openCloseCycles !== 20 || report.scrollResetValue !== 0 ||

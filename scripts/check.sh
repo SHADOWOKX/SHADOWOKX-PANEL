@@ -10,7 +10,7 @@ cd "$shadow_project_dir"
 gjs -m scripts/validate-json.mjs metadata.json package.json
 gjs -m scripts/validate-release.mjs "$shadow_project_dir"
 xmllint --noout schemas/org.gnome.shell.extensions.shadow-panel.gschema.xml
-for shadow_mascot in icons/mascot/*.svg icons/weather/*.svg; do
+for shadow_mascot in icons/mascot/*.svg icons/weather/*.svg icons/providers/*.svg; do
   xmllint --noout "$shadow_mascot"
 done
 if rg -n '<image|data:|href="https?://' icons/mascot/*.svg; then
@@ -19,11 +19,13 @@ if rg -n '<image|data:|href="https?://' icons/mascot/*.svg; then
 fi
 glib-compile-schemas --strict --dry-run schemas
 gjs -m tests/validate-mascot.mjs "$shadow_project_dir"
+python3 tests/validate-clawd-layout.py
 
 SHADOW_PANEL_TEST_ISOLATED=1 \
 XDG_DATA_HOME="$shadow_test_dir/data" \
 XDG_CACHE_HOME="$shadow_test_dir/cache" \
 gjs -m tests/run-tests.mjs
+SHADOW_PANEL_TEST_ISOLATED=1 XDG_CONFIG_HOME="$shadow_test_dir/config" gjs -m tests/ai-providers.mjs
 
 for shadow_scenario in authenticated unauthenticated missing existing-history; do
   shadow_case_dir="$shadow_test_dir/first-run-$shadow_scenario"

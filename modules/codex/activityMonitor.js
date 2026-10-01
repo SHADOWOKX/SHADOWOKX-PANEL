@@ -74,6 +74,12 @@ export function parseCodexSessionActivity(text) {
             continue;
         }
 
+        if (record?.type === 'response_item' && record.payload?.type === 'message' &&
+            record.payload?.role === 'assistant' && record.payload?.phase === 'final_answer') {
+            events.push({kind: 'terminal', type: 'task_complete', turnId: null,
+                timestamp: eventTimestamp(record)});
+            continue;
+        }
         if (record?.type === 'response_item' &&
             ACTIVITY_RESPONSE_TYPES.has(record.payload?.type)) {
             events.push({
@@ -290,8 +296,8 @@ export class CodexActivityMonitor extends Observable {
         if (this._destroyed)
             return;
         const previous = this._pendingReads.get(path);
-        if (previous)
-            GLib.Source.remove(previous.id);
+        // Coalesce writes without postponing reads during a busy stream.
+        if (previous) { previous.initial ||= initial; return; }
         const id = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 80, () => {
             this._pendingReads.delete(path);
             this._readSession(path, initial || previous?.initial);
@@ -377,9 +383,10 @@ export class CodexActivityMonitor extends Observable {
             return;
         }
         if (event.kind === 'terminal') {
-            if (event.turnId)
+            if (event.turnId) {
                 this._activeTurns.delete(key);
-            else
+                this._activeTurns.delete(this._turnKey(path, null));
+            } else
                 this._dropTurnsForPath(path);
             if (this._activeTurns.size > 0) {
                 this._markActivity('session', event.timestamp, true);
@@ -402,9 +409,10 @@ export class CodexActivityMonitor extends Observable {
         if (this._pathHasActiveTurn(path)) {
             this._markActivity('session', event.timestamp, true);
         } else if (ACTIVITY_RESPONSE_TYPES.has(event.type)) {
-            // A Shell reload may begin tailing after task_started. Direct model/tool
-            // response records are still genuine work; give only those a short pulse.
-            this._markActivity('session', event.timestamp, false);
+            // Desktop sessions and a bounded tail can omit task_started. Model/tool
+            // output establishes a live turn, held until its explicit final response.
+            this._activeTurns.add(this._turnKey(path, null));
+            this._markActivity('session', event.timestamp, true);
         }
     }
 

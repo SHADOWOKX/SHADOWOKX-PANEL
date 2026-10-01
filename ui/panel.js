@@ -11,8 +11,9 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 import {formatCountdown, formatResetDate} from '../lib/format.js';
-import {ACCENTS, MODULE_IDS, MODULE_META} from '../lib/constants.js';
-import {chooseInitialModule} from '../lib/moduleConfig.js';
+import {ACCENTS, MODULE_META} from '../lib/constants.js';
+import {usageTaskActive} from '../modules/ai/normalize.js';
+import {chooseInitialModule, visibleModules} from '../lib/moduleConfig.js';
 import {
     codexRemainingSummary,
     codexLimitColor,
@@ -70,15 +71,16 @@ class ShadowIndicator extends PanelMenu.Button {
         this._popupOpen = false;
         this._destroyed = false;
         this._codexState = null;
+        this._codexTaskActive = false;
         this._weatherState = null;
+        this._applicationState = {openIds: [], focusedId: null};
         this._notificationSource = null;
         this._lastUsageState = null;
         this._visibleRefreshId = 0;
         this._lastWeatherArtwork = null;
         this._mounted = false;
         this._mountSignalId = 0;
-        this._moduleIds = MODULE_IDS.filter(id =>
-            id !== 'weather' || settings.get_boolean('show-weather-panel'));
+        this._moduleIds = visibleModules(settings);
 
         this._buildIndicator();
         this._buildDashboard();
@@ -199,7 +201,7 @@ class ShadowIndicator extends PanelMenu.Button {
         }, 'shadow-icon-button shadow-settings-button'));
         this._root.add_child(header);
 
-        if (this._moduleIds.length > 1) {
+        if (this._moduleIds.length > 0) {
             this._tabs = new TabStrip(
                 this._extension,
                 this._settings,
@@ -243,6 +245,7 @@ class ShadowIndicator extends PanelMenu.Button {
             fitPageScroll: (scroll, pageActor) => this._fitPageScroll(scroll, pageActor),
             codexProvider: services.codexProvider,
             weatherProvider: services.weatherProvider,
+            aiProviders: services.aiProviders,
         };
 
         this._subscriptions.push(services.codexProvider.subscribe(state => {
@@ -252,9 +255,28 @@ class ShadowIndicator extends PanelMenu.Button {
             this._syncIndicator();
         }));
         this._subscriptions.push(services.codexActivityMonitor.subscribe(state => {
-            if (!this._destroyed)
-                this._mascot?.setState(state.active ? 'active' : 'idle', {completed: state.completed === true});
+            if (this._destroyed) return;
+            this._codexTaskActive = state.active;
+            this._syncMascotActivity();
         }));
+        const taskExpiryId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 3, () => {
+            if (this._destroyed) return GLib.SOURCE_REMOVE;
+            this._syncMascotActivity();
+            return GLib.SOURCE_CONTINUE;
+        });
+        this._subscriptions.push(() => GLib.Source.remove(taskExpiryId));
+        this._subscriptions.push(services.aiActivityMonitor.subscribe(state => {
+            if (this._destroyed) return;
+            this._applicationState = state;
+            this._syncMascotActivity();
+            this._syncIndicator();
+        }));
+        for (const provider of services.aiProviders.values()) {
+            this._subscriptions.push(provider.subscribe(() => {
+                this._syncMascotActivity();
+                this._syncIndicator();
+            }));
+        }
         if (services.weatherProvider) {
             this._subscriptions.push(services.weatherProvider.subscribe(state => {
                 if (this._destroyed)
@@ -289,6 +311,9 @@ class ShadowIndicator extends PanelMenu.Button {
         );
         if (initial)
             this._select(initial);
+        else
+            this._pageStack.add_child(stateMessage('preferences-system-symbolic',
+                'No providers visible', 'Add or show an AI provider in Settings.'));
     }
 
     _activeWorkArea() {
@@ -399,8 +424,30 @@ class ShadowIndicator extends PanelMenu.Button {
                 this._queueVisibleRefresh();
         }
         selectedPage?.activate();
+        this._syncIndicator();
         if (this._settings.get_boolean('remember-last-tab'))
             this._settings.set_string('last-selected-tab', id);
+    }
+
+    _syncMascotActivity() {
+        const services = this._extension.getRuntimeServices();
+        const reported = [...(services.aiProviders?.values() ?? [])].some(provider =>
+            usageTaskActive(provider.getState()?.data));
+        const active = (this._moduleIds.includes('codex') && this._codexTaskActive) || reported;
+        this._mascot?.setState(active ? 'active' : 'idle');
+    }
+
+    _activeSubscriptionSummary() {
+        // Follow the subscription selected by the user, never window focus.
+        const candidates = [this._activeId, ...this._moduleIds];
+        const id = candidates.find(value => value && value !== 'weather' && this._moduleIds.includes(value)) ?? 'codex';
+        if (id === 'codex') return {id, name: 'Codex',
+            window: this._codexState?.weekly ?? this._codexState?.fiveHour,
+            percent: codexRemainingSummary(this._codexState)};
+        const state = this._extension.getRuntimeServices().aiProviders?.get(id)?.getState();
+        const window = state?.data?.windows.find(value => /week/i.test(value.label)) ?? state?.data?.windows[0];
+        return {id, name: MODULE_META[id].name, window,
+            percent: window && (!window.resetsAt || window.resetsAt > Date.now()) ? Math.round(100 - window.usedPercent) : null};
     }
 
     _syncIndicator() {
@@ -411,11 +458,12 @@ class ShadowIndicator extends PanelMenu.Button {
         const constrained = monitorWidth < 900;
         const singleItem = monitorWidth < 650;
 
-        const codexWindow = this._codexState?.weekly ?? this._codexState?.fiveHour;
-        const codexPercent = codexRemainingSummary(this._codexState);
+        const summary = this._activeSubscriptionSummary();
+        const codexWindow = summary.window;
+        const codexPercent = summary.percent;
         const codexParts = [];
-        if (this._settings.get_boolean('show-codex-remaining') && codexPercent !== null)
-            codexParts.push(`${codexPercent}%`);
+        if (this._settings.get_boolean('show-codex-remaining'))
+            codexParts.push(codexPercent !== null ? `${codexPercent}%` : '—%');
         if (!constrained && this._settings.get_boolean('show-codex-reset-countdown')) {
             const countdown = resetCountdown(codexWindow);
             if (countdown)
@@ -427,10 +475,10 @@ class ShadowIndicator extends PanelMenu.Button {
         setIfChanged(this._codexSummary.label, 'text', codexParts.join('  '));
         setIfChanged(this._codexSummary.label, 'style', `color: ${codexLimitColor(codexPercent)};`);
         setIfChanged(this._codexSummary.label, 'visible', codexParts.length > 0);
-        setIfChanged(this._codexSummary.item, 'visible', codexIcon || codexParts.length > 0);
+        setIfChanged(this._codexSummary.item, 'visible', this._moduleIds.some(id => id !== 'weather') && (codexIcon || codexParts.length > 0));
         const codexAccessibleName = codexPercent === null
-            ? 'Codex remaining capacity unavailable'
-            : `Codex ${codexPercent}% remaining`;
+            ? `${summary.name} remaining capacity unavailable`
+            : `${summary.name} ${codexPercent}% remaining`;
         const usageStateLabel = this._syncUsageState();
         setIfChanged(this._codexSummary.item, 'accessible_name', usageStateLabel
             ? `${codexAccessibleName}, ${usageStateLabel.toLowerCase()}`
@@ -472,7 +520,8 @@ class ShadowIndicator extends PanelMenu.Button {
     }
 
     _syncUsageState() {
-        const enabled = this._settings.get_boolean('show-codex-usage-state') &&
+        const enabled = this._activeSubscriptionSummary().id === 'codex' &&
+            this._settings.get_boolean('show-codex-usage-state') &&
             this._settings.get_boolean('show-codex-remaining') &&
             codexRemainingSummary(this._codexState) !== null;
         const state = enabled ? codexUsagePace(this._codexState) : null;
@@ -533,13 +582,14 @@ class ShadowIndicator extends PanelMenu.Button {
 
     _indicatorTooltipText() {
         const lines = [];
-        const codexPercent = codexRemainingSummary(this._codexState);
+        const summary = this._activeSubscriptionSummary();
+        const codexPercent = summary.percent;
         const usageState = this._settings.get_boolean('show-codex-usage-state')
             ? codexUsagePace(this._codexState)
             : null;
-        const codexWindow = this._codexState?.weekly ?? this._codexState?.fiveHour;
+        const codexWindow = summary.window;
         if (codexPercent !== null) {
-            lines.push(`Codex · ${codexPercent}% remaining`);
+            lines.push(`${summary.name} · ${codexPercent}% remaining`);
             if (Number.isFinite(codexWindow?.resetsAt))
                 lines.push(`Resets ${formatResetDate(codexWindow.resetsAt)}`);
             if (usageState)

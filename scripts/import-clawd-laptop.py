@@ -49,7 +49,15 @@ for frame in range(int(document['ip']), int(document['op'])):
     for (x, y), color in sorted(cells.items()):
         paths.setdefault(color, []).append(f'M{x} {y}h1v1h-1z')
     body = ''.join(f'<path fill="{color}" d="{"".join(rects)}"/>' for color, rects in paths.items())
-    svg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="14 13 36 25" shape-rendering="crispEdges">' + body + '</svg>\n'
+    body = body.replace('<path fill="#8b8b8b"', '<path transform="translate(-5.5 0)" fill="#8b8b8b"')
+    visible_cells = [(x - (5.5 if color == '#8b8b8b' else 0), y) for (x, y), color in cells.items()]
+    left = min(x for x, y in visible_cells)
+    right = max(x for x, y in visible_cells) + 1
+    top = min(y for x, y in visible_cells)
+    bottom = max(y for x, y in visible_cells) + 1
+    size = max(24.5, right - left + 2 if right - left > 24.5 else 24.5, bottom - top + 2)
+    viewbox = f'{(left + right - size) / 2:g} {(top + bottom - size) / 2:g} {size:g} {size:g}'
+    svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="{viewbox}" shape-rendering="crispEdges">' + body + '</svg>\n'
     name = f'laptop-{frame:02}.svg'
     (output / name).write_text(svg)
     duration = round((frame + 1) * 1000 / document['fr']) - round(frame * 1000 / document['fr'])

@@ -1,13 +1,14 @@
 # Shadowokx Panel
 
-A lightweight cross-platform panel for checking **ChatGPT Codex usage** and **local weather** from one place.
+A lightweight panel for checking **AI subscription usage** and **local weather**. Linux 3.0 adds provider logo tabs for Codex, Claude, OpenCode, Command Code, DeepSeek, GLM and Gemini; connection capabilities are detailed below. Windows remains on the Codex and Weather preview.
 
-Linux `2.3.11` · Windows `2.1 Preview 2`.
+Linux `3.1.2` · Windows `2.1 Preview 2`.
 
+- Provider logo buttons with settings to add, hide or remove panel connections
 - Weekly and 5-hour Codex limits
 - Clawd types on the original laptop animation during live Codex work and celebrates a successful completed turn
 - Four animated companions: Shadow Robot, Codex Companion, Clawd (official pixel companion) and Penguin
-- Terminal, Clay and Glacier themes alongside the existing surface presets
+- Fourteen surface presets including Dracula, Catppuccin, Ocean and Rosé Pine; thirteen accent colors and a custom color picker
 - Compact account activity heatmap with daily and weekly views
 - Local weather, UV, hourly forecast, and sunrise/sunset
 - Native Linux and Windows interfaces
@@ -167,3 +168,45 @@ Build the installable package:
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).
+
+## AI subscriptions · 3.0
+
+The top selector switches between Codex, Claude, OpenCode, Command Code, DeepSeek, GLM / Z.ai, Gemini and Weather. With several providers enabled it uses compact logo buttons with tooltips and arrow-key navigation. Settings → AI providers lets you hide a provider without losing its connection, remove its panel connection, and add it again. Removing a provider never cancels the subscription or deletes provider credentials. Connections refresh every minute and when their page opens. Settings changes appear after the popup closes.
+
+Codex continues to read the local app-server. Claude uses the official Claude Code status-line `rate_limits` fields. In Settings → AI providers → Claude, press **Connect**, restart Claude Code and send a prompt. Existing custom status lines are automatically chained, and a private `settings.shadow-panel-backup.json` preserves the original settings. The exporter stores only allowance fields, never conversation content. [Claude status-line documentation](https://code.claude.com/docs/en/statusline).
+
+For DeepSeek, select a private text file containing only your API key. Leave the usage JSON path empty to read the official `GET https://api.deepseek.com/user/balance` endpoint. This reports **API balance**, not an invented subscription percentage. The token is read only when needed and is never stored in GSettings or logged. [DeepSeek balance documentation](https://api-docs.deepseek.com/api/get-user-balance/).
+
+OpenCode, Command Code, GLM and Gemini currently use a **usage JSON export**. These buttons alone do not automatically retrieve account limits. Configure a source produced by your provider integration, or write it to `$XDG_CONFIG_HOME/shadow-panel/usage/<provider>.json` (default `~/.config/shadow-panel/usage/`). All non-Codex providers also accept a custom usage JSON file. The source must report real account allowance or balance, rather than context-window utilization:
+
+```json
+{
+  "plan": "Your plan",
+  "updatedAt": "2026-10-01T14:30:00Z",
+  "windows": [
+    {"label": "Weekly allowance", "usedPercent": 35, "resetsAt": "2026-10-08T14:30:00Z"}
+  ],
+  "balance": {"amount": 12.50, "currency": "USD"},
+  "tokens": {"total": 125000}
+}
+```
+
+Optional values remain hidden when absent. Missing or malformed sources show a connection message; stale sources and failed refreshes are marked, and expired windows are discarded. Authentication files do not contain enough information to infer remaining allowances, so they are not treated as usage sources. Use **Open provider dashboard** to view billing directly.
+
+Appearance includes Dracula, Catppuccin, Ocean and Rosé Pine, plus the existing ten surface presets, light/dark/system mode, thirteen accent colors and the custom color picker.
+
+## Companion and quick connections · 3.1
+
+**Vary work animations** chooses laptop work, walking, jumping and waving while a task is running. Idle, app-open and popup-open states stay static; they never start an animation. The system reduced-motion setting and the animation toggle still apply. Open AI windows and supported CLI processes are detected locally every three seconds; application presence does not imply token consumption. The top-bar allowance follows the focused provider or selected provider page.
+
+Clawd uses a fixed 26px icon allocation in every state, with vector frames centered inside that allocation. Laptop frames use the same visible character width as standing frames, so the companion does not shrink while typing.
+
+In **Settings → AI providers**, use **Connect** for Claude, paste a DeepSeek key into its password entry and press the apply arrow, or use **Choose file…** for another provider's exported usage JSON. The file picker validates usage before connecting. Files are watched for changes, so updated exports appear immediately without waiting for the minute polling interval. Signing into the provider dashboard by itself does not make its subscription limits available: OpenCode, Command Code, GLM and Gemini still require a usage export.
+
+### Work-only animation · 3.1.2
+
+An open client, focused window, updated balance or usage refresh does not start the mascot. Codex uses actual task/session events. Other provider exports can explicitly report `activity: {"active": true, "updatedAt": "...", "expiresAt": "..."}`; reports must be timestamped and expire (30 seconds by default, at most two minutes per report). Without a valid task report, the companion stays still. Work stops cancel the animation immediately; sleeping poses do not schedule background movement.
+
+### Work and allowance fixes · 3.1.2
+
+The top-bar allowance follows the selected subscription, independent of window focus. An unconnected provider displays an explicit unavailable percentage instead of hiding the value. Codex Desktop sessions without a task-start marker are detected from model/tool work and remain active through quiet tool waits until the explicit assistant final response or task completion. Quota refreshes remain idle.

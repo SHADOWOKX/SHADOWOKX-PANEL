@@ -212,10 +212,15 @@ export default class UiSmokeExtension extends Extension {
             usageStateSetting: indicator._settings.get_boolean('show-codex-usage-state'),
             usageStateKey: indicator._lastUsageState,
             usageStateVisible: indicator._codexPaceIcon.visible,
-            expectedTimerCount: services?.weatherProvider ? 2 : 1,
+            expectedTimerCount: (services?.weatherProvider ? 3 : 2) + (services?.aiProviders?.size ?? 0),
         };
 
         const originalMascotSetting = indicator._settings.get_boolean('animated-mascot');
+        const originalSyncMascotActivity = indicator._syncMascotActivity;
+        indicator._syncMascotActivity = () => {};
+        services.aiActivityMonitor._windows = () => [];
+        services.aiActivityMonitor._procRoot = '/shadow-panel-test-no-processes';
+        await services.aiActivityMonitor.refresh();
         const originalAnimationsSetting = indicator._settings.get_boolean('animations');
         services.codexActivityMonitor.stop();
         indicator._settings.set_boolean('animated-mascot', true);
@@ -237,7 +242,7 @@ export default class UiSmokeExtension extends Extension {
         indicator._mascot._postCloseDelayMs = 80;
         indicator.menu.open();
         await settle(40);
-        report.mascotWakingTransition = indicator._mascot._state === 'waking';
+        report.mascotPopupStatic = indicator._mascot._state === 'awake' && indicator._mascot._activeId === 0;
         await settle(340);
         report.mascotPopupAwake = indicator._mascot._state === 'awake' &&
             indicator._mascot._currentFrame === 'robot-awake.svg';
@@ -245,8 +250,7 @@ export default class UiSmokeExtension extends Extension {
         await settle(30);
         report.mascotAwakeDuringCloseDelay = indicator._mascot._state === 'awake';
         await settle(80);
-        report.mascotGoingToSleepTransition =
-            indicator._mascot._state === 'going-to-sleep';
+        report.mascotIdleStatic = indicator._mascot._state === 'sleeping' && indicator._mascot._activeId === 0;
         await settle(340);
         report.mascotSleepsAfterClose = indicator._mascot._state === 'sleeping' &&
             indicator._mascot._currentFrame === 'robot-sleep.svg';
@@ -600,8 +604,82 @@ export default class UiSmokeExtension extends Extension {
             .every(([id, page]) => page.actor.get_first_child() === hiddenChildren.get(id));
         report.unchangedCodexStateIgnored = !indicator._pages.get('codex')._stateDirty;
         indicator.menu.open();
+        indicator._settings.set_boolean('mascot-continuous', true);
+        indicator._mascot.setState('active');
+        indicator._mascot.setState('idle', {completed: true});
+        indicator.menu.close();
+        const idleFrameCount = indicator._mascot._activeFrame;
+        await settle(550);
+        report.mascotIdleDespiteVariety = indicator._mascot._state !== 'active' &&
+            indicator._mascot._activeId === 0 && indicator._mascot._sleepId === 0 &&
+            indicator._mascot._activeFrame === idleFrameCount;
+        indicator._mascot.setApplicationOpen(true);
+        await settle(200);
+        report.mascotApplicationStatic = indicator._mascot._state !== 'active' && indicator._mascot._activeId === 0;
+        indicator._mascot.setApplicationOpen(false);
+        indicator.menu.open();
+        const {MascotController} = await import(Gio.File.new_for_path(
+            `${indicator._extension.path}/ui/mascot.js`).get_uri());
+        const testSettings = {
+            get_string: key => key === 'mascot-character' ? 'octopus' : indicator._settings.get_string(key),
+            get_boolean: key => key === 'mascot-continuous' ? true : indicator._settings.get_boolean(key),
+            connect: (...args) => indicator._settings.connect(...args),
+            disconnect: id => indicator._settings.disconnect(id),
+        };
+        const octopus = new MascotController(indicator._extension, testSettings, 20);
+        indicator._indicatorBox.add_child(octopus.actor);
+        octopus.setAnimationsEnabled(true);
+        octopus.setState('active');
+        await settle(100);
+        const fixedSize = [octopus.actor.width, octopus.actor.height];
+        const phases = [octopus._currentFrame];
+        for (let phase = 0; phase < 3; phase++) {
+            octopus._clearMotionTimer();
+            octopus._startActiveSequence();
+            phases.push(octopus._currentFrame);
+            await settle(20);
+        }
+        report.octopusScenes = phases[0].startsWith('laptop-') && phases[1].startsWith('crabwalking-') &&
+            phases[2].startsWith('jumpinghappy-') && phases[3].startsWith('waving-');
+        report.octopusFixedSize = fixedSize[0] === 26 && fixedSize[1] === 26 &&
+            octopus.actor.width === 26 && octopus.actor.height === 26;
+        octopus.setState('idle', {completed: true});
+        const stoppedFrame = octopus._currentFrame;
+        octopus.setApplicationOpen(true);
+        await settle(200);
+        report.octopusStopsWhenIdle = octopus._activeId === 0 && octopus._sleepId === 0 &&
+            octopus._currentFrame === stoppedFrame;
+        octopus.destroy();
+        indicator._syncMascotActivity = originalSyncMascotActivity;
+        indicator._syncMascotActivity();
+        report.aiPages = [];
+        for (const [id, provider] of services.aiProviders ?? []) {
+            indicator._select(id);
+            await settle();
+            const page = indicator._pages.get(id);
+            report.aiPages.push({id, width: page.actor.width, height: page.actor.height,
+                ready: findStyles(page.actor, 'shadow-text-button').some(button => button.label === 'Open provider dashboard')});
+        }
+        const claudeProvider = services.aiProviders?.get('claude');
+        if (claudeProvider) {
+            claudeProvider._setState({status: 'ready', error: null, data: {
+                windows: [{label: 'Weekly allowance', usedPercent: 35, resetsAt: Date.now() + 3600000}],
+                balances: [], tokens: null, plan: 'UI test subscription', updatedAt: Date.now(),
+            }});
+            indicator._select('claude');
+            await settle();
+            report.aiAllowanceRendered = labelsIn(indicator._pages.get('claude').actor).includes('65% remaining');
+            report.selectedProviderSummary = indicator._codexSummary.label.text === '65%' &&
+                indicator._codexSummary.item.accessible_name.includes('Claude');
+            const applicationState = indicator._applicationState;
+            indicator._applicationState = {focusedId: 'gemini', openIds: ['gemini']};
+            indicator._syncIndicator();
+            report.focusKeepsSelectedAllowance = indicator._codexSummary.label.text === '65%';
+            indicator._applicationState = applicationState;
+            indicator._syncIndicator();
+        }
         const capturePage = GLib.getenv('SHADOW_UI_PAGE');
-        if (capturePage === 'codex' || capturePage === 'weather') {
+        if (indicator._pages.has(capturePage)) {
             indicator._select(capturePage);
             await settle(120);
         }

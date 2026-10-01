@@ -228,7 +228,7 @@ function testCodexActivitySignals() {
 
 function testModuleConfiguration() {
     const pages = ['codex', 'weather'];
-    equal(MODULE_IDS.join(','), pages.join(','), 'only Codex and Weather are registered');
+    equal(MODULE_IDS.join(','), 'codex,claude,opencode,commandcode,deepseek,glm,gemini,weather', 'AI providers and Weather are registered');
     equal(chooseInitialModule(pages, true, 'weather', 'codex'), 'weather', 'last page wins');
     equal(chooseInitialModule(pages, false, 'weather', 'codex'), 'codex', 'default page wins');
     equal(chooseInitialModule(pages, true, 'removed', 'codex'), 'codex',
@@ -1157,6 +1157,18 @@ async function testCodexActivityLifecycle() {
     monitor._readSession(sessionPath);
     equal(monitor.getState().active, false,
         'post-terminal token metadata cannot resurrect an idle mascot');
+    const directWork = JSON.stringify({timestamp: new Date().toISOString(), type: 'response_item',
+        payload: {type: 'custom_tool_call'}}) + '\n';
+    GLib.file_set_contents(sessionPath, startRecord + terminalRecord + trailingNoise + directWork);
+    monitor._readSession(sessionPath);
+    await waitMilliseconds(70);
+    equal(monitor.getState().active, true,
+        'desktop work without a task-start marker stays active across quiet tool waits');
+    const finalResponse = JSON.stringify({timestamp: new Date().toISOString(), type: 'response_item',
+        payload: {type: 'message', role: 'assistant', phase: 'final_answer'}}) + '\n';
+    GLib.file_set_contents(sessionPath, startRecord + terminalRecord + trailingNoise + directWork + finalResponse);
+    monitor._readSession(sessionPath);
+    equal(monitor.getState().active, false, 'desktop assistant final response stops inferred work');
     monitor.start();
     provider._setState({
         status: 'success',

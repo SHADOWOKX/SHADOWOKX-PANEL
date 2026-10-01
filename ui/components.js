@@ -7,7 +7,6 @@ import St from 'gi://St';
 import {ACCENTS, MODULE_META} from '../lib/constants.js';
 import {isHexColor} from '../lib/format.js';
 import {progressFillGeometry} from '../lib/progress.js';
-import {staticMascotIcon} from './mascot.js';
 
 export function resolveAccent(settings) {
     const preset = settings.get_string('accent-color');
@@ -103,8 +102,10 @@ export function animateRefreshButton(button, settings, active) {
 }
 
 export function moduleIcon(extension, id, size = 16, styleClass = '') {
-    if (id === 'codex')
-        return staticMascotIcon(extension, size, styleClass);
+    if (MODULE_META[id] && id !== 'weather')
+        return new St.Icon({gicon: Gio.icon_new_for_string(GLib.build_filenamev([
+            extension.path, 'icons', 'providers', `${id}-symbolic.svg`,
+        ])), icon_size: size, style_class: styleClass});
     return new St.Icon({
         icon_size: size,
         style_class: styleClass,

@@ -1,3 +1,5 @@
+import '../modules/ai/page.js';
+import '../modules/ai/provider.js';
 import '../modules/codex/page.js';
 import '../modules/codex/shareImage.js';
 import '../modules/weather/page.js';

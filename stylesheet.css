@@ -1,4 +1,4 @@
-/* Shadowokx Panel 2.3 — focused Codex and Weather utility */
+/* Shadowokx Panel 3.0 — AI subscriptions and Weather */
 
 .shadow-menu-item {
   padding: 0;
@@ -939,3 +939,19 @@
 .shadow-spend-cell { spacing: 2px; }
 .shadow-spend-caption { font-size: 9px; }
 .shadow-spend-value { font-size: 16px; font-weight: 700; font-feature-settings: "tnum"; }
+
+/* Compact provider segments, matching the header action-button treatment. */
+.shadow-provider-strip { min-height: 34px; padding: 4px; spacing: 3px; border-radius: 12px; }
+.shadow-provider-strip .shadow-tab { min-height: 28px; padding: 3px 4px; border-radius: 9px; }
+.shadow-provider-strip .shadow-tab-icon-tile { padding: 3px; border-radius: 6px; }
+.shadow-ai-body { spacing: 12px; }
+.shadow-ai-card { padding: 14px; spacing: 10px; }
+.shadow-ai-value { font-size: 28px; font-weight: bold; }
+.shadow-theme-dark.shadow-bg-dracula { background-color: #282a36; }
+.shadow-theme-light.shadow-bg-dracula { background-color: #f1eef9; }
+.shadow-theme-dark.shadow-bg-catppuccin { background-color: #1e1e2e; }
+.shadow-theme-light.shadow-bg-catppuccin { background-color: #eff1f5; }
+.shadow-theme-dark.shadow-bg-ocean { background-color: #102a35; }
+.shadow-theme-light.shadow-bg-ocean { background-color: #e4f2f4; }
+.shadow-theme-dark.shadow-bg-rose-pine { background-color: #191724; }
+.shadow-theme-light.shadow-bg-rose-pine { background-color: #faf4ed; }

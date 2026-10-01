@@ -88,11 +88,11 @@ function mascotPath(extension, name, character = selectedCharacter(extension)) {
         : GLib.build_filenamev([extension.path, 'icons', 'mascot', character, name]);
 }
 
-function mascotIcon(extension, name, size, styleClass) {
-    if (selectedCharacter(extension) === 'octopus' && styleClass.includes('shadow-panel-mascot'))
-        size = Math.round(size * 1.1);
+function mascotIcon(extension, name, size, styleClass, character = selectedCharacter(extension)) {
+    if (character === 'octopus' && styleClass.includes('shadow-panel-mascot'))
+        size = Math.round(size * 1.3);
     return new St.Icon({
-        gicon: Gio.icon_new_for_string(mascotPath(extension, name)),
+        gicon: Gio.icon_new_for_string(mascotPath(extension, name, character)),
         icon_size: size,
         width: size,
         height: size,
@@ -116,6 +116,9 @@ export class MascotController {
         this._destroyed = false;
         this._state = MascotState.SLEEPING;
         this._codexActive = false;
+        this._appOpen = false;
+        this._continuous = settings.get_boolean('mascot-continuous');
+        this._continuousPhase = 0;
         this._popupOpen = false;
         this._displayEnabled = true;
         this._postCloseDelayMs = MASCOT_POST_CLOSE_AWAKE_MS;
@@ -147,7 +150,8 @@ export class MascotController {
             extension,
             'robot-sleep.svg',
             size,
-            'shadow-panel-mascot'
+            'shadow-panel-mascot',
+            this._character
         );
         this._currentFrame = 'robot-sleep.svg';
         this._actorDestroyId = this.actor.connect('destroy', () => {
@@ -155,6 +159,11 @@ export class MascotController {
             this._destroy(false);
         });
 
+        this._continuousId = settings.connect('changed::mascot-continuous', () => {
+            this._continuous = settings.get_boolean('mascot-continuous');
+            this._cancelMotion();
+            this._reconcileSemanticState();
+        });
         this._settingsId = settings.connect('changed::animated-mascot', () =>
             this._syncAnimationPreference());
         this._animationsId = settings.connect('changed::animations', () =>
@@ -196,21 +205,29 @@ export class MascotController {
         this._reconcileSemanticState();
     }
 
+    _wantsActivity() { return this._codexActive; }
+
+    setApplicationOpen(open) {
+        const next = Boolean(open);
+        if (next === this._appOpen) return;
+        this._appOpen = next;
+        // A client being open is not evidence of a running task.
+        // Leave the current task animation and idle pose untouched.
+    }
+
     setState(state, {completed = false} = {}) {
         const active = state === MascotState.ACTIVE;
         if (this._codexActive === active)
             return;
         this._codexActive = active;
         if (active) {
+            this._continuousPhase = 0;
             this._clearPostCloseTimer();
             this._enterActive();
         } else {
-            if (this._clawd && completed) {
-                this._enterCompleted();
-                return;
-            }
-            this._enterAwake();
-            if (!this._popupOpen)
+            if (this._wantsActivity()) this._enterActive();
+            else this._enterAwake();
+            if (!this._popupOpen && !this._wantsActivity())
                 this._schedulePostCloseSleep();
         }
     }
@@ -222,7 +239,7 @@ export class MascotController {
         this._popupOpen = next;
         if (next) {
             this._clearPostCloseTimer();
-            if (this._codexActive) {
+            if (this._wantsActivity()) {
                 if (this._state !== MascotState.ACTIVE)
                     this._enterActive();
             } else if (this._state === MascotState.SLEEPING ||
@@ -230,7 +247,7 @@ export class MascotController {
                 this._enterWaking();
             else if (this._state !== MascotState.WAKING)
                 this._enterAwake();
-        } else if (!this._codexActive) {
+        } else if (!this._wantsActivity()) {
             if (this._state !== MascotState.WAKING)
                 this._enterAwake();
             this._schedulePostCloseSleep();
@@ -244,7 +261,7 @@ export class MascotController {
     _reconcileSemanticState() {
         if (this._destroyed)
             return;
-        if (this._codexActive) {
+        if (this._wantsActivity()) {
             this._enterActive();
         } else if (this._popupOpen || this._postCloseId) {
             this._setVisualState(MascotState.AWAKE, 'robot-awake.svg');
@@ -254,18 +271,8 @@ export class MascotController {
     }
 
     _enterWaking() {
-        this._cancelMotion();
-        if (!this._canMove()) {
-            this._setVisualState(MascotState.AWAKE, 'robot-awake.svg');
-            return;
-        }
-        this._state = MascotState.WAKING;
-        this._playSequence(this._clawd?.wake ?? WAKE_SEQUENCE, () => {
-            if (this._codexActive)
-                this._enterActive();
-            else
-                this._enterAwake();
-        });
+        // Opening the popup only changes the static pose.
+        this._enterAwake();
     }
 
     _enterAwake() {
@@ -285,48 +292,15 @@ export class MascotController {
         this._startActiveSequence();
     }
 
-    _enterCompleted() {
-        this._cancelMotion();
-        this._clearPostCloseTimer();
-        this._state = MascotState.AWAKE;
-        const finish = () => {
-            this._enterAwake();
-            if (!this._popupOpen)
-                this._schedulePostCloseSleep();
-        };
-        if (!this._canMove()) {
-            finish();
-            return;
-        }
-        this._playSequence([...this._clawd.workOutro, ...this._clawd.complete], finish);
-    }
-
     _enterGoingToSleep() {
-        if (this._codexActive) {
-            this._enterActive();
-            return;
-        }
-        if (this._popupOpen) {
-            this._enterAwake();
-            return;
-        }
-        this._cancelMotion();
-        if (this._clawd) {
-            this._enterSleeping();
-            return;
-        }
-        if (!this._canMove()) {
-            this._enterSleeping();
-            return;
-        }
-        this._state = MascotState.GOING_TO_SLEEP;
-        this._playSequence(SLEEP_SEQUENCE, () => this._enterSleeping());
+        if (this._wantsActivity()) this._enterActive();
+        else if (this._popupOpen) this._enterAwake();
+        else this._enterSleeping();
     }
 
     _enterSleeping() {
         this._cancelMotion();
         this._setVisualState(MascotState.SLEEPING, 'robot-sleep.svg');
-        this._scheduleSleepMotion();
     }
 
     _setVisualState(state, frame) {
@@ -362,13 +336,22 @@ export class MascotController {
     }
 
     _startActiveSequence() {
-        if (!this._codexActive || this._state !== MascotState.ACTIVE || !this._canMove())
+        if (!this._wantsActivity() || this._state !== MascotState.ACTIVE || !this._canMove())
             return;
         if (this._clawd) {
-            const sequence = this._workIntroNeeded ? this._clawd.workIntro : this._clawd.workLoop;
+            let sequence;
+            if (this._continuous) {
+                const phases = [
+                    [...this._clawd.workIntro, ...Array.from({length: 40}, () => this._clawd.workLoop).flat(), ...this._clawd.workOutro],
+                    this._clawd.active[0], this._clawd.active[1], this._clawd.wake,
+                ];
+                sequence = phases[this._continuousPhase++ % phases.length];
+            } else {
+                sequence = this._workIntroNeeded ? this._clawd.workIntro : this._clawd.workLoop;
+            }
             this._workIntroNeeded = false;
             this._playSequence(sequence, () => {
-                if (this._codexActive && this._state === MascotState.ACTIVE && this._canMove())
+                if (this._wantsActivity() && this._state === MascotState.ACTIVE && this._canMove())
                     this._startActiveSequence();
             });
             return;
@@ -385,30 +368,8 @@ export class MascotController {
             ? custom.map(frame => [`robot-active-${String(frame).padStart(2, '0')}.svg`, 150])
             : ACTIVE_SEQUENCES[sequenceIndex];
         this._playSequence(sequence, () => {
-            if (this._codexActive && this._state === MascotState.ACTIVE && this._canMove())
+            if (this._wantsActivity() && this._state === MascotState.ACTIVE && this._canMove())
                 this._startActiveSequence();
-        });
-    }
-
-    _scheduleSleepMotion() {
-        if (!this._canMove() || this._state !== MascotState.SLEEPING)
-            return;
-        const spread = MASCOT_SLEEP_MAX_MS - MASCOT_SLEEP_MIN_MS;
-        const delay = MASCOT_SLEEP_MIN_MS + Math.floor(Math.random() * (spread + 1));
-        this._sleepDelayMs = delay;
-        this._sleepId = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, delay, () => {
-            this._sleepId = 0;
-            if (this._state !== MascotState.SLEEPING || !this._canMove())
-                return GLib.SOURCE_REMOVE;
-            const twitch = Math.random() < 0.35;
-            const sequence = twitch
-                ? [['robot-sleep-twitch.svg', 180], ['robot-sleep.svg', 180]]
-                : [['robot-sleep-breathe.svg', 320], ['robot-sleep.svg', 260]];
-            this._playSequence(this._clawd?.idle ?? sequence, () => {
-                this._show('robot-sleep.svg');
-                this._scheduleSleepMotion();
-            });
-            return GLib.SOURCE_REMOVE;
         });
     }
 
@@ -419,7 +380,7 @@ export class MascotController {
             this._postCloseDelayMs,
             () => {
                 this._postCloseId = 0;
-                if (!this._destroyed && !this._codexActive && !this._popupOpen)
+                if (!this._destroyed && !this._wantsActivity() && !this._popupOpen)
                     this._enterGoingToSleep();
                 return GLib.SOURCE_REMOVE;
             }
@@ -471,6 +432,9 @@ export class MascotController {
             return;
         this._destroyed = true;
         this._clearTimers();
+        if (this._continuousId)
+            this._settings.disconnect(this._continuousId);
+        this._continuousId = 0;
         if (this._settingsId)
             this._settings.disconnect(this._settingsId);
         if (this._animationsId)

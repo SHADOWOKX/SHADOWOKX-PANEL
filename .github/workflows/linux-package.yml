@@ -120,9 +120,9 @@ jobs:
             "Shadowokx Panel for Linux v$VERSION" \
             "" \
             "- GNOME Shell 50 package for Ubuntu 26.04.1 / Wayland." \
-            "- Four animated companions: Robot, Codex Companion, official Clawd pixel companion and Penguin; Terminal, Clay and Glacier themes." \
-            "- Clawd's original laptop animation follows actual Codex work, with a short celebration after a successful turn." \
-            "- GPT-6.1 Sol pricing fixes missing current-day device estimates; compact daily/weekly account heatmaps remain." \
+            "- Switch between Codex, Claude, OpenCode, Command Code, DeepSeek, GLM and Gemini with provider-logo tabs and account connection settings." \
+            "- Centered Clawd stays animated during actual work, including Codex Desktop tool waits, and stops on completion." \
+            "- Expanded themes and accent colors; the selected subscription allowance remains stable when application focus changes." \
             "- Today is shown as not reported when the Codex account has not returned a current-day bucket; local session totals are not substituted." \
             "" \
             "Install or update with one command:" \

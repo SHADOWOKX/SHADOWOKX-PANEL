@@ -74,6 +74,7 @@ export GSETTINGS_SCHEMA_DIR="$shadow_runtime_dir/data/gnome-shell/extensions/sha
 
 dbus-run-session -- sh -eu -c '
   gsettings set org.gnome.shell disable-user-extensions false
+  gsettings set org.gnome.shell.extensions.shadow-panel mascot-continuous false
   gsettings set org.gnome.shell.extensions.shadow-panel density "$SHADOW_UI_DENSITY"
   gsettings set org.gnome.shell.extensions.shadow-panel panel-width "$SHADOW_UI_WIDTH"
   gsettings set org.gnome.shell.extensions.shadow-panel theme "$SHADOW_UI_THEME"

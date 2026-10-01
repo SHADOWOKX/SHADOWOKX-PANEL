@@ -4,6 +4,9 @@ import GLib from 'gi://GLib';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
+import {AIActivityMonitor} from './services/aiActivity.js';
+import {AIProvider} from './modules/ai/provider.js';
+import {visibleModules} from './lib/moduleConfig.js';
 import {CodexProvider} from './modules/codex/provider.js';
 import {CodexActivityMonitor} from './modules/codex/activityMonitor.js';
 import {WeatherProvider} from './modules/weather/provider.js';
@@ -12,6 +15,8 @@ import {Scheduler} from './services/scheduler.js';
 import {ShadowIndicator} from './ui/panel.js';
 
 const REBUILD_KEYS = Object.freeze([
+    'ai-providers',
+    'hidden-ai-providers',
     'panel-placement',
     'show-weather-panel',
     'show-weather-top-bar',
@@ -40,6 +45,7 @@ const REBUILD_KEYS = Object.freeze([
 
 const LIVE_INDICATOR_KEYS = Object.freeze([
     'animated-mascot',
+    'mascot-continuous',
     'show-codex-icon',
     'show-codex-remaining',
     'show-codex-reset-countdown',
@@ -157,6 +163,33 @@ export default class ShadowPanelExtension extends Extension {
     }
 
     _ensureServices() {
+        if (!this._services.aiActivityMonitor) {
+            const monitor = new AIActivityMonitor(this._settings, this._scheduler, () =>
+                global.get_window_actors().map(actor => {
+                    const window = actor.meta_window;
+                    const application = window.get_wm_class() || window.get_gtk_application_id() || '';
+                    // Include terminal/browser titles for CLI and browser clients.
+                    return {application: /terminal|console|chrome|firefox|chromium|brave|edge/i.test(application)
+                        ? window.get_title() : application, focused: window.has_focus()};
+                }));
+            this._services.aiActivityMonitor = monitor;
+            monitor.start();
+        }
+        this._services.aiProviders ??= new Map();
+        const visible = visibleModules(this._settings);
+        for (const [id, provider] of this._services.aiProviders) {
+            if (!visible.includes(id)) {
+                provider.destroy();
+                this._services.aiProviders.delete(id);
+            }
+        }
+        for (const id of visible.filter(id => id !== 'codex' && id !== 'weather')) {
+            if (!this._services.aiProviders.has(id)) {
+                const provider = new AIProvider(id, this._settings, this._scheduler);
+                this._services.aiProviders.set(id, provider);
+                provider.start();
+            }
+        }
         if (!this._services.codexProvider) {
             const provider = new CodexProvider(this._settings, this._scheduler, this._logger);
             this._services.codexProvider = provider;
@@ -213,6 +246,8 @@ export default class ShadowPanelExtension extends Extension {
         this._rebuildId = 0;
         this._rebuildPending = false;
         this._destroyIndicator();
+        for (const provider of this._services?.aiProviders?.values() ?? [])
+            provider.destroy();
         for (const service of Object.values(this._services ?? {}))
             service.destroy?.();
         this._services = {};

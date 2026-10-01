@@ -1,6 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist gettext-domain="shadow-panel">
   <schema id="org.gnome.shell.extensions.shadow-panel" path="/org/gnome/shell/extensions/shadow-panel/">
+    <key name="ai-providers" type="as">
+      <default>['codex', 'claude', 'opencode', 'commandcode', 'deepseek', 'glm', 'gemini']</default>
+      <summary>Providers added to the panel, in display order</summary>
+    </key>
+    <key name="hidden-ai-providers" type="as">
+      <default>[]</default>
+      <summary>Temporarily hidden AI providers</summary>
+    </key>
+    <key name="ai-sources" type="s">
+      <default>'{}'</default>
+      <summary>Provider source settings (paths only, no credentials)</summary>
+    </key>
     <key name="debug" type="b">
       <default>false</default>
       <summary>Enable redacted debug logging</summary>
@@ -18,6 +30,10 @@
       <default>true</default>
       <summary>Show the Shadowokx mascot in the top bar</summary>
     </key>
+    <key name="mascot-continuous" type="b">
+      <default>true</default>
+      <summary>Vary animation scenes only while a task is active</summary>
+    </key>
     <key name="animated-mascot" type="b">
       <default>true</default>
       <summary>Animate the Shadowokx mascot while Codex is working</summary>
@@ -26,6 +42,12 @@
       <choices>
         <choice value="robot"/>
         <choice value="codex"/>
+        <choice value="claude"/>
+        <choice value="opencode"/>
+        <choice value="commandcode"/>
+        <choice value="deepseek"/>
+        <choice value="glm"/>
+        <choice value="gemini"/>
         <choice value="octopus"/>
         <choice value="penguin"/>
       </choices>
@@ -75,6 +97,12 @@
     <key name="default-tab" type="s">
       <choices>
         <choice value="codex"/>
+        <choice value="claude"/>
+        <choice value="opencode"/>
+        <choice value="commandcode"/>
+        <choice value="deepseek"/>
+        <choice value="glm"/>
+        <choice value="gemini"/>
         <choice value="weather"/>
       </choices>
       <default>'codex'</default>
@@ -126,6 +154,10 @@
         <choice value="terminal"/>
         <choice value="clay"/>
         <choice value="glacier"/>
+        <choice value="dracula"/>
+        <choice value="catppuccin"/>
+        <choice value="ocean"/>
+        <choice value="rose-pine"/>
       </choices>
       <default>'claude-gray'</default>
       <summary>Dashboard surface treatment</summary>
@@ -140,6 +172,11 @@
         <choice value="amber"/>
         <choice value="rose"/>
         <choice value="graphite"/>
+        <choice value="teal"/>
+        <choice value="pink"/>
+        <choice value="red"/>
+        <choice value="indigo"/>
+        <choice value="lime"/>
         <choice value="custom"/>
       </choices>
       <default>'rose'</default>
