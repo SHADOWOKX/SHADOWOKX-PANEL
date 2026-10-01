@@ -93,7 +93,7 @@ public sealed partial class SettingsWindow
             var previous=Path.Combine(_host.Paths.Root,"usage","claude-previous-command.txt");
             if (!string.IsNullOrWhiteSpace(old) && !old.Contains("claude-statusline.ps1",StringComparison.Ordinal)) await File.WriteAllTextAsync(previous,old);
             static string Quote(string text)=>"'"+text.Replace("'","''",StringComparison.Ordinal)+"'";
-            var command="powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& "+Quote(script)+" -OutputPath "+Quote(destination)+" -PreviousFile "+Quote(previous)+""";
+            var command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command " + (char)34 + "& " + Quote(script) + " -OutputPath " + Quote(destination) + " -PreviousFile " + Quote(previous) + (char)34;
             settings["statusLine"]=new JsonObject { ["type"]="command",["command"]=command };
             if (File.Exists(path)) File.Copy(path,path+".shadow-panel-backup",true);
             await File.WriteAllTextAsync(path,settings.ToJsonString(new() { WriteIndented=true }));
