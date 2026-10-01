@@ -119,7 +119,8 @@ try {
         }
     }
     const clawd = readJson('icons/mascot/octopus/animations.json');
-    for (const sequence of [clawd.wake, clawd.idle, ...clawd.active]) {
+    for (const sequence of [clawd.wake, clawd.idle, ...clawd.active,
+        clawd.workIntro, clawd.workLoop, clawd.workOutro, clawd.complete]) {
         for (const [name, duration] of sequence) {
             if (!Number.isFinite(duration) || duration <= 0 ||
                 !GLib.file_test(GLib.build_filenamev([projectDirectory, 'icons', 'mascot',

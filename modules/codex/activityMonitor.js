@@ -375,7 +375,8 @@ export class CodexActivityMonitor extends Observable {
                 const lastActivity = Number.isFinite(event.timestamp)
                     ? Math.min(now, event.timestamp)
                     : now;
-                this._setState({active: false, source: 'idle', lastActivity});
+                this._setState({active: false, source: 'idle', lastActivity,
+                    completed: event.type === 'task_complete'});
             }
             return;
         }

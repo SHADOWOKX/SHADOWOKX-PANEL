@@ -253,7 +253,7 @@ class ShadowIndicator extends PanelMenu.Button {
         }));
         this._subscriptions.push(services.codexActivityMonitor.subscribe(state => {
             if (!this._destroyed)
-                this._mascot?.setState(state.active ? 'active' : 'idle');
+                this._mascot?.setState(state.active ? 'active' : 'idle', {completed: state.completed === true});
         }));
         if (services.weatherProvider) {
             this._subscriptions.push(services.weatherProvider.subscribe(state => {
