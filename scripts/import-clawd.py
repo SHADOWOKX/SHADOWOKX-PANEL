@@ -31,14 +31,15 @@ for name in ['Waving','CrabWalking','JumpingHappy','Pointing']:
     if color[3]>127:
      key='#%02x%02x%02x'%color[:3]
      colors.setdefault(key,[]).append(f'M{start} {y}h{x-start}v1h{-x+start}z')
-  svg='<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="14 6 30 32" shape-rendering="crispEdges">'+''.join(f'<path fill="{c}" d="{"".join(p)}"/>' for c,p in colors.items())+'</svg>\n'
+  viewbox={'Waving':'13 15 28 24','CrabWalking':'13 19 28 20','JumpingHappy':'13 6 28 32','Pointing':'13 15 32 24'}[name]
+  svg=f'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="{viewbox}" shape-rendering="crispEdges">'+''.join(f'<path fill="{c}" d="{"".join(p)}"/>' for c,p in colors.items())+'</svg>\n'
   duration=im.info.get('duration',80)
   if svg==last:
    seq[-1][1]+=duration
   else:
    file=f'{name.lower()}-{len(seq):02}.svg';(out/file).write_text(svg);seq.append([file,duration]);last=svg
  clips[name]=seq
-stand=(out/clips['Waving'][0][0]).read_text()
+stand=(out/clips['Waving'][0][0]).read_text().replace('viewBox="13 15 28 24"', 'viewBox="13 19 28 20"')
 for p in out.glob('robot-*.svg'):p.write_text(stand)
 manifest={'source':'https://claude.ai/images/clawd/core/','sources':{n:{'file':f'Clawd-{n}.gif','sha256':hashlib.sha256((source_dir/(n+'.gif')).read_bytes()).hexdigest()} for n in clips},'wake':clips['Waving'],'active':[clips['CrabWalking'],clips['JumpingHappy'],clips['Pointing']],'idle':clips['Pointing']}
 (out/'animations.json').write_text(json.dumps(manifest,indent=2)+'\n')

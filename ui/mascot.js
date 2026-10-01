@@ -89,6 +89,8 @@ function mascotPath(extension, name, character = selectedCharacter(extension)) {
 }
 
 function mascotIcon(extension, name, size, styleClass) {
+    if (selectedCharacter(extension) === 'octopus' && styleClass.includes('shadow-panel-mascot'))
+        size = Math.round(size * 1.1);
     return new St.Icon({
         gicon: Gio.icon_new_for_string(mascotPath(extension, name)),
         icon_size: size,
