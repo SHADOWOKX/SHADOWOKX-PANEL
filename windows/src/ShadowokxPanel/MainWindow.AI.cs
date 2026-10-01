@@ -8,6 +8,16 @@ using ShadowokxPanel.Core.Settings;
 namespace ShadowokxPanel;
 public sealed partial class MainWindow
 {
+    private readonly Dictionary<string,SvgImageSource> _providerImages = [];
+    private SvgImageSource ProviderLogo(string id)
+    {
+        if (!_providerImages.TryGetValue(id,out var source))
+        {
+            source = new SvgImageSource(new Uri($"ms-appx:///Assets/Providers/{id}-symbolic.svg"));
+            _providerImages[id] = source;
+        }
+        return source;
+    }
     private string SelectedAI => _host.Settings.Current.SelectedProvider;
     private bool OtherAI => _viewModel.SelectedPage != "weather" && SelectedAI != "codex";
     private void AIChanged(object? sender, EventArgs args) => DispatcherQueue.TryEnqueue(() =>
@@ -19,7 +29,7 @@ public sealed partial class MainWindow
     private void RenderProviderTabs()
     {
         SubscriptionTabName.Text = AICatalog.Providers.GetValueOrDefault(SelectedAI) ?? "AI usage";
-        SubscriptionTabIcon.Source = new SvgImageSource(new Uri($"ms-appx:///Assets/Providers/{SelectedAI}-symbolic.svg"));
+        SubscriptionTabIcon.Source = ProviderLogo(SelectedAI);
         ProviderTabs.Children.Clear(); ProviderTabs.RowDefinitions.Clear(); ProviderTabs.ColumnDefinitions.Clear();
         var ids=_host.Settings.Current.VisibleProviders.Where(id=>!_host.Settings.Current.RemovedProviders.Contains(id)).ToArray();
         if (!ids.Contains(SelectedAI) && ids.Length>0)
@@ -30,7 +40,7 @@ public sealed partial class MainWindow
         {
             var id=ids[i];
             var content=new StackPanel { Orientation=Orientation.Horizontal,Spacing=6,HorizontalAlignment=HorizontalAlignment.Center };
-            content.Children.Add(new Image { Source=new SvgImageSource(new Uri($"ms-appx:///Assets/Providers/{id}-symbolic.svg")), Width=16,Height=16 });
+            content.Children.Add(new Image { Source=ProviderLogo(id), Width=16,Height=16 });
             content.Children.Add(new TextBlock { Text=id=="codex"?"Codex":id=="commandcode"?"Command":id=="glm"?"GLM":AICatalog.Providers[id], FontSize=11, VerticalAlignment=VerticalAlignment.Center });
             var button=new Button { Content=content,CornerRadius=new CornerRadius(10),Height=38,MinWidth=0,Padding=new Thickness(4),HorizontalAlignment=HorizontalAlignment.Stretch,
                 Background=SelectedAI==id?ResourceBrush("AccentBrush",.12):Transparent(),BorderBrush=SelectedAI==id?ResourceBrush("AccentBrush",.45):Transparent() };

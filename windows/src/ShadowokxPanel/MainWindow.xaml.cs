@@ -41,6 +41,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private bool _exiting;
     private bool _disposed;
     private int _positionedHeight;
+    private bool _heightConstrained;
     private int? _codexNaturalHeight;
     private int? _weatherNaturalHeight;
     private bool _contentResizeQueued;
@@ -318,6 +319,7 @@ public sealed partial class MainWindow : Window, IDisposable
             desiredHeight);
         var width = bounds.Width;
         var height = bounds.Height;
+        _heightConstrained = height < Math.Ceiling(desiredHeight * scale);
         _appWindow.MoveAndResize(new RectInt32(bounds.X, bounds.Y, width, height));
         ApplyPanelFrameStyling();
         ApplyRoundedWindowRegion(width, height, scale);

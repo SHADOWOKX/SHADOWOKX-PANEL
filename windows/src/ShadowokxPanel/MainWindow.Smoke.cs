@@ -71,11 +71,12 @@ public sealed partial class MainWindow
         UpdateRelativeTimeLabels();
         await CaptureAsync(Path.Combine(output, "codex.png"));
         var codexOverflow = CodexScroll.ScrollableHeight;
+        var codexConstrained = _heightConstrained;
         await _viewModel.SelectPageAsync("weather");
         await Task.Delay(150);
         await CaptureAsync(Path.Combine(output, "weather.png"));
         var weatherOverflow = WeatherScroll.ScrollableHeight;
-        if (Root.ActualHeight >= 680 && (codexOverflow > 1 || weatherOverflow > 1))
+        if (Root.ActualHeight >= 680 && ((codexOverflow > 1 && !codexConstrained) || (weatherOverflow > 1 && !_heightConstrained)))
             throw new InvalidOperationException($"Normal content overflow: Codex {codexOverflow}, Weather {weatherOverflow}");
         if (ProviderTabs.Children.Count != 7) throw new InvalidOperationException("Provider logo tabs missing.");
         var claudePath = _host.AI.DefaultPath("claude");

@@ -102,8 +102,8 @@
                 </ScrollViewer>
                 <ScrollViewer
                     x:Name="CodexScroll"
-                    VerticalScrollBarVisibility="Disabled"
-                    VerticalScrollMode="Disabled"
+                    VerticalScrollBarVisibility="Auto"
+                    VerticalScrollMode="Enabled"
                     HorizontalScrollBarVisibility="Disabled"
                     HorizontalScrollMode="Disabled">
                     <StackPanel Spacing="10" Padding="0,0,0,3">
