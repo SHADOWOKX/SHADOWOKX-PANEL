@@ -50,7 +50,8 @@ export function attachTooltip(actor, textOrProvider) {
         tooltip = new St.Label({text: value, style_class: 'shadow-tooltip'});
         tooltip.clutter_text.set_line_wrap(true);
         tooltip.clutter_text.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR);
-        tooltip.set_width(Math.min(320, Math.max(120, global.stage.width - 32)));
+        const [, naturalWidth] = tooltip.get_preferred_width(-1);
+        tooltip.set_width(Math.min(naturalWidth, 320, Math.max(120, global.stage.width - 32)));
         global.stage.add_child(tooltip);
         const [x, y] = actor.get_transformed_position();
         const [width, height] = actor.get_transformed_size();
