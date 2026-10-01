@@ -18,6 +18,8 @@ public sealed partial class MainWindow
     });
     private void RenderProviderTabs()
     {
+        SubscriptionTabName.Text = AICatalog.Providers.GetValueOrDefault(SelectedAI) ?? "AI usage";
+        SubscriptionTabIcon.Source = new SvgImageSource(new Uri($"ms-appx:///Assets/Providers/{SelectedAI}-symbolic.svg"));
         ProviderTabs.Children.Clear(); ProviderTabs.RowDefinitions.Clear(); ProviderTabs.ColumnDefinitions.Clear();
         var ids=_host.Settings.Current.VisibleProviders.Where(id=>!_host.Settings.Current.RemovedProviders.Contains(id)).ToArray();
         if (!ids.Contains(SelectedAI) && ids.Length>0)

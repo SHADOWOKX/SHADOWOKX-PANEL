@@ -674,6 +674,10 @@ public sealed partial class MainWindow : Window, IDisposable
         double? remaining = SelectedAI == "codex" ? state.Weekly?.RemainingPercent ?? state.FiveHour?.RemainingPercent :
             _host.AI.State(SelectedAI).Usage?.Windows.Where(w=>w.ResetsAt is null || w.ResetsAt>DateTimeOffset.UtcNow).Select(w=>(double?)(100-w.UsedPercent)).FirstOrDefault();
         _tray.SetCompanionVisible(_viewModel.Settings.ShowTrayCompanion);
+        _companion.VaryWork = _viewModel.Settings.VaryWorkAnimations;
+        _companion.Configure(_viewModel.Settings.Companion,
+            _viewModel.Settings.ShowTrayCompanion || (_visible && _viewModel.SelectedPage != "weather"),
+            _viewModel.Settings.Animations && _uiSettings.AnimationsEnabled);
         var pace = _viewModel.Settings.ShowCodexStateIndicator ? _viewModel.UsagePace : UsagePace.Unknown;
         var lines = new List<string> { "Shadowokx Panel" };
         lines.Add(remaining.HasValue
