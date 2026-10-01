@@ -44,7 +44,9 @@ public sealed class AppHost : IAsyncDisposable
             var logger = new RedactingLogger(Paths, () => Settings.Current.DebugLogging);
             _codex = new CodexProvider(
                 Paths, settings.CodexRefreshMinutes,
-                discover: () => CodexDiscovery.Find(explicitExecutable: Settings.Current.CodexExecutablePath), logger: logger);
+                discover: () => CodexDiscovery.Find(explicitExecutable: Settings.Current.CodexExecutablePath), logger: logger,
+                discoverAlternative: excluded => CodexDiscovery.Find(
+                    explicitExecutable: Settings.Current.CodexExecutablePath, excludedExecutables: excluded));
             _weather = new WeatherProvider(
                 Paths,
                 settings.WeatherLocation,
