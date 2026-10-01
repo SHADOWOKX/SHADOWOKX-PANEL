@@ -86,13 +86,13 @@ public sealed partial class MainWindow
             int[]? pixels = null;
             var icon = Platform.TrayIconRenderer.Create(size, percent, mascotPath, value => pixels = value);
             Platform.NativeMethods.DestroyIcon(icon);
-            if (pixels is null || !pixels.Take(size * size / 2).Any(pixel => pixel != 0) ||
+            if (pixels is null || !pixels.Take(size * size / 2).Any(pixel => ((uint)pixel >> 24) != 0) ||
                 !pixels.Skip(size * size * 2 / 3).Any(pixel => pixel == -1))
                 throw new InvalidOperationException("Combined tray badge lost its companion or allowance.");
             using var trayStream = new InMemoryRandomAccessStream();
             var trayEncoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, trayStream);
             var trayBytes = new byte[pixels.Length * sizeof(int)];
-            Buffer.BlockCopy(pixels, 0, trayBytes, 0, trayBytes.Length);
+            System.Buffer.BlockCopy(pixels, 0, trayBytes, 0, trayBytes.Length);
             trayEncoder.SetPixelData(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied, (uint)size, (uint)size, 96, 96, trayBytes);
             await trayEncoder.FlushAsync();
             using var trayReader = new DataReader(trayStream.GetInputStreamAt(0));

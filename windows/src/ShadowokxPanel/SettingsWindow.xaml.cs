@@ -15,6 +15,7 @@ public sealed partial class SettingsWindow : Window
     private readonly AppHost _host;
     private readonly AppWindow _appWindow;
     private bool _loading = true;
+    private string _category = "General";
 
     public SettingsWindow(AppHost host)
     {
@@ -34,6 +35,7 @@ public sealed partial class SettingsWindow : Window
     private void Category_Click(object sender, RoutedEventArgs args) => SelectCategory((string)((Button)sender).Tag);
     internal void SelectCategory(string name)
     {
+        _category = name;
         var pages = new[] { GeneralPage, AccountsPage, AppearancePage, WeatherPage, AdvancedPage };
         var buttons = new[] { GeneralNav, AccountsNav, AppearanceNav, WeatherNav, AdvancedNav };
         var names = new[] { "General", "Accounts", "Appearance", "Weather", "Advanced" };
@@ -162,6 +164,7 @@ public sealed partial class SettingsWindow : Window
             UpdateEstimateInfo(_host.Settings.Current);
             CustomAccentBox.IsEnabled = next.Accent == AccentPreset.Custom;
             ThemeService.Apply(Root, _host.Settings.Current);
+            SelectCategory(_category);
         }
         catch (Exception error) when (error is UnauthorizedAccessException or IOException or
             ArgumentException or System.Security.SecurityException)
