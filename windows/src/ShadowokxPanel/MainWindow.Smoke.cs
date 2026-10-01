@@ -78,7 +78,7 @@ public sealed partial class MainWindow
         var weatherOverflow = WeatherScroll.ScrollableHeight;
         if (Root.ActualHeight >= 680 && ((codexOverflow > 1 && !codexConstrained) || (weatherOverflow > 1 && !_heightConstrained)))
             throw new InvalidOperationException($"Normal content overflow: Codex {codexOverflow}, Weather {weatherOverflow}");
-        if (ProviderTabs.Children.Count != 8) throw new InvalidOperationException("Provider logo tabs missing.");
+        if (ProviderTabs.Children.Count != 8 || ProviderTabs.RowDefinitions.Count != 1) throw new InvalidOperationException("Provider logo tabs missing.");
         var mascotPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Companions", "octopus", "waving-00.ico");
         foreach (var size in new[] { 16, 32, 64 })
         foreach (int? percent in new int?[] { 0, 11, 100, null })
