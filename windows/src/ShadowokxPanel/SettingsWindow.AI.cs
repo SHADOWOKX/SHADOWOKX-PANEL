@@ -13,7 +13,7 @@ public sealed partial class SettingsWindow
         {
             var row=new StackPanel { Spacing=6 };
             var removed=_host.Settings.Current.RemovedProviders.Contains(id);
-            row.Children.Add(new TextBlock { Text=name,FontWeight=Windows.UI.Text.FontWeights.SemiBold });
+            row.Children.Add(new TextBlock { Text=name,FontWeight=Microsoft.UI.Text.FontWeights.SemiBold });
             var visible=new CheckBox { Content="Show in panel",IsChecked=_host.Settings.Current.VisibleProviders.Contains(id) && !removed,IsEnabled=!removed };
             visible.Click+=async (_,_)=>
             {

@@ -42,7 +42,7 @@ public sealed partial class MainWindow
         AIContent.Children.Clear();
         if (!AICatalog.Contains(SelectedAI)) return;
         var state=_host.AI.State(SelectedAI);
-        AIContent.Children.Add(new TextBlock { Text=AICatalog.Providers[SelectedAI]+" Usage",FontSize=16,FontWeight=Windows.UI.Text.FontWeights.SemiBold });
+        AIContent.Children.Add(new TextBlock { Text=AICatalog.Providers[SelectedAI]+" Usage",FontSize=16,FontWeight=Microsoft.UI.Text.FontWeights.SemiBold });
         void Card(string title,string value,string? detail=null)
         {
             var stack=new StackPanel { Spacing=8 };
