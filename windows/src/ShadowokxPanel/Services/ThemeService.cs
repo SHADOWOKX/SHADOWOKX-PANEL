@@ -19,6 +19,15 @@ public static class ThemeService
             [ThemePreset.Graphite] = new("#15171a", "#1f2226", "#292d32", "#343941", "#f5f6f7", "#a5abb3", ElementTheme.Dark),
             [ThemePreset.Nord] = new("#242933", "#2e3440", "#3b4252", "#4c566a", "#eceff4", "#b6c0d1", ElementTheme.Dark),
             [ThemePreset.Amoled] = new("#000000", "#0c0c0d", "#171719", "#262629", "#ffffff", "#a9a9ae", ElementTheme.Dark),
+            [ThemePreset.Gnome] = new("#242424", "#303030", "#3d3d3d", "#484848", "#fafafa", "#b7b7b7", ElementTheme.Dark),
+            [ThemePreset.SoftNeutral] = new("#e8e6e1", "#f7f5f0", "#ffffff", "#d4d1c9", "#252522", "#6b6b64", ElementTheme.Light),
+            [ThemePreset.Terminal] = new("#101811", "#17231a", "#203126", "#314635", "#d7ffe2", "#91b89d", ElementTheme.Dark),
+            [ThemePreset.Clay] = new("#302823", "#3b322c", "#494036", "#605044", "#fff0df", "#c7b5a2", ElementTheme.Dark),
+            [ThemePreset.Glacier] = new("#182b35", "#223b47", "#2b4855", "#3b5e6b", "#e9f9ff", "#a3c5d4", ElementTheme.Dark),
+            [ThemePreset.Dracula] = new("#282a36", "#303341", "#3c4050", "#4b5064", "#f8f8f2", "#a5a7ba", ElementTheme.Dark),
+            [ThemePreset.Catppuccin] = new("#1e1e2e", "#272739", "#313147", "#45455d", "#cdd6f4", "#a6adc8", ElementTheme.Dark),
+            [ThemePreset.Ocean] = new("#102330", "#173140", "#214354", "#33576a", "#e5f5ff", "#98becf", ElementTheme.Dark),
+            [ThemePreset.Forest] = new("#15251d", "#203329", "#2d4638", "#405e4b", "#e3f5e8", "#a4c5ae", ElementTheme.Dark),
             [ThemePreset.Light] = new("#efefeb", "#e8e8e4", "#e0e0dc", "#d2d2ce", "#252624", "#70736f", ElementTheme.Light),
         };
 
@@ -32,6 +41,11 @@ public static class ThemeService
             [AccentPreset.Blue] = "#3b82f6",
             [AccentPreset.Violet] = "#8b5cf6",
             [AccentPreset.Amber] = "#f59e0b",
+            [AccentPreset.Teal] = "#14b8a6",
+            [AccentPreset.Pink] = "#ec4899",
+            [AccentPreset.Red] = "#ef4444",
+            [AccentPreset.Indigo] = "#6366f1",
+            [AccentPreset.Lime] = "#84cc16",
             [AccentPreset.Monochrome] = "#94a3b8",
         };
 

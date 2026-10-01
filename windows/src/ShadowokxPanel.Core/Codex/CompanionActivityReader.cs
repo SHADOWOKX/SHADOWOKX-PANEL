@@ -5,13 +5,13 @@ using System.Text.Json;
 namespace ShadowokxPanel.Core.Codex;
 
 // Local session events only: no model requests or account polling.
-public sealed class CompanionActivityReader
+public sealed class CompanionActivityReader(string? codexHome = null)
 {
     private readonly Dictionary<string, (DateTime Modified, bool Active, bool Completed)> _files = [];
 
     public async Task<(bool Active, bool Completed)> ReadAsync()
     {
-        var home = Environment.GetEnvironmentVariable("CODEX_HOME");
+        var home = codexHome ?? Environment.GetEnvironmentVariable("CODEX_HOME");
         if (string.IsNullOrWhiteSpace(home))
             home = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex");
         var now = DateTimeOffset.UtcNow;
@@ -45,7 +45,7 @@ public sealed class CompanionActivityReader
                 var text = Encoding.UTF8.GetString(bytes);
                 if (start > 0) text = text[(text.IndexOf('\n') + 1)..];
                 var active = known && previous.Active;
-                var terminal = false;
+
                 var success = false;
                 // Ignore a partial last record while Codex is appending it.
                 foreach (var line in text.Split('\n').SkipLast(1))
@@ -58,14 +58,19 @@ public sealed class CompanionActivityReader
                             !root.TryGetProperty("payload", out var payload)) continue;
                         if (recordType.GetString() == "event_msg" && payload.TryGetProperty("type", out var type))
                         {
-                            if (type.GetString() == "task_started") { active = true; terminal = false; success = false; }
+                            if (type.GetString() == "task_started") { active = true; success = false; }
                             else if (type.GetString() is "task_complete" or "turn_aborted")
-                            { active = false; terminal = true; success = type.GetString() == "task_complete"; }
+                            { active = false; success = type.GetString() == "task_complete"; }
                         }
-                        else if (!terminal && recordType.GetString() == "response_item" &&
+                        else if (recordType.GetString() == "response_item" &&
+                            payload.TryGetProperty("type", out var messageType) && messageType.GetString() == "message" &&
+                            payload.TryGetProperty("role",out var role) && role.GetString() == "assistant" &&
+                            payload.TryGetProperty("phase",out var phase) && phase.GetString() == "final_answer")
+                        { active=false;  success=true; }
+                        else if (recordType.GetString() == "response_item" &&
                             payload.TryGetProperty("type", out var item) &&
                             item.GetString() is "reasoning" or "function_call" or "custom_tool_call")
-                            active = true;
+                            { active = true; }
                     }
                     catch (JsonException) { }
                 }

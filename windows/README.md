@@ -198,3 +198,23 @@ Check the notification-area overflow. A tray-first launch intentionally keeps th
 - Local history belongs to the Windows login, not a stored Codex account identifier.
 - A new installation needs two real daily samples for a graph and four completed days for pace classification.
 - Summary-image export is not included in the initial Windows release.
+
+## Windows 3.1.2
+
+Provider logo buttons for Codex, Claude, OpenCode, Command Code, DeepSeek, GLM and Gemini appear above the dashboard. Select a provider to control the displayed tray allowance. Settings can hide, remove, restore or disconnect providers. Codex uses the existing CLI login; Connect Claude installs a usage-only status line bridge and preserves the existing command and a settings backup. DeepSeek accepts a per-user API key and displays API balance, which is distinct from subscription allowance. Other providers accept usage JSON; no unavailable subscription percentage is invented. File changes refresh immediately, with a 30-second fallback.
+
+The centered Linux Clawd frames are shared with Windows at a fixed 40-pixel dashboard size. A separate animated companion notification icon appears beside the percentage icon; Windows controls their ordering and overflow visibility. Pin both in taskbar settings. Only actual Codex session work or an explicit expiring activity report starts motion. An open app, popup, accounting update or idle blink does not. Work scenes rotate through laptop, walking, jumping and waving; disable variety or motion in Settings.
+
+Themes include Shadow, Midnight, Graphite, Nord, AMOLED, Light, GNOME, Soft Neutral, Terminal, Clay, Glacier, Dracula, Catppuccin, Ocean and Forest, with 13 accent colors and a custom color.
+
+A usage JSON file uses the same schema as Linux, for example:
+
+```json
+{
+  "updatedAt": "2026-10-01T16:00:00Z",
+  "windows": [{"label": "Weekly allowance", "usedPercent": 25, "resetsAt": "2026-10-07T16:00:00Z"}],
+  "activity": {"active": true, "updatedAt": "2026-10-01T16:00:00Z", "expiresAt": "2026-10-01T16:00:30Z"}
+}
+```
+
+Activity is optional; reports without a current timestamp never animate. The activity lease is capped at two minutes and must be renewed by the source.

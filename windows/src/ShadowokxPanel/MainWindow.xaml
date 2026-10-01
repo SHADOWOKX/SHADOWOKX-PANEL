@@ -14,6 +14,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
@@ -36,9 +37,12 @@
                 </Button>
             </Grid>
 
+            <Border Grid.Row="1" Background="{ThemeResource CardBrush}" CornerRadius="14" Padding="4">
+                <Grid x:Name="ProviderTabs" ColumnSpacing="3" RowSpacing="3" />
+            </Border>
             <Border
                 x:Name="SegmentedBorder"
-                Grid.Row="1"
+                Grid.Row="2"
                 Background="{ThemeResource CardBrush}"
                 BorderBrush="{ThemeResource CardBorderBrush}"
                 BorderThickness="1"
@@ -92,7 +96,10 @@
                 </Grid>
             </Border>
 
-            <Grid Grid.Row="2">
+            <Grid Grid.Row="3">
+                <ScrollViewer x:Name="AIScroll" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="AIContent" Spacing="10" />
+                </ScrollViewer>
                 <ScrollViewer
                     x:Name="CodexScroll"
                     VerticalScrollBarVisibility="Disabled"
@@ -344,7 +351,7 @@
                                     <Border Grid.Row="0" Grid.Column="1" Background="{ThemeResource CardHoverBrush}" CornerRadius="10" Padding="9,6"><StackPanel Orientation="Horizontal" Spacing="9"><Image Source="Assets/Metrics/humidity.svg" Width="18" Height="18" Stretch="Uniform" /><StackPanel><TextBlock Text="Humidity" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="Humidity" Style="{StaticResource MetricValueStyle}" /></StackPanel></StackPanel></Border>
                                     <Border Grid.Row="1" Grid.Column="0" Background="{ThemeResource CardHoverBrush}" CornerRadius="10" Padding="9,6"><StackPanel Orientation="Horizontal" Spacing="9"><Image Source="Assets/Metrics/wind.svg" Width="18" Height="18" Stretch="Uniform" /><StackPanel><TextBlock Text="Wind" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="Wind" Style="{StaticResource MetricValueStyle}" /></StackPanel></StackPanel></Border>
                                     <Border Grid.Row="1" Grid.Column="1" Background="{ThemeResource CardHoverBrush}" CornerRadius="10" Padding="9,6"><StackPanel Orientation="Horizontal" Spacing="9"><Image Source="Assets/Metrics/rain.svg" Width="18" Height="18" Stretch="Uniform" /><StackPanel><TextBlock Text="Rain" FontSize="10" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="Rain" Style="{StaticResource MetricValueStyle}" /></StackPanel></StackPanel></Border>
-                                    <Grid x:Name="UvRow" Grid.Row="2" Grid.ColumnSpan="2" Margin="0,2,0,0">
+                                    <Grid x:Name="UvRow" Grid.Row="3" Grid.ColumnSpan="2" Margin="0,2,0,0">
                                         <TextBlock Text="UV Index" Style="{StaticResource MetricLabelStyle}" />
                                         <TextBlock x:Name="UvIndex" HorizontalAlignment="Right" Style="{StaticResource MetricValueStyle}" />
                                     </Grid>

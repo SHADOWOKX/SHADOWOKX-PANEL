@@ -24,6 +24,7 @@ public sealed class AppHost : IAsyncDisposable
         Settings = new SettingsStore(Paths);
     }
 
+    public Core.AI.AIProviderService AI { get; private set; } = null!;
     public ApplicationPaths Paths { get; }
     public SettingsStore Settings { get; }
     public bool ProvidersReady { get; private set; }
@@ -41,6 +42,7 @@ public sealed class AppHost : IAsyncDisposable
             if (_initialized)
                 return;
             var settings = await Settings.LoadAsync(cancellationToken);
+            AI = new Core.AI.AIProviderService(Paths, Settings);
             var logger = new RedactingLogger(Paths, () => Settings.Current.DebugLogging);
             _codex = new CodexProvider(
                 Paths, settings.CodexRefreshMinutes,
@@ -76,6 +78,7 @@ public sealed class AppHost : IAsyncDisposable
             if (!_initialized || _codex is null || _weather is null)
                 throw new InvalidOperationException("The application host has not been initialized.");
             _started = true;
+            AI.Start();
             try
             {
                 await Task.WhenAll(
@@ -103,6 +106,7 @@ public sealed class AppHost : IAsyncDisposable
 
     public Task RefreshAllAsync(bool force = true, CancellationToken cancellationToken = default) =>
         Task.WhenAll(
+            AI.RefreshAsync(),
             Codex.RefreshAsync(force, cancellationToken),
             Settings.Current.ShowWeather
                 ? Weather.RefreshAsync(force, cancellationToken)
@@ -155,6 +159,7 @@ public sealed class AppHost : IAsyncDisposable
             if (_disposed)
                 return;
             _disposed = true;
+            AI?.Dispose();
             if (_settingsSubscribed)
             {
                 Settings.Changed -= OnSettingsChanged;

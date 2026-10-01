@@ -24,10 +24,11 @@
                     <ComboBox x:Name="ThemeCombo" Header="Theme" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged">
                         <x:String>Follow Windows</x:String><x:String>Shadow</x:String><x:String>Midnight</x:String>
                         <x:String>Graphite</x:String><x:String>Nord</x:String><x:String>AMOLED</x:String><x:String>Light</x:String>
+                        <x:String>GNOME</x:String><x:String>Soft Neutral</x:String><x:String>Terminal</x:String><x:String>Clay</x:String><x:String>Glacier</x:String><x:String>Dracula</x:String><x:String>Catppuccin</x:String><x:String>Ocean</x:String><x:String>Forest</x:String>
                     </ComboBox>
                     <ComboBox x:Name="AccentCombo" Header="Accent" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged">
                         <x:String>Rose</x:String><x:String>Orange</x:String><x:String>Emerald</x:String><x:String>Cyan</x:String>
-                        <x:String>Blue</x:String><x:String>Violet</x:String><x:String>Amber</x:String><x:String>Monochrome</x:String><x:String>Custom</x:String>
+                        <x:String>Blue</x:String><x:String>Violet</x:String><x:String>Amber</x:String><x:String>Monochrome</x:String><x:String>Custom</x:String><x:String>Teal</x:String><x:String>Pink</x:String><x:String>Red</x:String><x:String>Indigo</x:String><x:String>Lime</x:String>
                     </ComboBox>
                     <TextBox x:Name="CustomAccentBox" Header="Custom accent" PlaceholderText="#f97316" MaxLength="7" LostFocus="SettingChanged" />
                     <ComboBox x:Name="DensityCombo" Header="Layout density" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged">
@@ -36,9 +37,17 @@
                     <ComboBox x:Name="CompanionCombo" Header="Animated companion" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged">
                         <ComboBoxItem Content="Robot" /><ComboBoxItem Content="Codex" /><ComboBoxItem Content="Clawd" /><ComboBoxItem Content="Penguin" />
                     </ComboBox>
-                    <ToggleSwitch x:Name="AnimationsToggle" Header="Subtle animations" Toggled="SettingChanged" />
+                    <ToggleSwitch x:Name="TrayCompanionToggle" Header="Companion beside tray percentage" Toggled="SettingChanged" />
+                    <ToggleSwitch x:Name="VaryWorkToggle" Header="Vary work animations" Toggled="SettingChanged" />
+                    <ToggleSwitch x:Name="AnimationsToggle" Header="Animate only during active work" Toggled="SettingChanged" />
                 </StackPanel>
 
+                <StackPanel Spacing="10">
+                    <TextBlock Text="AI ACCOUNTS" Style="{StaticResource SectionLabelStyle}" />
+                    <TextBlock Text="Codex uses your existing CLI login. Connect Claude usage with the button below; connect DeepSeek with an API key. Other providers use a usage JSON file. Updates appear as soon as the source changes." TextWrapping="Wrap" FontSize="12" />
+                    <StackPanel x:Name="ProviderSettings" Spacing="10" />
+                    <TextBlock x:Name="ConnectionMessage" TextWrapping="Wrap" FontSize="12" />
+                </StackPanel>
                 <StackPanel Spacing="10">
                     <TextBlock Text="CODEX" Style="{StaticResource SectionLabelStyle}" />
                     <TextBox x:Name="CodexExecutableBox" Header="Codex CLI path (optional)" PlaceholderText="Auto-detect" LostFocus="SettingChanged" />

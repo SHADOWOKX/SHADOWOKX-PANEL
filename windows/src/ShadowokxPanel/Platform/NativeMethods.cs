@@ -86,6 +86,9 @@ internal static class NativeMethods
         internal Guid guidItem;
     }
 
+    [DllImport("user32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+    internal static extern nint LoadImage(nint instance,string name,uint type,int width,int height,uint flags);
+
     [DllImport("shell32.dll", EntryPoint = "Shell_NotifyIconGetRect")]
     internal static extern int ShellNotifyIconGetRect(ref NotifyIconIdentifier identifier, out Rect rectangle);
 

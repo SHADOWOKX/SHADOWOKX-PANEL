@@ -18,6 +18,11 @@ public sealed class CompanionAnimator : IDisposable
     private Action? _finished;
     private string _character = "octopus";
     private int _frame;
+    public event Action<string, string>? FrameChanged;
+    public Func<bool>? ExternalWork { get; set; }
+    public Func<bool>? CodexEnabled { get; set; }
+    public bool VaryWork { get; set; } = true;
+    private int _scene;
     private bool _visible;
     private bool _enabled;
     private bool _active;
@@ -33,6 +38,12 @@ public sealed class CompanionAnimator : IDisposable
         foreach (var name in new[] { "wake", "workIntro", "workLoop", "workOutro", "complete" })
             _clawd[name] = manifest.RootElement.GetProperty(name).EnumerateArray()
                 .Select(frame => (frame[0].GetString()!.Replace(".svg", ".png", StringComparison.Ordinal), frame[1].GetInt32())).ToArray();
+        foreach (var scene in manifest.RootElement.GetProperty("active").EnumerateArray())
+        {
+            var frames = scene.EnumerateArray().Select(frame => (frame[0].GetString()!.Replace(".svg", ".png", StringComparison.Ordinal), frame[1].GetInt32())).ToArray();
+            var name = frames[0].Item1.Split('-')[0];
+            _clawd[name] = frames;
+        }
         _motion.Tick += MotionTick;
         _activity.Tick += ActivityTick;
         Show("robot-awake.png");
@@ -49,8 +60,7 @@ public sealed class CompanionAnimator : IDisposable
         if (!animations) { Show("robot-awake.png"); return; }
         _activity.Start();
         if (_active) StartWork(true);
-        else Play(_character == "octopus" ? _clawd["wake"] :
-            [("robot-wake-half.png", 120), ("robot-awake.png", 180)], Idle);
+        else Idle();
         ActivityTick(null, null);
     }
 
@@ -63,11 +73,10 @@ public sealed class CompanionAnimator : IDisposable
         {
             var state = await Task.Run(() => _reader.ReadAsync());
             if (_disposed || generation != _generation) return;
-            if (state.Active == _active) return;
-            _active = state.Active;
+            var active = (state.Active && (CodexEnabled?.Invoke() ?? true)) || (ExternalWork?.Invoke() ?? false);
+            if (active == _active) return;
+            _active = active;
             if (_active) StartWork(true);
-            else if (state.Completed && _character == "octopus")
-                Play([.. _clawd["workOutro"], .. _clawd["complete"]], Idle);
             else Idle();
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException)
@@ -77,8 +86,19 @@ public sealed class CompanionAnimator : IDisposable
 
     private void StartWork(bool intro)
     {
+        if (!_active) { Idle(); return; }
         if (_character == "octopus")
-            Play(_clawd[intro ? "workIntro" : "workLoop"], () => StartWork(false));
+        {
+            if (intro) { _scene = 0; Play(_clawd["workIntro"], () => StartWork(false)); }
+            else if (!VaryWork) Play(_clawd["workLoop"], () => StartWork(false));
+            else
+            {
+                var scene = _scene++ % 4;
+                var name = scene switch { 1 => "crabwalking", 2 => "jumpinghappy", 3 => "waving", _ => "workLoop" };
+                var loops = scene == 0 ? 8 : 3;
+                Play(Enumerable.Range(0,loops).SelectMany(_ => _clawd[name]).ToArray(), () => StartWork(false));
+            }
+        }
         else
         {
             var frames = _character == "penguin" ? new[] { 1, 4, 7, 10, 13, 10, 7, 4 } :
@@ -87,7 +107,7 @@ public sealed class CompanionAnimator : IDisposable
         }
     }
 
-    private void Idle() => Play([("robot-awake.png", 6000), ("robot-blink.png", 120)], Idle);
+    private void Idle() { _motion.Stop(); _finished = null; Show("robot-awake.png"); }
 
     private void Play((string Name, int Duration)[] sequence, Action finished)
     {
@@ -121,6 +141,7 @@ public sealed class CompanionAnimator : IDisposable
             _images[key] = image;
         }
         _image.Source = image;
+        FrameChanged?.Invoke(_character, name);
     }
 
     public void Dispose()

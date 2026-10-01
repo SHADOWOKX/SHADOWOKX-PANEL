@@ -73,6 +73,10 @@ public sealed partial class MainWindow : Window, IDisposable
         }
         StartupDiagnostics.Write("MainWindow InitializeComponent successful");
         _companion = new CompanionAnimator(WeeklyCompanion);
+        _companion.ExternalWork = () => _host.AI.AnyWorking();
+        _companion.CodexEnabled = () => _host.Settings.Current.VisibleProviders.Contains("codex") && !_host.Settings.Current.RemovedProviders.Contains("codex");
+        _companion.FrameChanged += (character, frame) => _tray?.UpdateCompanion(character,frame);
+        _host.AI.Changed += AIChanged;
 
         StartupDiagnostics.Write("TokenGraphControl construction start");
         _tokenGraph = new TokenGraphControl();
@@ -182,7 +186,7 @@ public sealed partial class MainWindow : Window, IDisposable
         if (!_visible)
             return;
         _visible = false;
-        _companion.Configure(_host.Settings.Current.Companion, false, false);
+        _companion.Configure(_host.Settings.Current.Companion, _host.Settings.Current.ShowTrayCompanion, _host.Settings.Current.Animations);
         _codexVisibilityTimer.Stop();
         _host.Codex.SetVisible(false);
         _clockTimer.Stop();
@@ -370,9 +374,11 @@ public sealed partial class MainWindow : Window, IDisposable
         ApplyThemeIfChanged(settings);
         WeatherTab.Visibility = settings.ShowWeather ? Visibility.Visible : Visibility.Collapsed;
         WeatherColumn.Width = settings.ShowWeather ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
-        SegmentedBorder.Visibility = settings.ShowWeather ? Visibility.Visible : Visibility.Collapsed;
+        SegmentedBorder.Visibility = Visibility.Visible;
+        RenderProviderTabs();
+        _companion.VaryWork = settings.VaryWorkAnimations;
         var weatherSelected = settings.ShowWeather && _viewModel.SelectedPage == "weather";
-        _companion.Configure(settings.Companion, _visible && !weatherSelected,
+        _companion.Configure(settings.Companion, settings.ShowTrayCompanion || (_visible && !weatherSelected),
             settings.Animations && _uiSettings.AnimationsEnabled);
         CodexScroll.Visibility = weatherSelected ? Visibility.Collapsed : Visibility.Visible;
         WeatherScroll.Visibility = weatherSelected ? Visibility.Visible : Visibility.Collapsed;
@@ -394,6 +400,8 @@ public sealed partial class MainWindow : Window, IDisposable
         }
         _codexLayoutKey = CodexLayoutKey.Create(_viewModel.Codex, settings);
         _weatherLayoutKey = WeatherLayoutKey.Create(_viewModel.Weather, settings);
+        AIScroll.Visibility = OtherAI ? Visibility.Visible : Visibility.Collapsed;
+        if (OtherAI) { CodexScroll.Visibility = Visibility.Collapsed; RenderAI(); }
         _lastRenderedSettings = settings;
         UpdateTray();
         QueueContentResize();
@@ -663,19 +671,23 @@ public sealed partial class MainWindow : Window, IDisposable
         if (_tray is null)
             return;
         var state = _viewModel.Codex;
-        var remaining = state.Weekly?.RemainingPercent ?? state.FiveHour?.RemainingPercent;
+        double? remaining = SelectedAI == "codex" ? state.Weekly?.RemainingPercent ?? state.FiveHour?.RemainingPercent :
+            _host.AI.State(SelectedAI).Usage?.Windows.Where(w=>w.ResetsAt is null || w.ResetsAt>DateTimeOffset.UtcNow).Select(w=>(double?)(100-w.UsedPercent)).FirstOrDefault();
+        _tray.SetCompanionVisible(_viewModel.Settings.ShowTrayCompanion);
         var pace = _viewModel.Settings.ShowCodexStateIndicator ? _viewModel.UsagePace : UsagePace.Unknown;
         var lines = new List<string> { "Shadowokx Panel" };
         lines.Add(remaining.HasValue
-            ? $"Codex: {Math.Round(remaining.Value):0}% remaining" +
+            ? $"{AICatalogName()}: {Math.Round(remaining.Value):0}% remaining" +
                 (pace != UsagePace.Unknown ? $" · {pace}" : string.Empty)
-            : "Codex: unavailable");
+            : $"{AICatalogName()}: unavailable");
         if (_viewModel.Settings.ShowWeatherInTrayTooltip && _viewModel.Weather.Current is { } weather)
             lines.Add($"Weather: {Math.Round(weather.Temperature):0}° · {weather.Condition.Label}");
         int? displayedPercent = remaining.HasValue
             ? (int)Math.Round(remaining.Value, MidpointRounding.AwayFromZero) : null;
         _tray.Update(string.Join('\n', lines), displayedPercent);
     }
+
+    private string AICatalogName() => Core.AI.AICatalog.Providers.GetValueOrDefault(SelectedAI) ?? "AI";
 
     private void OpenSettings()
     {
@@ -747,7 +759,7 @@ public sealed partial class MainWindow : Window, IDisposable
             var nextLayout = CodexLayoutKey.Create(_viewModel.Codex, _viewModel.Settings);
             var layoutChanged = _codexLayoutKey != nextLayout;
             _codexLayoutKey = nextLayout;
-            if (!weatherSelected)
+            if (!weatherSelected && !OtherAI)
                 RenderCodex(_viewModel.Codex, _viewModel.Settings);
             UpdateTray();
             if (layoutChanged && !weatherSelected)
@@ -918,7 +930,7 @@ public sealed partial class MainWindow : Window, IDisposable
             return;
         Root.UpdateLayout();
         var weather = _host.Settings.Current.ShowWeather && _viewModel.SelectedPage == "weather";
-        var scroll = weather ? WeatherScroll : CodexScroll;
+        var scroll = weather ? WeatherScroll : OtherAI ? AIScroll : CodexScroll;
         if (scroll.Content is not FrameworkElement content ||
             scroll.ActualWidth <= 0 || scroll.ActualHeight <= 0 || Root.ActualHeight <= 0)
             return;
@@ -948,7 +960,7 @@ public sealed partial class MainWindow : Window, IDisposable
         _disposed = true;
         _exiting = true;
         _visible = false;
-        _companion.Configure(_host.Settings.Current.Companion, false, false);
+        _companion.Configure(_host.Settings.Current.Companion, _host.Settings.Current.ShowTrayCompanion, _host.Settings.Current.Animations);
         _codexVisibilityTimer.Stop();
         _host.Codex.SetVisible(false);
         _clockTimer.Stop();
@@ -956,6 +968,7 @@ public sealed partial class MainWindow : Window, IDisposable
         _appWindow.Closing -= AppWindow_Closing;
         Activated -= MainWindow_Activated;
         _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+        _host.AI.Changed -= AIChanged;
         _companion.Dispose();
         _tray?.Dispose();
         _tray = null;

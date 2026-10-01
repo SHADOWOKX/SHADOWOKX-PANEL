@@ -24,6 +24,10 @@ public sealed class TrayIcon : IDisposable
     private readonly nint _previousProcedure;
     private readonly uint _taskbarCreated;
     private nint _icon;
+    private nint _companionIcon;
+    private bool _companionVisible;
+    private string _companionCharacter = "octopus";
+    private string _companionFrame = "robot-awake.png";
     private string _tooltip = "Shadowokx Panel";
     private int? _remainingPercent;
     private IconKey? _iconKey;
@@ -100,6 +104,38 @@ public sealed class TrayIcon : IDisposable
         UpdateIconAndTooltip();
     }
 
+    public void SetCompanionVisible(bool visible)
+    {
+        if (_disposed || _companionVisible == visible) return;
+        _companionVisible=visible;
+        if (visible) AddCompanion();
+        else { var data=CompanionData(0); NativeMethods.ShellNotifyIcon(NativeMethods.NimDelete,ref data); }
+    }
+    public void UpdateCompanion(string character,string frame)
+    {
+        _companionCharacter=character;_companionFrame=frame;
+        if (_disposed || !_companionVisible) return;
+        ReplaceCompanion();
+        var data=CompanionData(NativeMethods.NifIcon | NativeMethods.NifTip);
+        NativeMethods.ShellNotifyIcon(NativeMethods.NimModify,ref data);
+    }
+    private void ReplaceCompanion()
+    {
+        var path=Path.Combine(AppContext.BaseDirectory,"Assets","Companions",_companionCharacter,Path.ChangeExtension(_companionFrame,".ico"));
+        var replacement=NativeMethods.LoadImage(0,path,1,CurrentIconSize(),CurrentIconSize(),0x10);
+        if (replacement==0) return;
+        var previous=_companionIcon;_companionIcon=replacement;
+        if (previous!=0) NativeMethods.DestroyIcon(previous);
+    }
+    private NativeMethods.NotifyIconData CompanionData(uint flags) => Data(flags) with { uID=2,hIcon=_companionIcon,szTip="Shadowokx Panel · Companion" };
+    private void AddCompanion()
+    {
+        ReplaceCompanion();
+        var data=CompanionData(NativeMethods.NifIcon | NativeMethods.NifTip | NativeMethods.NifMessage);
+        if (NativeMethods.ShellNotifyIcon(NativeMethods.NimAdd,ref data))
+        { data.uVersion=NativeMethods.NotifyIconVersion4; NativeMethods.ShellNotifyIcon(NativeMethods.NimSetVersion,ref data); }
+    }
+
     private bool Add()
     {
         EnsureIcon();
@@ -139,6 +175,7 @@ public sealed class TrayIcon : IDisposable
         if (message == _taskbarCreated)
         {
             _ = Add();
+            if (_companionVisible) AddCompanion();
             return 0;
         }
         if (message == CallbackMessage)
@@ -270,6 +307,10 @@ public sealed class TrayIcon : IDisposable
         if (_disposed)
             return;
         _disposed = true;
+        var companion=CompanionData(0);
+        NativeMethods.ShellNotifyIcon(NativeMethods.NimDelete,ref companion);
+        if (_companionIcon!=0) NativeMethods.DestroyIcon(_companionIcon);
+        _companionIcon=0;
         var data = Data(0);
         NativeMethods.ShellNotifyIcon(NativeMethods.NimDelete, ref data);
         NativeMethods.SetWindowLongPtr(_hwnd, NativeMethods.GwlpWndProc, _previousProcedure);

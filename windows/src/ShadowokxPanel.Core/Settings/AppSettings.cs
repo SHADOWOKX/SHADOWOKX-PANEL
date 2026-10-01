@@ -9,6 +9,7 @@ public enum ThemePreset
     Nord,
     Amoled,
     Light,
+    Gnome, SoftNeutral, Terminal, Clay, Glacier, Dracula, Catppuccin, Ocean, Forest,
 }
 
 public enum AccentPreset
@@ -22,6 +23,7 @@ public enum AccentPreset
     Amber,
     Monochrome,
     Custom,
+    Teal, Pink, Red, Indigo, Lime,
 }
 
 public enum LayoutDensity
@@ -32,6 +34,12 @@ public enum LayoutDensity
 
 public sealed record AppSettings
 {
+    public string[] VisibleProviders { get; init; } = ["codex", "claude", "opencode", "commandcode", "deepseek", "glm", "gemini"];
+    public string[] RemovedProviders { get; init; } = [];
+    public Dictionary<string, AI.AISource> AISources { get; init; } = [];
+    public string SelectedProvider { get; init; } = "codex";
+    public bool VaryWorkAnimations { get; init; } = true;
+    public bool ShowTrayCompanion { get; init; } = true;
     public string CodexExecutablePath { get; init; } = string.Empty;
     public bool StartWithWindows { get; init; }
     public bool ShowWeather { get; init; } = true;
