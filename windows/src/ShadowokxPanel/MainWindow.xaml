@@ -151,6 +151,7 @@
                                     </Grid>
                                     <Grid>
                                         <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Image x:Name="WeeklyCompanion" Width="40" Height="40" VerticalAlignment="Center" IsHitTestVisible="False" AutomationProperties.Name="Animated Codex companion" />
                                             <TextBlock x:Name="WeeklyRemaining" Foreground="{ThemeResource AccentBrush}" FontSize="34" FontWeight="Bold" />
                                             <TextBlock Text="remaining" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="11" VerticalAlignment="Bottom" Margin="0,0,0,6" />
                                         </StackPanel>

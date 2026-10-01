@@ -11,6 +11,7 @@ namespace ShadowokxPanel;
 
 public sealed partial class SettingsWindow : Window
 {
+    private static readonly string[] Companions = ["robot", "codex", "octopus", "penguin"];
     private readonly AppHost _host;
     private readonly AppWindow _appWindow;
     private bool _loading;
@@ -40,6 +41,7 @@ public sealed partial class SettingsWindow : Window
         CustomAccentBox.Text = settings.CustomAccent;
         DensityCombo.SelectedIndex = settings.Density == LayoutDensity.Compact ? 0 : 1;
         AnimationsToggle.IsOn = settings.Animations;
+        CompanionCombo.SelectedIndex = Array.IndexOf(Companions, settings.Companion);
         CodexExecutableBox.Text = settings.CodexExecutablePath;
         CostEstimateToggle.IsOn = settings.ShowCostEstimate;
         EstimateModelCombo.ItemsSource = ApiPriceCatalog.Models.Select(p => p.Model).ToArray();
@@ -107,6 +109,7 @@ public sealed partial class SettingsWindow : Window
             CustomAccent = CustomAccentBox.Text,
             Density = DensityCombo.SelectedIndex == 0 ? LayoutDensity.Compact : LayoutDensity.Comfortable,
             Animations = AnimationsToggle.IsOn,
+            Companion = Companions[Math.Clamp(CompanionCombo.SelectedIndex, 0, 3)],
             ShowLifetimeTokens = LifetimeToggle.IsOn,
             ShowTokenHistory = HistoryToggle.IsOn,
             ShowUsageState = UsageStateToggle.IsOn,
@@ -173,6 +176,7 @@ public sealed partial class SettingsWindow : Window
             CustomAccent = defaults.CustomAccent,
             Density = defaults.Density,
             Animations = defaults.Animations,
+            Companion = defaults.Companion,
         };
         try
         {
