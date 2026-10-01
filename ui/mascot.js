@@ -222,9 +222,10 @@ export class MascotController {
         this._popupOpen = next;
         if (next) {
             this._clearPostCloseTimer();
-            if (this._codexActive)
-                this._enterActive();
-            else if (this._state === MascotState.SLEEPING ||
+            if (this._codexActive) {
+                if (this._state !== MascotState.ACTIVE)
+                    this._enterActive();
+            } else if (this._state === MascotState.SLEEPING ||
                 this._state === MascotState.GOING_TO_SLEEP)
                 this._enterWaking();
             else if (this._state !== MascotState.WAKING)

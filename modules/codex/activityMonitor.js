@@ -321,8 +321,24 @@ export class CodexActivityMonitor extends Observable {
             fragment = newline >= 0 ? text.slice(newline + 1) : text;
             this._files.set(path, {offset: chunk.end, fragment});
 
+            const events = parseCodexSessionActivity(complete);
+            // Restore starts from the bounded tail before applying fresh activity.
+            // A turn can have started well before the extension/popup was opened.
+            if (initial && events.some(event => event.timestamp >= this._now() - 30000)) {
+                this._dropTurnsForPath(path);
+                for (const event of events) {
+                    const key = this._turnKey(path, event.turnId);
+                    if (event.kind === 'start') this._activeTurns.add(key);
+                    else if (event.kind === 'terminal') {
+                        if (event.turnId) this._activeTurns.delete(key);
+                        else this._dropTurnsForPath(path);
+                    }
+                }
+                if (this._pathHasActiveTurn(path))
+                    this._markActivity('session', events.at(-1)?.timestamp, true);
+            }
             const recentCutoff = this._now() - this._graceMs;
-            for (const event of parseCodexSessionActivity(complete)) {
+            for (const event of events) {
                 if (!initial || event.timestamp === null || event.timestamp >= recentCutoff)
                     this._applySessionEvent(path, event);
             }

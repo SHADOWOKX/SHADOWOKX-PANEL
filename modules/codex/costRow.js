@@ -132,9 +132,9 @@ export function costRow(accountUsage, localUsage, accountUsageStatus) {
             : periodsCost[index]?.unknownTokens > 0 ? 'Unpriced' : '—',
             style_class: 'shadow-spend-value'});
         if (Number.isFinite(amounts[index])) {
-            attachTooltip(amount, 'USD estimate for recorded sessions on this device, using model-specific input, cached input and output prices. Not an account bill. ' +
-                (incomplete[index] ? 'Partial: some models or records could not be priced. ' : '') +
-                `Standard rates; fast-mode premiums and tool fees excluded. Recorded tokens in this period: ${tokensFormatter.format(periodsCost[index]?.tokens ?? 0)}. Prices checked ${localUsage?.priceDate ?? 'unavailable'}.`);
+            attachTooltip(amount, incomplete[index]
+                ? 'Partial device estimate · some records are unpriced.'
+                : 'Device estimate · not an account bill.');
         }
         cell.add_child(amount);
         spend.add_child(cell);
