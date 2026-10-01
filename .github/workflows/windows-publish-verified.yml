@@ -1,0 +1,86 @@
+name: Publish verified Windows release
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Windows CI run containing tested installer artifacts
+        required: true
+        type: string
+      version:
+        description: Version already built and tested (X.Y.Z)
+        required: true
+        type: string
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: windows-release-publish
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUN_ID: ${{ inputs.run_id }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - name: Verify successful first-party Windows CI source
+        id: verified
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > run.json
+          python3 - <<'PY'
+          import json, os
+          run = json.load(open('run.json'))
+          assert run['conclusion'] == 'success' and run['status'] == 'completed'
+          assert run['path'] == '.github/workflows/windows-ci.yml'
+          assert run['head_repository']['full_name'] == os.environ['GITHUB_REPOSITORY']
+          assert run['event'] == 'push'
+          assert run['head_branch'] in ('windows-port', 'codex/windows-3.1-parity')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write('sha=' + run['head_sha'] + '\n')
+          PY
+          sha="$(jq -r .head_sha run.json)"
+          gh api "repos/$GITHUB_REPOSITORY/contents/windows/Directory.Build.props?ref=$sha" --jq .content | base64 -d > build.props
+          python3 - <<'PY'
+          import os, xml.etree.ElementTree as ET
+          version = ET.parse('build.props').findtext('./PropertyGroup/VersionPrefix')
+          assert version == os.environ['VERSION'], 'Requested version differs from tested build'
+          PY
+      - name: Download exact tested installer artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: ShadowokxPanel-Windows-${{ steps.verified.outputs.sha }}
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          path: assets
+      - name: Verify checksums and publish
+        env:
+          SOURCE_SHA: ${{ steps.verified.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          root = Path('assets')
+          checksums = dict(line.split(None, 1)[::-1] for line in (root / 'checksums.txt').read_text().splitlines() if line.strip())
+          for name in ('ShadowokxPanel-Setup-x64.exe', 'ShadowokxPanel-Portable-x64.zip'):
+              assert hashlib.sha256((root / name).read_bytes()).hexdigest() == checksums.get(name)
+          PY
+          cat > notes.md <<EOFNOTES
+          Windows $VERSION includes provider-logo subscription tabs, account connection settings, expanded themes and accents, and centered Clawd animations beside the allowance and as a separate tray icon.
+
+          Real Codex Desktop work or an explicit current activity report starts motion; the final response stops it. Application focus no longer changes the selected subscription percentage. Small screens can scroll the full account dashboard.
+
+          Codex uses the existing CLI login, Claude has a usage-only status line bridge, DeepSeek displays API balance with an API key, and other providers use usage JSON sources. Windows controls tray icon ordering and overflow visibility.
+
+          Download **ShadowokxPanel-Setup-x64.exe** or the portable ZIP. No .NET SDK or administrator privileges are needed. This community build is unsigned; SHA-256 values are included in checksums.txt.
+
+          Built from [$SOURCE_SHA](https://github.com/$GITHUB_REPOSITORY/commit/$SOURCE_SHA), validated by [Windows CI](https://github.com/$GITHUB_REPOSITORY/actions/runs/$RUN_ID), including 90 core tests and native allowance, animation, popup, history and export checks. See the [code signing policy](https://github.com/$GITHUB_REPOSITORY/blob/main/CODE_SIGNING_POLICY.md).
+          EOFNOTES
+          gh release create "windows-v$VERSION" assets/ShadowokxPanel-Setup-x64.exe assets/ShadowokxPanel-Portable-x64.zip assets/checksums.txt \
+            --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" --title "Shadowokx Panel for Windows v$VERSION" --latest --notes-file notes.md
