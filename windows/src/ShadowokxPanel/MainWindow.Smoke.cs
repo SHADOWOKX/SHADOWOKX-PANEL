@@ -98,7 +98,7 @@ public sealed partial class MainWindow
             using var trayReader = new DataReader(trayStream.GetInputStreamAt(0));
             await trayReader.LoadAsync((uint)trayStream.Size);
             var png = new byte[(int)trayStream.Size]; trayReader.ReadBytes(png);
-            await File.WriteAllBytesAsync(Path.Combine(output, $"tray-{size}-{percent?.ToString() ?? "unknown"}.png"), png);
+            await File.WriteAllBytesAsync(Path.Combine(output, $"tray-{size}-{percent?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "unknown"}.png"), png);
         }
         var originalSettings = _host.Settings.Current;
         foreach (var single in new[] { "codex", "claude" })
