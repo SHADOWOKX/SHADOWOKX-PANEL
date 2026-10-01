@@ -28,25 +28,31 @@ public sealed partial class MainWindow
     });
     private void RenderProviderTabs()
     {
-        SubscriptionTabName.Text = AICatalog.Providers.GetValueOrDefault(SelectedAI) ?? "AI usage";
-        SubscriptionTabIcon.Source = ProviderLogo(SelectedAI);
         ProviderTabs.Children.Clear(); ProviderTabs.RowDefinitions.Clear(); ProviderTabs.ColumnDefinitions.Clear();
         var ids=_host.Settings.Current.VisibleProviders.Where(id=>!_host.Settings.Current.RemovedProviders.Contains(id)).ToArray();
         if (!ids.Contains(SelectedAI) && ids.Length>0)
             _ = _host.Settings.SaveAsync(_host.Settings.Current with { SelectedProvider=ids[0] });
-        for (var c=0;c<4;c++) ProviderTabs.ColumnDefinitions.Add(new ColumnDefinition { Width=new GridLength(1,GridUnitType.Star) });
-        for (var r=0;r<(ids.Length+3)/4;r++) ProviderTabs.RowDefinitions.Add(new RowDefinition { Height=GridLength.Auto });
-        for (var i=0;i<ids.Length;i++)
+        var pages=ids.ToList();
+        if (_host.Settings.Current.ShowWeather) pages.Add("weather");
+        ProviderBorder.Visibility = pages.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+        var columns=Math.Min(4,Math.Max(1,pages.Count));
+        for (var c=0;c<columns;c++) ProviderTabs.ColumnDefinitions.Add(new ColumnDefinition { Width=new GridLength(1,GridUnitType.Star) });
+        for (var r=0;r<(pages.Count+columns-1)/columns;r++) ProviderTabs.RowDefinitions.Add(new RowDefinition { Height=GridLength.Auto });
+        for (var i=0;i<pages.Count;i++)
         {
-            var id=ids[i];
+            var id=pages[i];
             var content=new StackPanel { Orientation=Orientation.Horizontal,Spacing=6,HorizontalAlignment=HorizontalAlignment.Center };
-            content.Children.Add(new Image { Source=ProviderLogo(id), Width=16,Height=16 });
-            content.Children.Add(new TextBlock { Text=id=="codex"?"Codex":id=="commandcode"?"Command":id=="glm"?"GLM":AICatalog.Providers[id], FontSize=11, VerticalAlignment=VerticalAlignment.Center });
+            content.Children.Add(new Image { Source=id=="weather"?new SvgImageSource(new Uri("ms-appx:///Assets/Weather/clear-day.svg")):ProviderLogo(id), Width=16,Height=16 });
+            content.Children.Add(new TextBlock { Text=id=="codex"?"Codex":id=="commandcode"?"Command":id=="glm"?"GLM":id=="weather"?"Weather":AICatalog.Providers[id], FontSize=11, VerticalAlignment=VerticalAlignment.Center });
             var button=new Button { Content=content,CornerRadius=new CornerRadius(10),Height=38,MinWidth=0,Padding=new Thickness(4),HorizontalAlignment=HorizontalAlignment.Stretch,
-                Background=SelectedAI==id?ResourceBrush("AccentBrush",.12):Transparent(),BorderBrush=SelectedAI==id?ResourceBrush("AccentBrush",.45):Transparent() };
-            AutomationProperties.SetName(button,AICatalog.Providers[id]);
-            button.Click+=async (_,_)=> { await _host.Settings.SaveAsync(_host.Settings.Current with { SelectedProvider=id }); await _viewModel.SelectPageAsync("codex"); Render(); };
-            Grid.SetRow(button,i/4);Grid.SetColumn(button,i%4);ProviderTabs.Children.Add(button);
+                Background=(id=="weather"?_viewModel.SelectedPage=="weather":_viewModel.SelectedPage!="weather" && SelectedAI==id)?ResourceBrush("AccentBrush",.12):Transparent(),BorderBrush=(id=="weather"?_viewModel.SelectedPage=="weather":_viewModel.SelectedPage!="weather" && SelectedAI==id)?ResourceBrush("AccentBrush",.45):Transparent() };
+            AutomationProperties.SetName(button,id=="weather"?"Weather":AICatalog.Providers[id]);
+            button.Click+=async (_,_)=> {
+                if (id=="weather") await _viewModel.SelectPageAsync("weather");
+                else { await _host.Settings.SaveAsync(_host.Settings.Current with { SelectedProvider=id }); await _viewModel.SelectPageAsync("codex"); }
+                Render();
+            };
+            Grid.SetRow(button,i/columns);Grid.SetColumn(button,i%columns);ProviderTabs.Children.Add(button);
         }
     }
     private void RenderAI()

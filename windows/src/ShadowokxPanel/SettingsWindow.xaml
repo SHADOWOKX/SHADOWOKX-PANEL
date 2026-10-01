@@ -1,98 +1,480 @@
-<Window
-    x:Class="ShadowokxPanel.SettingsWindow"
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid x:Name="Root" Background="{ThemeResource AppBackgroundBrush}">
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel Spacing="22" Padding="28">
-                <StackPanel Spacing="4">
-                    <TextBlock Text="Shadowokx Panel" FontSize="24" FontWeight="SemiBold" Foreground="{ThemeResource PrimaryTextBrush}" />
-                    <TextBlock Text="Windows settings" Foreground="{ThemeResource SecondaryTextBrush}" />
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="ShadowokxPanel.SettingsWindow">
+    <Border x:Name="Root" Background="{ThemeResource AppBackgroundBrush}" BorderBrush="{ThemeResource CardBorderBrush}" BorderThickness="1" CornerRadius="18">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="52" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid x:Name="HeaderDrag" PointerPressed="HeaderDrag_PointerPressed" Background="Transparent">
+                    <TextBlock Text="Shadowokx Panel · Settings" FontWeight="SemiBold" FontSize="15" Margin="22,0,0,0" VerticalAlignment="Center" Foreground="{ThemeResource PrimaryTextBrush}" />
+                </Grid>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" Padding="6">
+                    <Button Content="−" Width="40" Height="36" Background="Transparent" Click="Minimize_Click" AutomationProperties.Name="Minimize" />
+                    <Button Content="□" Width="40" Height="36" Background="Transparent" Click="Maximize_Click" AutomationProperties.Name="Maximize or restore" />
+                    <Button Content="✕" Width="40" Height="36" Background="Transparent" Click="Close_Click" AutomationProperties.Name="Close" />
                 </StackPanel>
-
-                <StackPanel Spacing="10">
-                    <TextBlock Text="GENERAL" Style="{StaticResource SectionLabelStyle}" />
-                    <ToggleSwitch x:Name="StartWithWindowsToggle" Header="Start with Windows" Toggled="SettingChanged" />
-                    <ToggleSwitch x:Name="ShowWeatherToggle" Header="Show Weather" Toggled="SettingChanged" />
-                    <ToggleSwitch x:Name="CodexStateToggle" Header="Show Codex usage state" Toggled="SettingChanged" />
-                    <ToggleSwitch x:Name="WeatherTooltipToggle" Header="Weather in tray tooltip" Toggled="SettingChanged" />
-                    <ToggleSwitch x:Name="RefreshOnOpenToggle" Header="Refresh stale Weather when opened" Toggled="SettingChanged" />
-                </StackPanel>
-
-                <StackPanel Spacing="10">
-                    <TextBlock Text="APPEARANCE" Style="{StaticResource SectionLabelStyle}" />
-                    <ComboBox x:Name="ThemeCombo" Header="Theme" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged">
-                        <x:String>Follow Windows</x:String><x:String>Shadow</x:String><x:String>Midnight</x:String>
-                        <x:String>Graphite</x:String><x:String>Nord</x:String><x:String>AMOLED</x:String><x:String>Light</x:String>
-                        <x:String>GNOME</x:String><x:String>Soft Neutral</x:String><x:String>Terminal</x:String><x:String>Clay</x:String><x:String>Glacier</x:String><x:String>Dracula</x:String><x:String>Catppuccin</x:String><x:String>Ocean</x:String><x:String>Forest</x:String>
-                    </ComboBox>
-                    <ComboBox x:Name="AccentCombo" Header="Accent" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged">
-                        <x:String>Rose</x:String><x:String>Orange</x:String><x:String>Emerald</x:String><x:String>Cyan</x:String>
-                        <x:String>Blue</x:String><x:String>Violet</x:String><x:String>Amber</x:String><x:String>Monochrome</x:String><x:String>Custom</x:String><x:String>Teal</x:String><x:String>Pink</x:String><x:String>Red</x:String><x:String>Indigo</x:String><x:String>Lime</x:String>
-                    </ComboBox>
-                    <TextBox x:Name="CustomAccentBox" Header="Custom accent" PlaceholderText="#f97316" MaxLength="7" LostFocus="SettingChanged" />
-                    <ComboBox x:Name="DensityCombo" Header="Layout density" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged">
-                        <x:String>Compact</x:String><x:String>Comfortable</x:String>
-                    </ComboBox>
-                    <ComboBox x:Name="CompanionCombo" Header="Animated companion" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged">
-                        <ComboBoxItem Content="Robot" /><ComboBoxItem Content="Codex" /><ComboBoxItem Content="Clawd" /><ComboBoxItem Content="Penguin" />
-                    </ComboBox>
-                    <ToggleSwitch x:Name="TrayCompanionToggle" Header="Companion beside tray percentage" Toggled="SettingChanged" />
-                    <ToggleSwitch x:Name="VaryWorkToggle" Header="Vary work animations" Toggled="SettingChanged" />
-                    <ToggleSwitch x:Name="AnimationsToggle" Header="Animate only during active work" Toggled="SettingChanged" />
-                </StackPanel>
-
-                <StackPanel Spacing="10">
-                    <TextBlock Text="AI ACCOUNTS" Style="{StaticResource SectionLabelStyle}" />
-                    <TextBlock Text="Codex uses your existing CLI login. Connect Claude usage with the button below; connect DeepSeek with an API key. Other providers use a usage JSON file. Updates appear as soon as the source changes." TextWrapping="Wrap" FontSize="12" />
-                    <StackPanel x:Name="ProviderSettings" Spacing="10" />
-                    <TextBlock x:Name="ConnectionMessage" TextWrapping="Wrap" FontSize="12" />
-                </StackPanel>
-                <StackPanel Spacing="10">
-                    <TextBlock Text="CODEX" Style="{StaticResource SectionLabelStyle}" />
-                    <TextBox x:Name="CodexExecutableBox" Header="Codex CLI path (optional)" PlaceholderText="Auto-detect" LostFocus="SettingChanged" />
-                    <ToggleSwitch x:Name="CostEstimateToggle" Header="Show device USD estimate" Toggled="SettingChanged" />
-                    <ComboBox x:Name="EstimateModelCombo" Visibility="Collapsed" Header="Reference model for account estimates" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged" />
-                    <NumberBox x:Name="EstimateCachedBox" Visibility="Collapsed" Header="Cached input (%)" Minimum="0" Maximum="100" ValueChanged="NumberChanged" />
-                    <NumberBox x:Name="EstimateOutputBox" Visibility="Collapsed" Header="Output (%)" Minimum="0" Maximum="100" ValueChanged="NumberChanged" />
-                    <NumberBox x:Name="EstimateWriteBox" Visibility="Collapsed" Header="Cache writes (%)" Minimum="0" Maximum="100" ValueChanged="NumberChanged" />
-                    <ToggleSwitch x:Name="EstimateLongToggle" Visibility="Collapsed" Header="Assume prompts above 272K input tokens" Toggled="SettingChanged" />
-                    <TextBlock x:Name="EstimateInfo" Visibility="Collapsed" TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource SecondaryTextBrush}" />
-                    <HyperlinkButton x:Name="EstimateSourceLink" Visibility="Collapsed" Content="Official model prices" />
-                    <ToggleSwitch x:Name="LifetimeToggle" Header="Show lifetime tokens" Toggled="SettingChanged" />
-                    <ToggleSwitch x:Name="HistoryToggle" Header="Show token history" Toggled="SettingChanged" />
-                    <ToggleSwitch x:Name="UsageStateToggle" Header="Show usage state" Toggled="SettingChanged" />
-                </StackPanel>
-
-                <StackPanel Spacing="10">
-                    <TextBlock Text="WEATHER" Style="{StaticResource SectionLabelStyle}" />
-                    <TextBox x:Name="LocationBox" Header="Location" MaxLength="120" LostFocus="SettingChanged" />
-                    <ComboBox x:Name="TemperatureCombo" Header="Temperature unit" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged">
-                        <x:String>Celsius</x:String><x:String>Fahrenheit</x:String>
-                    </ComboBox>
-                    <ComboBox x:Name="WindCombo" Header="Wind unit" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged">
-                        <x:String>km/h</x:String><x:String>mph</x:String>
-                    </ComboBox>
-                    <ToggleSwitch x:Name="UvToggle" Header="UV Index" Toggled="SettingChanged" />
-                    <ToggleSwitch x:Name="PrecipitationToggle" Header="Hourly precipitation" Toggled="SettingChanged" />
-                </StackPanel>
-
-                <StackPanel Spacing="10">
-                    <TextBlock Text="REFRESH" Style="{StaticResource SectionLabelStyle}" />
-                    <TextBlock Text="Codex updates every 30 seconds while visible and every 60 seconds in the background." TextWrapping="Wrap" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
-                    <NumberBox x:Name="WeatherInterval" Header="Weather refresh interval (minutes)" Minimum="15" Maximum="180" SpinButtonPlacementMode="Inline" ValueChanged="NumberChanged" />
-                </StackPanel>
-
-                <StackPanel Spacing="10">
-                    <TextBlock Text="ADVANCED" Style="{StaticResource SectionLabelStyle}" />
-                    <ToggleSwitch x:Name="DebugToggle" Header="Redacted debug logging" Toggled="SettingChanged" />
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Button Content="Clear local history" Click="ClearHistory_Click" />
-                        <Button Content="Reset appearance" Click="ResetAppearance_Click" />
+            </Grid>
+            <Border Grid.Row="1" Background="{ThemeResource CardBrush}" CornerRadius="12" Margin="20,4,20,8" Padding="4">
+                <Grid x:Name="SettingsNavigation" ColumnSpacing="3">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="GeneralNav" Grid.Column="0" Content="General" Tag="General" Click="Category_Click" MinWidth="0" Padding="5,8" HorizontalAlignment="Stretch" Background="Transparent" CornerRadius="9" />
+                    <Button x:Name="AccountsNav" Grid.Column="1" Content="Accounts" Tag="Accounts" Click="Category_Click" MinWidth="0" Padding="5,8" HorizontalAlignment="Stretch" Background="Transparent" CornerRadius="9" />
+                    <Button x:Name="AppearanceNav" Grid.Column="2" Content="Appearance" Tag="Appearance" Click="Category_Click" MinWidth="0" Padding="5,8" HorizontalAlignment="Stretch" Background="Transparent" CornerRadius="9" />
+                    <Button x:Name="WeatherNav" Grid.Column="3" Content="Weather" Tag="Weather" Click="Category_Click" MinWidth="0" Padding="5,8" HorizontalAlignment="Stretch" Background="Transparent" CornerRadius="9" />
+                    <Button x:Name="AdvancedNav" Grid.Column="4" Content="Advanced" Tag="Advanced" Click="Category_Click" MinWidth="0" Padding="5,8" HorizontalAlignment="Stretch" Background="Transparent" CornerRadius="9" />
+                </Grid>
+            </Border>
+            <ScrollViewer x:Name="SettingsScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <Grid Padding="24,8,24,24">
+                    <StackPanel x:Name="GeneralPage" Spacing="14" Visibility="Visible">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="General" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="4,8,0,2" />
+                            <Border Background="{ThemeResource CardBrush}" BorderBrush="{ThemeResource CardBorderBrush}" BorderThickness="1" CornerRadius="14">
+                                <StackPanel Spacing="1">
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Start with Windows" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ToggleSwitch x:Name="StartWithWindowsToggle" Toggled="SettingChanged" AutomationProperties.Name="Start with Windows" HorizontalAlignment="Right" OnContent="" OffContent="" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Show Weather" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ToggleSwitch x:Name="ShowWeatherToggle" Toggled="SettingChanged" AutomationProperties.Name="Show Weather" HorizontalAlignment="Right" OnContent="" OffContent="" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Show Codex usage state" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ToggleSwitch x:Name="CodexStateToggle" Toggled="SettingChanged" AutomationProperties.Name="Show Codex usage state" HorizontalAlignment="Right" OnContent="" OffContent="" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Weather in tray tooltip" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ToggleSwitch x:Name="WeatherTooltipToggle" Toggled="SettingChanged" AutomationProperties.Name="Weather in tray tooltip" HorizontalAlignment="Right" OnContent="" OffContent="" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Refresh stale Weather when opened" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ToggleSwitch x:Name="RefreshOnOpenToggle" Toggled="SettingChanged" AutomationProperties.Name="Refresh stale Weather when opened" HorizontalAlignment="Right" OnContent="" OffContent="" />
+                                        </Grid>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
                     </StackPanel>
-                    <TextBlock Text="Settings and history stay in your Windows user profile. Authentication credentials are never copied." TextWrapping="Wrap" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
-                </StackPanel>
-            </StackPanel>
-        </ScrollViewer>
-    </Grid>
+                    <StackPanel x:Name="AccountsPage" Spacing="14" Visibility="Collapsed">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Ai Accounts" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="4,8,0,2" />
+                            <Border Background="{ThemeResource CardBrush}" BorderBrush="{ThemeResource CardBorderBrush}" BorderThickness="1" CornerRadius="14">
+                                <StackPanel Spacing="1">
+                                    <Border Padding="14,10">
+                                        <TextBlock Text="Codex uses your existing CLI login. Connect Claude usage with the button below; connect DeepSeek with an API key. Other providers use a usage JSON file. Updates appear as soon as the source changes." TextWrapping="Wrap" FontSize="12" />
+                                    </Border>
+                                    <Border Padding="14,10">
+                                        <StackPanel x:Name="ProviderSettings" Spacing="10" />
+                                    </Border>
+                                    <Border Padding="14,10">
+                                        <TextBlock x:Name="ConnectionMessage" TextWrapping="Wrap" FontSize="12" />
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Codex" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="4,8,0,2" />
+                            <Border Background="{ThemeResource CardBrush}" BorderBrush="{ThemeResource CardBorderBrush}" BorderThickness="1" CornerRadius="14">
+                                <StackPanel Spacing="1">
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Codex CLI path (optional)" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <TextBox x:Name="CodexExecutableBox" PlaceholderText="Auto-detect" LostFocus="SettingChanged" AutomationProperties.Name="Codex CLI path (optional)" HorizontalAlignment="Right" Width="205" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Show device USD estimate" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ToggleSwitch x:Name="CostEstimateToggle" Toggled="SettingChanged" AutomationProperties.Name="Show device USD estimate" HorizontalAlignment="Right" OnContent="" OffContent="" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Reference model for account estimates" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ComboBox x:Name="EstimateModelCombo" Visibility="Collapsed" HorizontalAlignment="Right" SelectionChanged="SelectionChanged" AutomationProperties.Name="Reference model for account estimates" Width="205" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Cached input (%)" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <NumberBox x:Name="EstimateCachedBox" Visibility="Collapsed" Minimum="0" Maximum="100" ValueChanged="NumberChanged" AutomationProperties.Name="Cached input (%)" HorizontalAlignment="Right" Width="205" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Output (%)" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <NumberBox x:Name="EstimateOutputBox" Visibility="Collapsed" Minimum="0" Maximum="100" ValueChanged="NumberChanged" AutomationProperties.Name="Output (%)" HorizontalAlignment="Right" Width="205" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Cache writes (%)" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <NumberBox x:Name="EstimateWriteBox" Visibility="Collapsed" Minimum="0" Maximum="100" ValueChanged="NumberChanged" AutomationProperties.Name="Cache writes (%)" HorizontalAlignment="Right" Width="205" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Assume prompts above 272K input tokens" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ToggleSwitch x:Name="EstimateLongToggle" Visibility="Collapsed" Toggled="SettingChanged" AutomationProperties.Name="Assume prompts above 272K input tokens" HorizontalAlignment="Right" OnContent="" OffContent="" />
+                                        </Grid>
+                                    </Grid>
+                                    <Border Padding="14,10" Visibility="Collapsed">
+                                        <TextBlock x:Name="EstimateInfo" Visibility="Collapsed" TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource SecondaryTextBrush}" />
+                                    </Border>
+                                    <Border Padding="14,10" Visibility="Collapsed">
+                                        <HyperlinkButton x:Name="EstimateSourceLink" Visibility="Collapsed" Content="Official model prices" />
+                                    </Border>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Show lifetime tokens" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ToggleSwitch x:Name="LifetimeToggle" Toggled="SettingChanged" AutomationProperties.Name="Show lifetime tokens" HorizontalAlignment="Right" OnContent="" OffContent="" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Show token history" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ToggleSwitch x:Name="HistoryToggle" Toggled="SettingChanged" AutomationProperties.Name="Show token history" HorizontalAlignment="Right" OnContent="" OffContent="" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Show usage state" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ToggleSwitch x:Name="UsageStateToggle" Toggled="SettingChanged" AutomationProperties.Name="Show usage state" HorizontalAlignment="Right" OnContent="" OffContent="" />
+                                        </Grid>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel x:Name="AppearancePage" Spacing="14" Visibility="Collapsed">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Appearance" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="4,8,0,2" />
+                            <Border Background="{ThemeResource CardBrush}" BorderBrush="{ThemeResource CardBorderBrush}" BorderThickness="1" CornerRadius="14">
+                                <StackPanel Spacing="1">
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Theme" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ComboBox x:Name="ThemeCombo" HorizontalAlignment="Right" SelectionChanged="SelectionChanged" AutomationProperties.Name="Theme" Width="205">
+                                                <x:String>Follow Windows</x:String>
+                                                <x:String>Shadow</x:String>
+                                                <x:String>Midnight</x:String>
+                                                <x:String>Graphite</x:String>
+                                                <x:String>Nord</x:String>
+                                                <x:String>AMOLED</x:String>
+                                                <x:String>Light</x:String>
+                                                <x:String>GNOME</x:String>
+                                                <x:String>Soft Neutral</x:String>
+                                                <x:String>Terminal</x:String>
+                                                <x:String>Clay</x:String>
+                                                <x:String>Glacier</x:String>
+                                                <x:String>Dracula</x:String>
+                                                <x:String>Catppuccin</x:String>
+                                                <x:String>Ocean</x:String>
+                                                <x:String>Forest</x:String>
+                                                <x:String>Dusk</x:String>
+                                                <x:String>Mocha</x:String>
+                                                <x:String>Lavender</x:String>
+                                            </ComboBox>
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Accent" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ComboBox x:Name="AccentCombo" HorizontalAlignment="Right" SelectionChanged="SelectionChanged" AutomationProperties.Name="Accent" Width="205">
+                                                <x:String>Rose</x:String>
+                                                <x:String>Orange</x:String>
+                                                <x:String>Emerald</x:String>
+                                                <x:String>Cyan</x:String>
+                                                <x:String>Blue</x:String>
+                                                <x:String>Violet</x:String>
+                                                <x:String>Amber</x:String>
+                                                <x:String>Monochrome</x:String>
+                                                <x:String>Custom</x:String>
+                                                <x:String>Teal</x:String>
+                                                <x:String>Pink</x:String>
+                                                <x:String>Red</x:String>
+                                                <x:String>Indigo</x:String>
+                                                <x:String>Lime</x:String>
+                                            </ComboBox>
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Custom accent" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <TextBox x:Name="CustomAccentBox" PlaceholderText="#f97316" MaxLength="7" LostFocus="SettingChanged" AutomationProperties.Name="Custom accent" HorizontalAlignment="Right" Width="205" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Layout density" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ComboBox x:Name="DensityCombo" HorizontalAlignment="Right" SelectionChanged="SelectionChanged" AutomationProperties.Name="Layout density" Width="205">
+                                                <x:String>Compact</x:String>
+                                                <x:String>Comfortable</x:String>
+                                            </ComboBox>
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Animated companion" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ComboBox x:Name="CompanionCombo" HorizontalAlignment="Right" SelectionChanged="SelectionChanged" AutomationProperties.Name="Animated companion" Width="205">
+                                                <ComboBoxItem Content="Robot" />
+                                                <ComboBoxItem Content="Codex" />
+                                                <ComboBoxItem Content="Clawd" />
+                                                <ComboBoxItem Content="Penguin" />
+                                            </ComboBox>
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Companion with tray percentage" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ToggleSwitch x:Name="TrayCompanionToggle" Toggled="SettingChanged" AutomationProperties.Name="Companion with tray percentage" HorizontalAlignment="Right" OnContent="" OffContent="" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Vary work animations" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ToggleSwitch x:Name="VaryWorkToggle" Toggled="SettingChanged" AutomationProperties.Name="Vary work animations" HorizontalAlignment="Right" OnContent="" OffContent="" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Animate only during active work" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ToggleSwitch x:Name="AnimationsToggle" Toggled="SettingChanged" AutomationProperties.Name="Animate only during active work" HorizontalAlignment="Right" OnContent="" OffContent="" />
+                                        </Grid>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel x:Name="WeatherPage" Spacing="14" Visibility="Collapsed">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Weather" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="4,8,0,2" />
+                            <Border Background="{ThemeResource CardBrush}" BorderBrush="{ThemeResource CardBorderBrush}" BorderThickness="1" CornerRadius="14">
+                                <StackPanel Spacing="1">
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Location" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <TextBox x:Name="LocationBox" MaxLength="120" LostFocus="SettingChanged" AutomationProperties.Name="Location" HorizontalAlignment="Right" Width="205" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Temperature unit" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ComboBox x:Name="TemperatureCombo" HorizontalAlignment="Right" SelectionChanged="SelectionChanged" AutomationProperties.Name="Temperature unit" Width="205">
+                                                <x:String>Celsius</x:String>
+                                                <x:String>Fahrenheit</x:String>
+                                            </ComboBox>
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Wind unit" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ComboBox x:Name="WindCombo" HorizontalAlignment="Right" SelectionChanged="SelectionChanged" AutomationProperties.Name="Wind unit" Width="205">
+                                                <x:String>km/h</x:String>
+                                                <x:String>mph</x:String>
+                                            </ComboBox>
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="UV Index" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ToggleSwitch x:Name="UvToggle" Toggled="SettingChanged" AutomationProperties.Name="UV Index" HorizontalAlignment="Right" OnContent="" OffContent="" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Hourly precipitation" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ToggleSwitch x:Name="PrecipitationToggle" Toggled="SettingChanged" AutomationProperties.Name="Hourly precipitation" HorizontalAlignment="Right" OnContent="" OffContent="" />
+                                        </Grid>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel x:Name="AdvancedPage" Spacing="14" Visibility="Collapsed">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Refresh" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="4,8,0,2" />
+                            <Border Background="{ThemeResource CardBrush}" BorderBrush="{ThemeResource CardBorderBrush}" BorderThickness="1" CornerRadius="14">
+                                <StackPanel Spacing="1">
+                                    <Border Padding="14,10">
+                                        <TextBlock Text="Codex updates every 30 seconds while visible and every 60 seconds in the background." TextWrapping="Wrap" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
+                                    </Border>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Weather refresh interval (minutes)" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <NumberBox x:Name="WeatherInterval" Minimum="15" Maximum="180" SpinButtonPlacementMode="Inline" ValueChanged="NumberChanged" AutomationProperties.Name="Weather refresh interval (minutes)" HorizontalAlignment="Right" Width="205" />
+                                        </Grid>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Advanced" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="4,8,0,2" />
+                            <Border Background="{ThemeResource CardBrush}" BorderBrush="{ThemeResource CardBorderBrush}" BorderThickness="1" CornerRadius="14">
+                                <StackPanel Spacing="1">
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Redacted debug logging" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ToggleSwitch x:Name="DebugToggle" Toggled="SettingChanged" AutomationProperties.Name="Redacted debug logging" HorizontalAlignment="Right" OnContent="" OffContent="" />
+                                        </Grid>
+                                    </Grid>
+                                    <Border Padding="14,10">
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <Button Content="Clear local history" Click="ClearHistory_Click" />
+                                            <Button Content="Reset appearance" Click="ResetAppearance_Click" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Padding="14,10">
+                                        <TextBlock Text="Settings and history stay in your Windows user profile. Authentication credentials are never copied." TextWrapping="Wrap" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="12" />
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+        </Grid>
+    </Border>
 </Window>

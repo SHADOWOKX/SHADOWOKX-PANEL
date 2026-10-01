@@ -28,6 +28,9 @@ public static class ThemeService
             [ThemePreset.Catppuccin] = new("#1e1e2e", "#272739", "#313147", "#45455d", "#cdd6f4", "#a6adc8", ElementTheme.Dark),
             [ThemePreset.Ocean] = new("#102330", "#173140", "#214354", "#33576a", "#e5f5ff", "#98becf", ElementTheme.Dark),
             [ThemePreset.Forest] = new("#15251d", "#203329", "#2d4638", "#405e4b", "#e3f5e8", "#a4c5ae", ElementTheme.Dark),
+            [ThemePreset.Dusk] = new("#252136", "#302b43", "#3b3451", "#504763", "#f3eafd", "#b9aeca", ElementTheme.Dark),
+            [ThemePreset.Mocha] = new("#2b2322", "#382e2c", "#443835", "#584744", "#ffefdf", "#c5aaa0", ElementTheme.Dark),
+            [ThemePreset.Lavender] = new("#eeeaf6", "#f8f5ff", "#e3dcf0", "#cfc4e0", "#332a43", "#766789", ElementTheme.Light),
             [ThemePreset.Light] = new("#efefeb", "#e8e8e4", "#e0e0dc", "#d2d2ce", "#252624", "#70736f", ElementTheme.Light),
         };
 

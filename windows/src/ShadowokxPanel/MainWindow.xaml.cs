@@ -374,22 +374,14 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         var settings = _viewModel.Settings;
         ApplyThemeIfChanged(settings);
-        WeatherTab.Visibility = settings.ShowWeather ? Visibility.Visible : Visibility.Collapsed;
-        WeatherColumn.Width = settings.ShowWeather ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
-        SegmentedBorder.Visibility = Visibility.Visible;
+        var weatherSelected = settings.ShowWeather && _viewModel.SelectedPage == "weather";
         RenderProviderTabs();
         _companion.VaryWork = settings.VaryWorkAnimations;
-        var weatherSelected = settings.ShowWeather && _viewModel.SelectedPage == "weather";
-        ProviderBorder.Visibility = weatherSelected ? Visibility.Collapsed : Visibility.Visible;
-        DashboardGrid.RowSpacing = weatherSelected ? 7 : 10;
+        DashboardGrid.RowSpacing = 10;
         _companion.Configure(settings.Companion, settings.ShowTrayCompanion || (_visible && !weatherSelected),
             settings.Animations && _uiSettings.AnimationsEnabled);
         CodexScroll.Visibility = weatherSelected ? Visibility.Collapsed : Visibility.Visible;
         WeatherScroll.Visibility = weatherSelected ? Visibility.Visible : Visibility.Collapsed;
-        CodexTab.Background = weatherSelected ? Transparent() : ResourceBrush("AccentBrush", 0.12);
-        WeatherTab.Background = weatherSelected ? ResourceBrush("AccentBrush", 0.12) : Transparent();
-        CodexTab.BorderBrush = weatherSelected ? Transparent() : ResourceBrush("AccentBrush", 0.45);
-        WeatherTab.BorderBrush = weatherSelected ? ResourceBrush("AccentBrush", 0.45) : Transparent();
         if (weatherSelected)
         {
             CodexRefreshRing.IsActive = false;

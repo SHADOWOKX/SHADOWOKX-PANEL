@@ -9,7 +9,7 @@ public enum ThemePreset
     Nord,
     Amoled,
     Light,
-    Gnome, SoftNeutral, Terminal, Clay, Glacier, Dracula, Catppuccin, Ocean, Forest,
+    Gnome, SoftNeutral, Terminal, Clay, Glacier, Dracula, Catppuccin, Ocean, Forest, Dusk, Mocha, Lavender,
 }
 
 public enum AccentPreset

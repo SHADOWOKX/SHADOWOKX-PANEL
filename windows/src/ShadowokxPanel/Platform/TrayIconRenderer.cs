@@ -7,7 +7,7 @@ internal static class TrayIconRenderer
 {
     private const int GlyphColor = unchecked((int)0xFFFFFFFF);
 
-    public static nint Create(int size, int? remainingPercent)
+    public static nint Create(int size, int? remainingPercent, string? companionPath = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size);
 
@@ -15,12 +15,13 @@ internal static class TrayIconRenderer
         var pixels = new int[checked(size * size)];
         var padding = Math.Max(1, size / 16);
         var usable = Math.Max(1, size - padding * 2);
-        var scaleY = Math.Max(1, usable / glyph.Height);
+        var combined = companionPath is not null;
+        var scaleY = Math.Max(1, (combined ? size / 3 : usable) / glyph.Height);
         var scaleX = Math.Max(1, Math.Min(usable / glyph.Width, scaleY));
         var renderedWidth = glyph.Width * scaleX;
         var renderedHeight = glyph.Height * scaleY;
         var left = Math.Max(0, (size - renderedWidth) / 2);
-        var top = Math.Max(0, (size - renderedHeight) / 2);
+        var top = Math.Max(0, combined ? size - renderedHeight : (size - renderedHeight) / 2);
 
         foreach (var point in glyph.Pixels)
         {
@@ -62,6 +63,31 @@ internal static class TrayIconRenderer
         try
         {
             Marshal.Copy(pixels, 0, bits, pixels.Length);
+            if (companionPath is not null)
+            {
+                var mascotSize = Math.Max(1, top - padding);
+                var mascot = NativeMethods.LoadImage(0, companionPath, 1, mascotSize, mascotSize, 0x10);
+                if (mascot != 0)
+                {
+                    var dc = NativeMethods.CreateCompatibleDC(0);
+                    try
+                    {
+                        if (dc == 0) throw new InvalidOperationException("Tray drawing context unavailable.");
+                        var previousBitmap = NativeMethods.SelectObject(dc, colorBitmap);
+                        try
+                        {
+                            NativeMethods.DrawIconEx(dc, (size-mascotSize)/2, 0, mascot, mascotSize, mascotSize, 0, 0, 3);
+                            Marshal.Copy(bits, pixels, 0, pixels.Length);
+                        }
+                        finally { NativeMethods.SelectObject(dc, previousBitmap); }
+                    }
+                    finally
+                    {
+                        if (dc != 0) NativeMethods.DeleteDC(dc);
+                        NativeMethods.DestroyIcon(mascot);
+                    }
+                }
+            }
             var maskStride = ((size + 15) / 16) * 2;
             var maskPixels = new byte[checked(maskStride * size)];
             Array.Fill(maskPixels, byte.MaxValue);

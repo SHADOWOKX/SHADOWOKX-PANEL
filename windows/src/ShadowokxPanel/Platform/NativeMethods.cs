@@ -89,6 +89,22 @@ internal static class NativeMethods
     [DllImport("user32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
     internal static extern nint LoadImage(nint instance,string name,uint type,int width,int height,uint flags);
 
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool ReleaseCapture();
+    [DllImport("user32.dll", EntryPoint="SendMessageW")]
+    internal static extern nint SendMessage(nint hwnd, uint message, nint wParam, nint lParam);
+    [DllImport("gdi32.dll")]
+    internal static extern nint CreateCompatibleDC(nint dc);
+    [DllImport("gdi32.dll")]
+    internal static extern nint SelectObject(nint dc, nint value);
+    [DllImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool DeleteDC(nint dc);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool DrawIconEx(nint dc, int x, int y, nint icon, int width, int height, uint step, nint brush, uint flags);
+
     [DllImport("shell32.dll", EntryPoint = "Shell_NotifyIconGetRect")]
     internal static extern int ShellNotifyIconGetRect(ref NotifyIconIdentifier identifier, out Rect rectangle);
 

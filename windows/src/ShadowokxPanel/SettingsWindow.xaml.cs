@@ -14,7 +14,7 @@ public sealed partial class SettingsWindow : Window
     private static readonly string[] Companions = ["robot", "codex", "octopus", "penguin"];
     private readonly AppHost _host;
     private readonly AppWindow _appWindow;
-    private bool _loading;
+    private bool _loading = true;
 
     public SettingsWindow(AppHost host)
     {
@@ -23,12 +23,40 @@ public sealed partial class SettingsWindow : Window
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
         _appWindow = AppWindow.GetFromWindowId(Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd));
         _appWindow.Title = "Shadowokx Panel Settings";
-        _appWindow.Resize(new SizeInt32(560, 760));
+        _appWindow.Resize(new SizeInt32(680, 740));
+        if (_appWindow.Presenter is OverlappedPresenter presenter) presenter.SetBorderAndTitleBar(false,false);
+        SelectCategory("General");
         LoadValues(host.Settings.Current);
         RenderProviderSettings();
         ThemeService.Apply(Root, host.Settings.Current);
     }
 
+    private void Category_Click(object sender, RoutedEventArgs args) => SelectCategory((string)((Button)sender).Tag);
+    internal void SelectCategory(string name)
+    {
+        var pages = new[] { GeneralPage, AccountsPage, AppearancePage, WeatherPage, AdvancedPage };
+        var buttons = new[] { GeneralNav, AccountsNav, AppearanceNav, WeatherNav, AdvancedNav };
+        var names = new[] { "General", "Accounts", "Appearance", "Weather", "Advanced" };
+        for (var i=0;i<pages.Length;i++)
+        {
+            pages[i].Visibility=names[i]==name?Visibility.Visible:Visibility.Collapsed;
+            buttons[i].Background=names[i]==name?new Microsoft.UI.Xaml.Media.SolidColorBrush(ThemeService.AccentColor(_host.Settings.Current)) { Opacity=.16 }:new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent);
+        }
+        SettingsScroll.ChangeView(null,0,null,true);
+    }
+    private void Minimize_Click(object sender,RoutedEventArgs args) => ((OverlappedPresenter)_appWindow.Presenter).Minimize();
+    private void Maximize_Click(object sender,RoutedEventArgs args)
+    {
+        var presenter=(OverlappedPresenter)_appWindow.Presenter;
+        if (presenter.State==OverlappedPresenterState.Maximized) presenter.Restore();else presenter.Maximize();
+    }
+    private void Close_Click(object sender,RoutedEventArgs args) => Close();
+    private void HeaderDrag_PointerPressed(object sender,Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args)
+    {
+        if (!args.GetCurrentPoint(HeaderDrag).Properties.IsLeftButtonPressed) return;
+        NativeMethods.ReleaseCapture();NativeMethods.SendMessage(WinRT.Interop.WindowNative.GetWindowHandle(this),0x00A1,2,0);
+    }
+    internal Microsoft.UI.Xaml.FrameworkElement PreviewRoot => Root;
     private void LoadValues(AppSettings settings)
     {
         _loading = true;

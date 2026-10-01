@@ -78,7 +78,39 @@ public sealed partial class MainWindow
         var weatherOverflow = WeatherScroll.ScrollableHeight;
         if (Root.ActualHeight >= 680 && ((codexOverflow > 1 && !codexConstrained) || (weatherOverflow > 1 && !_heightConstrained)))
             throw new InvalidOperationException($"Normal content overflow: Codex {codexOverflow}, Weather {weatherOverflow}");
-        if (ProviderTabs.Children.Count != 7) throw new InvalidOperationException("Provider logo tabs missing.");
+        if (ProviderTabs.Children.Count != 8) throw new InvalidOperationException("Provider logo tabs missing.");
+        var originalSettings = _host.Settings.Current;
+        foreach (var single in new[] { "codex", "claude" })
+        {
+            await _host.Settings.SaveAsync(originalSettings with { VisibleProviders = [single], RemovedProviders = [], SelectedProvider = single, ShowWeather = false });
+            Render();
+            if (ProviderBorder.Visibility != Microsoft.UI.Xaml.Visibility.Collapsed)
+                throw new InvalidOperationException("Single-page navigation remained visible.");
+            await _host.Settings.SaveAsync(_host.Settings.Current with { ShowWeather = true });
+            Render();
+            if (ProviderTabs.Children.Count != 2 || ProviderBorder.Visibility != Microsoft.UI.Xaml.Visibility.Visible)
+                throw new InvalidOperationException("Provider and weather did not share navigation.");
+        }
+        await _host.Settings.SaveAsync(originalSettings);
+        Render();
+        var settingsPreview = new SettingsWindow(_host);
+        settingsPreview.Activate();
+        try
+        {
+            foreach (var category in new[] { "General", "Appearance", "Accounts" })
+            {
+                settingsPreview.SelectCategory(category);
+                await Task.Delay(250);
+                using var preview = await CreateImageAsync(settingsPreview.PreviewRoot);
+                using var previewReader = new DataReader(preview.GetInputStreamAt(0));
+                await previewReader.LoadAsync((uint)preview.Size);
+                var previewBytes = new byte[(int)preview.Size];
+                previewReader.ReadBytes(previewBytes);
+                await File.WriteAllBytesAsync(Path.Combine(output, $"settings-{category.ToLowerInvariant()}.png"), previewBytes);
+            }
+        }
+        finally { settingsPreview.Close(); }
+        ShowPanel();
         var claudePath = _host.AI.DefaultPath("claude");
         Directory.CreateDirectory(Path.GetDirectoryName(claudePath)!);
         await File.WriteAllTextAsync(claudePath, JsonSerializer.Serialize(new

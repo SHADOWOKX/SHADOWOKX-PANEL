@@ -24,7 +24,6 @@ public sealed class TrayIcon : IDisposable
     private readonly nint _previousProcedure;
     private readonly uint _taskbarCreated;
     private nint _icon;
-    private nint _companionIcon;
     private bool _companionVisible;
     private string _companionCharacter = "octopus";
     private string _companionFrame = "robot-awake.png";
@@ -107,34 +106,19 @@ public sealed class TrayIcon : IDisposable
     public void SetCompanionVisible(bool visible)
     {
         if (_disposed || _companionVisible == visible) return;
-        _companionVisible=visible;
-        if (visible) AddCompanion();
-        else { var data=CompanionData(0); NativeMethods.ShellNotifyIcon(NativeMethods.NimDelete,ref data); }
+        _companionVisible = visible;
+        UpdateIconAndTooltip();
     }
-    public void UpdateCompanion(string character,string frame)
+    public void UpdateCompanion(string character, string frame)
     {
-        _companionCharacter=character;_companionFrame=frame;
-        if (_disposed || !_companionVisible) return;
-        ReplaceCompanion();
-        var data=CompanionData(NativeMethods.NifIcon | NativeMethods.NifTip);
-        NativeMethods.ShellNotifyIcon(NativeMethods.NimModify,ref data);
+        if (_disposed) return;
+        _companionCharacter = character;
+        _companionFrame = frame;
+        if (_companionVisible) UpdateIconAndTooltip();
     }
-    private void ReplaceCompanion()
-    {
-        var path=Path.Combine(AppContext.BaseDirectory,"Assets","Companions",_companionCharacter,Path.ChangeExtension(_companionFrame,".ico"));
-        var replacement=NativeMethods.LoadImage(0,path,1,CurrentIconSize(),CurrentIconSize(),0x10);
-        if (replacement==0) return;
-        var previous=_companionIcon;_companionIcon=replacement;
-        if (previous!=0) NativeMethods.DestroyIcon(previous);
-    }
-    private NativeMethods.NotifyIconData CompanionData(uint flags) => Data(flags) with { uID=2,hIcon=_companionIcon,szTip="Shadowokx Panel · Companion" };
-    private void AddCompanion()
-    {
-        ReplaceCompanion();
-        var data=CompanionData(NativeMethods.NifIcon | NativeMethods.NifTip | NativeMethods.NifMessage);
-        if (NativeMethods.ShellNotifyIcon(NativeMethods.NimAdd,ref data))
-        { data.uVersion=NativeMethods.NotifyIconVersion4; NativeMethods.ShellNotifyIcon(NativeMethods.NimSetVersion,ref data); }
-    }
+    private string? CompanionPath => _companionVisible
+        ? Path.Combine(AppContext.BaseDirectory, "Assets", "Companions", _companionCharacter, Path.ChangeExtension(_companionFrame, ".ico")) : null;
+    private IconKey CurrentKey => new(CurrentIconSize(), _remainingPercent, CompanionPath);
 
     private bool Add()
     {
@@ -175,7 +159,6 @@ public sealed class TrayIcon : IDisposable
         if (message == _taskbarCreated)
         {
             _ = Add();
-            if (_companionVisible) AddCompanion();
             return 0;
         }
         if (message == CallbackMessage)
@@ -255,10 +238,10 @@ public sealed class TrayIcon : IDisposable
 
     private void EnsureIcon()
     {
-        var key = new IconKey(CurrentIconSize(), _remainingPercent);
+        var key = CurrentKey;
         if (_icon != 0 && _iconKey == key)
             return;
-        var replacement = TrayIconRenderer.Create(key.Size, key.RemainingPercent);
+        var replacement = TrayIconRenderer.Create(key.Size, key.RemainingPercent, key.CompanionPath);
         var previous = _icon;
         _icon = replacement;
         _iconKey = key;
@@ -270,13 +253,13 @@ public sealed class TrayIcon : IDisposable
     {
         if (_disposed)
             return;
-        var desired = new IconKey(CurrentIconSize(), _remainingPercent);
+        var desired = CurrentKey;
         var replace = forceIcon || _icon == 0 || _iconKey != desired;
         nint replacement;
         try
         {
             replacement = replace
-                ? TrayIconRenderer.Create(desired.Size, desired.RemainingPercent)
+                ? TrayIconRenderer.Create(desired.Size, desired.RemainingPercent, desired.CompanionPath)
                 : _icon;
         }
         catch (InvalidOperationException error)
@@ -307,10 +290,6 @@ public sealed class TrayIcon : IDisposable
         if (_disposed)
             return;
         _disposed = true;
-        var companion=CompanionData(0);
-        NativeMethods.ShellNotifyIcon(NativeMethods.NimDelete,ref companion);
-        if (_companionIcon!=0) NativeMethods.DestroyIcon(_companionIcon);
-        _companionIcon=0;
         var data = Data(0);
         NativeMethods.ShellNotifyIcon(NativeMethods.NimDelete, ref data);
         NativeMethods.SetWindowLongPtr(_hwnd, NativeMethods.GwlpWndProc, _previousProcedure);
@@ -321,5 +300,5 @@ public sealed class TrayIcon : IDisposable
         GC.KeepAlive(_windowProcedure);
     }
 
-    private readonly record struct IconKey(int Size, int? RemainingPercent);
+    private readonly record struct IconKey(int Size, int? RemainingPercent, string? CompanionPath);
 }

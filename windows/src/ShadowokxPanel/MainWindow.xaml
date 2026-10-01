@@ -14,7 +14,6 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
@@ -40,63 +39,7 @@
             <Border x:Name="ProviderBorder" Grid.Row="1" Background="{ThemeResource CardBrush}" CornerRadius="14" Padding="4">
                 <Grid x:Name="ProviderTabs" ColumnSpacing="3" RowSpacing="3" />
             </Border>
-            <Border
-                x:Name="SegmentedBorder"
-                Grid.Row="2"
-                Background="{ThemeResource CardBrush}"
-                BorderBrush="{ThemeResource CardBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="16"
-                Padding="3">
-                <Grid x:Name="SegmentedGrid" ColumnSpacing="3" HorizontalAlignment="Stretch">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition x:Name="WeatherColumn" Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Button
-                        x:Name="CodexTab"
-                        Grid.Column="0"
-                        Height="40"
-                        MinWidth="0"
-                        Padding="12,0"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Center"
-                        VerticalAlignment="Stretch"
-                        VerticalContentAlignment="Center"
-                        Background="Transparent"
-                        BorderThickness="1"
-                        CornerRadius="12"
-                        AutomationProperties.Name="ChatGPT Codex page"
-                        Click="CodexTab_Click">
-                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <Image x:Name="SubscriptionTabIcon" Source="Assets/robot.svg" Width="16" Height="16" Stretch="Uniform" />
-                            <TextBlock x:Name="SubscriptionTabName" Text="ChatGPT Codex" FontWeight="SemiBold" />
-                        </StackPanel>
-                    </Button>
-                    <Button
-                        x:Name="WeatherTab"
-                        Grid.Column="1"
-                        Height="40"
-                        MinWidth="0"
-                        Padding="12,0"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Center"
-                        VerticalAlignment="Stretch"
-                        VerticalContentAlignment="Center"
-                        Background="Transparent"
-                        BorderThickness="1"
-                        CornerRadius="12"
-                        AutomationProperties.Name="Weather page"
-                        Click="WeatherTab_Click">
-                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <Image Source="Assets/Weather/clear-day.svg" Width="17" Height="17" Stretch="Uniform" />
-                            <TextBlock Text="Weather" FontWeight="SemiBold" />
-                        </StackPanel>
-                    </Button>
-                </Grid>
-            </Border>
-
-            <Grid Grid.Row="3">
+            <Grid Grid.Row="2">
                 <ScrollViewer x:Name="AIScroll" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
                     <StackPanel x:Name="AIContent" Spacing="10" />
                 </ScrollViewer>
