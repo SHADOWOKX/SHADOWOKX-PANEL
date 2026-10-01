@@ -16,6 +16,7 @@ public sealed record CodexRefreshPolicy(TimeSpan VisibleInterval, TimeSpan Backg
 public sealed class CodexProvider : IAsyncDisposable
 {
     private readonly Func<CodexLaunchSpec?> _discover;
+    private readonly Func<IReadOnlyCollection<string>, CodexLaunchSpec?>? _discoverAlternative;
     private readonly ICodexProtocolClient _client;
     private readonly TokenCostReader _costReader;
     private readonly TokenHistoryStore _historyStore;
@@ -48,10 +49,13 @@ public sealed class CodexProvider : IAsyncDisposable
         Func<CodexLaunchSpec?>? discover = null,
         ICodexProtocolClient? client = null,
         RedactingLogger? logger = null,
-        CodexRefreshPolicy? refreshPolicy = null)
+        CodexRefreshPolicy? refreshPolicy = null,
+        Func<IReadOnlyCollection<string>, CodexLaunchSpec?>? discoverAlternative = null)
     {
         _ = Math.Clamp(refreshMinutes, 5, 120); // Retained for settings-file compatibility.
         _discover = discover ?? (() => CodexDiscovery.Find());
+        _discoverAlternative = discoverAlternative ?? (discover is null
+            ? excluded => CodexDiscovery.Find(excludedExecutables: excluded) : null);
         _client = client ?? new CodexProtocolClient();
         _costReader = new TokenCostReader(paths);
         _historyStore = new TokenHistoryStore(paths);
@@ -215,7 +219,7 @@ public sealed class CodexProvider : IAsyncDisposable
                 throw new CodexProviderException(
                 "not-installed", "Install Codex CLI for this Windows user, or select its executable in Settings. Sign in with ChatGPT, then retry.");
             _launchSpec = launch;
-            var response = await _client.ReadAsync(launch, linked.Token).ConfigureAwait(false);
+            var response = await ReadWithFallbackAsync(launch, linked.Token).ConfigureAwait(false);
             var now = DateTimeOffset.Now;
             CodexState live;
             try { live = CodexNormalizer.Normalize(response.RateLimits, response.Usage, now); }
@@ -262,15 +266,15 @@ public sealed class CodexProvider : IAsyncDisposable
             {
                 CodexProviderException known => (known.Code, known.Message),
                 CodexClientException { Failure: CodexClientFailure.StartFailed } =>
-                    ("start-failed", "Codex was found but could not be started."),
+                    ("start-failed", "Codex could not start. In Settings, select the Codex CLI executable inside the app’s resources folder, then retry."),
                 CodexClientException { Failure: CodexClientFailure.AuthenticationRequired } =>
                     ("authentication-required", "Sign in to Codex CLI with your ChatGPT account using codex login, then retry. API-key login does not expose ChatGPT limits."),
                 CodexClientException { Failure: CodexClientFailure.AppServerFailed } =>
-                    ("app-server-failed", "Codex started, but its usage service was unavailable."),
+                    ("app-server-failed", "Codex could not read your account. Update Codex, open it once, confirm ChatGPT sign-in, then retry."),
                 CodexClientException { Failure: CodexClientFailure.UnsupportedResponse } =>
                     ("unsupported-response", "This Codex version did not return supported usage data."),
                 CodexClientException { Failure: CodexClientFailure.Timeout } or TimeoutException =>
-                    ("timeout", "Codex did not respond in time."),
+                    ("timeout", "Codex did not respond. Open Codex, confirm it is signed in and online, then retry."),
                 InvalidDataException => ("usage-unavailable", "Open Codex and confirm you are signed in, then retry."),
                 _ => ("unavailable", "Codex usage is temporarily unavailable."),
             };
@@ -284,6 +288,32 @@ public sealed class CodexProvider : IAsyncDisposable
             await LogAsync("codex.refresh.failed", new { error = error.GetType().Name, code })
                 .ConfigureAwait(false);
             return state;
+        }
+    }
+
+    private async Task<CodexProtocolResponse> ReadWithFallbackAsync(
+        CodexLaunchSpec launch, CancellationToken cancellationToken)
+    {
+        var rejected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                var response = await _client.ReadAsync(launch, cancellationToken).ConfigureAwait(false);
+                _launchSpec = launch;
+                return response;
+            }
+            catch (CodexClientException error) when (attempt < 2 && _discoverAlternative is not null &&
+                error.Failure is CodexClientFailure.StartFailed or CodexClientFailure.AppServerFailed or CodexClientFailure.Timeout)
+            {
+                rejected.Add(launch.ExecutablePath);
+                var alternative = await Task.Run(() => _discoverAlternative(rejected), cancellationToken)
+                    .ConfigureAwait(false);
+                if (alternative is null || rejected.Contains(alternative.ExecutablePath)) throw;
+                launch = alternative;
+                await LogAsync("codex.discovery.retry", new { failure = error.Failure.ToString() })
+                    .ConfigureAwait(false);
+            }
         }
     }
 

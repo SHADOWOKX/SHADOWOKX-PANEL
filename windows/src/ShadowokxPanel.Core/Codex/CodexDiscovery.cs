@@ -17,12 +17,16 @@ public static class CodexDiscovery
         IEnumerable<string?>? appPathCandidates = null,
         IEnumerable<string?>? additionalSearchRoots = null,
         Func<string, IEnumerable<string>>? enumerateExecutables = null,
-        string? explicitExecutable = null)
+        string? explicitExecutable = null,
+        IReadOnlyCollection<string>? excludedExecutables = null)
     {
         string? Get(string name) => environment is null
             ? Environment.GetEnvironmentVariable(name)
             : environment.TryGetValue(name, out var value) ? value : null;
         fileExists ??= File.Exists;
+        var exists = fileExists;
+        fileExists = path => !(excludedExecutables?.Contains(path, StringComparer.OrdinalIgnoreCase) ?? false) &&
+            exists(path) && !IsDesktopExecutable(path, exists);
 
         var candidates = new List<string>();
         if (!string.IsNullOrWhiteSpace(explicitExecutable))
@@ -95,6 +99,8 @@ public static class CodexDiscovery
 
         var searchRoots = new List<string?>
         {
+            string.IsNullOrWhiteSpace(explicitExecutable) ? null : System.IO.Path.GetDirectoryName(explicitExecutable.Trim().Trim('"')),
+            Join(Get("CODEX_HOME"), "packages", "standalone", "current"),
             Join(profile, ".codex", "packages", "standalone", "current"),
             Join(roaming, "npm", "node_modules", "@openai", "codex"),
             Join(local, "pnpm", "global"),
@@ -114,6 +120,8 @@ public static class CodexDiscovery
         else if (environment is null && OperatingSystem.IsWindows())
         {
             searchRoots.AddRange(ReadRegisteredInstallRoots());
+            searchRoots.AddRange((registeredExecutables ?? []).Where(path => !string.IsNullOrWhiteSpace(path))
+                .Select(path => System.IO.Path.GetDirectoryName(path!.Trim().Trim('"'))));
             searchRoots.AddRange(ReadStoreInstallRoots());
         }
 
@@ -156,6 +164,15 @@ public static class CodexDiscovery
             return new CodexLaunchSpec(path, shim);
         }
         return null;
+    }
+
+    private static bool IsDesktopExecutable(string path, Func<string, bool> exists)
+    {
+        var directory = System.IO.Path.GetDirectoryName(path);
+        return directory is not null &&
+            System.IO.Path.GetFileName(path).Equals("codex.exe", StringComparison.OrdinalIgnoreCase) &&
+            (exists(Join(directory, "resources", "app.asar")!) ||
+             exists(Join(directory, "AppxManifest.xml")!));
     }
 
     private static bool IsDesktopHost(string path, IEnumerable<string?> roots) =>

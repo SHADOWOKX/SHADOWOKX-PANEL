@@ -5,6 +5,7 @@ on:
     branches:
       - windows-port
       - codex/windows-major-performance
+      - codex/windows-codex-limit-fix
     paths:
       - windows/**
       - .github/workflows/windows-ci.yml

@@ -14,7 +14,7 @@ public static class CodexNormalizer
         DateTimeOffset now)
     {
         var snapshot = GetProperty(response, "rateLimitsByLimitId", out var byId) &&
-            GetProperty(byId, "codex", out var codex)
+            GetProperty(byId, "codex", out var codex) && codex.ValueKind == JsonValueKind.Object
             ? codex
             : GetRequired(response, "rateLimits");
         var windows = WindowNames
@@ -34,13 +34,17 @@ public static class CodexNormalizer
             ReadDouble(credits, "availableCount") is { } available)
             resetCredits = Math.Clamp((int)Math.Round(available), 0, 999);
 
+        TokenUsage? tokenUsage;
+        try { tokenUsage = NormalizeUsage(usage, now); }
+        catch (OverflowException) { tokenUsage = null; }
+
         return new CodexState
         {
             Status = ProviderStatus.Success,
             FiveHour = fiveHour,
             Weekly = weekly,
             ResetCreditsAvailable = resetCredits,
-            TokenUsage = NormalizeUsage(usage, now),
+            TokenUsage = tokenUsage,
             LastSuccessfulRefresh = now,
         };
     }

@@ -16,7 +16,7 @@ public interface ICodexProtocolClient
 public sealed class CodexProtocolClient : ICodexProtocolClient
 {
     private const int MaximumLineCharacters = 1_048_576;
-    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
     public async Task<CodexProtocolResponse> ReadAsync(
         CodexLaunchSpec launch,
@@ -54,7 +54,7 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
                     {
                         name = "shadowokx-panel",
                         title = "Shadowokx Panel",
-                        version = "2.1.0",
+                        version = "2.1.1",
                     },
                     capabilities = new
                     {
@@ -84,8 +84,30 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
                 .ConfigureAwait(false);
             await WriteAsync(process, new
             {
-                jsonrpc = "2.0", id = 2, method = "account/usage/read", @params = new { },
+                jsonrpc = "2.0", id = 4, method = "account/read", @params = new { refreshToken = true },
             }, timeout.Token).ConfigureAwait(false);
+            for (var i = 0; i < 512; i++)
+            {
+                using var accountMessage = await ReadMessageAsync(output, timeout.Token).ConfigureAwait(false);
+                if (ReadId(accountMessage.RootElement) != 4) continue;
+                var root = accountMessage.RootElement;
+                if (root.TryGetProperty("error", out var accountError))
+                {
+                    // Older CLIs may lack account/read. Limits remain authoritative.
+                    if (!accountError.TryGetProperty("code", out var code) || !code.TryGetInt32(out var number) || number != -32601)
+                        throw ProtocolFailure(accountError, "Codex could not refresh its account.");
+                }
+                else if (root.TryGetProperty("result", out var accountResult) &&
+                    accountResult.TryGetProperty("account", out var account) &&
+                    (account.ValueKind == JsonValueKind.Null ||
+                     account.ValueKind == JsonValueKind.Object && account.TryGetProperty("type", out var type) &&
+                     type.GetString() is "apiKey" or "amazonBedrock"))
+                {
+                    throw new CodexClientException(CodexClientFailure.AuthenticationRequired,
+                        "Sign in to Codex with ChatGPT to read subscription limits.");
+                }
+                break;
+            }
             await WriteAsync(process, new
             {
                 jsonrpc = "2.0", id = 3, method = "account/rateLimits/read",
@@ -110,6 +132,13 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
                         throw new CodexClientException(CodexClientFailure.UnsupportedResponse,
                             "Codex returned an invalid limit response.");
                     rateLimits = result.Clone();
+                    // Usage is optional. Fetch limits first so old/slow usage endpoints
+                    // cannot prevent a valid subscription allowance from being displayed.
+                    timeout.CancelAfter(TimeSpan.FromSeconds(3));
+                    await WriteAsync(process, new
+                    {
+                        jsonrpc = "2.0", id = 2, method = "account/usage/read", @params = new { },
+                    }, timeout.Token).ConfigureAwait(false);
                 }
                 if (rateLimits.HasValue && usageSettled)
                     return new CodexProtocolResponse(rateLimits.Value, usage);
@@ -117,7 +146,8 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
             throw new CodexClientException(CodexClientFailure.AppServerFailed,
                 "Codex app-server returned too many unrelated messages.");
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && rateLimits.HasValue)
+        catch (Exception error) when (!cancellationToken.IsCancellationRequested && rateLimits.HasValue &&
+            error is OperationCanceledException or IOException or CodexClientException)
         {
             return new CodexProtocolResponse(rateLimits.Value, null);
         }
@@ -161,6 +191,17 @@ public sealed class CodexProtocolClient : ICodexProtocolClient
             info.ArgumentList.Add("app-server");
         }
         info.WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (OperatingSystem.IsWindows())
+        {
+            // Explorer can retain PATH from before npm/Node was installed. Refresh
+            // only the child environment so command shims can find their runtime.
+            var paths = new[] { Environment.GetEnvironmentVariable("PATH"),
+                Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User),
+                Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine) };
+            info.Environment["PATH"] = string.Join(';', paths.Where(value => !string.IsNullOrWhiteSpace(value))
+                .SelectMany(value => value!.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                .Select(Environment.ExpandEnvironmentVariables).Distinct(StringComparer.OrdinalIgnoreCase));
+        }
         return info;
     }
 
