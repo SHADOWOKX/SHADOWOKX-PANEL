@@ -39,7 +39,7 @@ jobs:
           assert run['path'] == '.github/workflows/windows-ci.yml'
           assert run['head_repository']['full_name'] == os.environ['GITHUB_REPOSITORY']
           assert run['event'] == 'push'
-          assert run['head_branch'] in ('windows-port', 'codex/windows-3.1-parity', 'codex/windows-3.2-ui')
+          assert run['head_branch'] in ('windows-port', 'codex/windows-3.1-parity', 'codex/windows-3.2-ui', 'codex/windows-tray-percentage')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
               out.write('sha=' + run['head_sha'] + '\n')
           PY
@@ -76,11 +76,11 @@ jobs:
 
           Real Codex Desktop work or an explicit current activity report starts motion; the final response stops it. Application focus no longer changes the selected subscription percentage. Small screens can scroll the full account dashboard.
 
-          Codex uses the existing CLI login, Claude has a usage-only status line bridge, DeepSeek displays API balance with an API key, and other providers use usage JSON sources. The companion and allowance share one notification icon. Windows notification slots are square, so the companion appears above the digits inside that icon; the tooltip contains the full percentage. Turning the companion off restores larger digits. Windows controls overflow visibility.
+          Codex uses the existing CLI login, Claude has a usage-only status line bridge, DeepSeek displays API balance with an API key, and other providers use usage JSON sources. The notification area displays the larger percentage-only icon again. The tiny stacked companion has been removed automatically for existing installations, together with its obsolete setting. Companion animations remain inside the panel and stop while it is hidden. The tooltip contains the full percentage. Windows controls overflow visibility.
 
           Download **ShadowokxPanel-Setup-x64.exe** or the portable ZIP. No .NET SDK or administrator privileges are needed. This community build is unsigned; SHA-256 values are included in checksums.txt.
 
-          Built from [$SOURCE_SHA](https://github.com/$GITHUB_REPOSITORY/commit/$SOURCE_SHA), validated by [Windows CI](https://github.com/$GITHUB_REPOSITORY/actions/runs/$RUN_ID), including 90 core tests and native allowance, animation, popup, history, export, shared navigation, settings previews and combined tray rendering checks at three icon sizes. See the [code signing policy](https://github.com/$GITHUB_REPOSITORY/blob/main/CODE_SIGNING_POLICY.md).
+          Built from [$SOURCE_SHA](https://github.com/$GITHUB_REPOSITORY/commit/$SOURCE_SHA), validated by [Windows CI](https://github.com/$GITHUB_REPOSITORY/actions/runs/$RUN_ID), including 90 core tests and native allowance, animation, popup, history, export, shared navigation, settings previews and readable percentage-only tray rendering checks at three icon sizes. See the [code signing policy](https://github.com/$GITHUB_REPOSITORY/blob/main/CODE_SIGNING_POLICY.md).
           EOFNOTES
           gh release create "windows-v$VERSION" assets/ShadowokxPanel-Setup-x64.exe assets/ShadowokxPanel-Portable-x64.zip assets/checksums.txt \
             --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" --title "Shadowokx Panel for Windows v$VERSION" --latest --notes-file notes.md
