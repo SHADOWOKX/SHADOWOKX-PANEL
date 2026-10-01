@@ -39,7 +39,7 @@ jobs:
           assert run['path'] == '.github/workflows/windows-ci.yml'
           assert run['head_repository']['full_name'] == os.environ['GITHUB_REPOSITORY']
           assert run['event'] == 'push'
-          assert run['head_branch'] in ('windows-port', 'codex/windows-3.1-parity')
+          assert run['head_branch'] in ('windows-port', 'codex/windows-3.1-parity', 'codex/windows-3.2-ui')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
               out.write('sha=' + run['head_sha'] + '\n')
           PY
@@ -72,15 +72,15 @@ jobs:
               assert hashlib.sha256((root / name).read_bytes()).hexdigest() == checksums.get(name)
           PY
           cat > notes.md <<EOFNOTES
-          Windows $VERSION includes provider-logo subscription tabs, account connection settings, expanded themes and accents, and centered Clawd animations beside the allowance and as a separate tray icon.
+          Windows $VERSION puts provider subscriptions and Weather in one navigation strip, hides navigation when only one page is enabled, and groups Settings into General, Accounts, Appearance, Weather and Advanced pages. Settings have integrated minimize, maximize and close controls without the white title bar. Dusk, Mocha and Lavender join the existing themes and accent colors.
 
           Real Codex Desktop work or an explicit current activity report starts motion; the final response stops it. Application focus no longer changes the selected subscription percentage. Small screens can scroll the full account dashboard.
 
-          Codex uses the existing CLI login, Claude has a usage-only status line bridge, DeepSeek displays API balance with an API key, and other providers use usage JSON sources. Windows controls tray icon ordering and overflow visibility.
+          Codex uses the existing CLI login, Claude has a usage-only status line bridge, DeepSeek displays API balance with an API key, and other providers use usage JSON sources. The companion and allowance share one notification icon. Windows notification slots are square, so the companion appears above the digits inside that icon; the tooltip contains the full percentage. Turning the companion off restores larger digits. Windows controls overflow visibility.
 
           Download **ShadowokxPanel-Setup-x64.exe** or the portable ZIP. No .NET SDK or administrator privileges are needed. This community build is unsigned; SHA-256 values are included in checksums.txt.
 
-          Built from [$SOURCE_SHA](https://github.com/$GITHUB_REPOSITORY/commit/$SOURCE_SHA), validated by [Windows CI](https://github.com/$GITHUB_REPOSITORY/actions/runs/$RUN_ID), including 90 core tests and native allowance, animation, popup, history and export checks. See the [code signing policy](https://github.com/$GITHUB_REPOSITORY/blob/main/CODE_SIGNING_POLICY.md).
+          Built from [$SOURCE_SHA](https://github.com/$GITHUB_REPOSITORY/commit/$SOURCE_SHA), validated by [Windows CI](https://github.com/$GITHUB_REPOSITORY/actions/runs/$RUN_ID), including 90 core tests and native allowance, animation, popup, history, export, shared navigation, settings previews and combined tray rendering checks at three icon sizes. See the [code signing policy](https://github.com/$GITHUB_REPOSITORY/blob/main/CODE_SIGNING_POLICY.md).
           EOFNOTES
           gh release create "windows-v$VERSION" assets/ShadowokxPanel-Setup-x64.exe assets/ShadowokxPanel-Portable-x64.zip assets/checksums.txt \
             --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" --title "Shadowokx Panel for Windows v$VERSION" --latest --notes-file notes.md
