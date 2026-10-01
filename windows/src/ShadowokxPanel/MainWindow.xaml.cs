@@ -37,6 +37,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private TrayIcon? _tray;
     private SettingsWindow? _settingsWindow;
     private bool _visible;
+    private readonly CompanionAnimator _companion;
     private bool _exiting;
     private bool _disposed;
     private int _positionedHeight;
@@ -71,6 +72,7 @@ public sealed partial class MainWindow : Window, IDisposable
             throw;
         }
         StartupDiagnostics.Write("MainWindow InitializeComponent successful");
+        _companion = new CompanionAnimator(WeeklyCompanion);
 
         StartupDiagnostics.Write("TokenGraphControl construction start");
         _tokenGraph = new TokenGraphControl();
@@ -180,6 +182,7 @@ public sealed partial class MainWindow : Window, IDisposable
         if (!_visible)
             return;
         _visible = false;
+        _companion.Configure(_host.Settings.Current.Companion, false, false);
         _codexVisibilityTimer.Stop();
         _host.Codex.SetVisible(false);
         _clockTimer.Stop();
@@ -369,6 +372,8 @@ public sealed partial class MainWindow : Window, IDisposable
         WeatherColumn.Width = settings.ShowWeather ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
         SegmentedBorder.Visibility = settings.ShowWeather ? Visibility.Visible : Visibility.Collapsed;
         var weatherSelected = settings.ShowWeather && _viewModel.SelectedPage == "weather";
+        _companion.Configure(settings.Companion, _visible && !weatherSelected,
+            settings.Animations && _uiSettings.AnimationsEnabled);
         CodexScroll.Visibility = weatherSelected ? Visibility.Collapsed : Visibility.Visible;
         WeatherScroll.Visibility = weatherSelected ? Visibility.Visible : Visibility.Collapsed;
         CodexTab.Background = weatherSelected ? Transparent() : ResourceBrush("AccentBrush", 0.12);
@@ -943,6 +948,7 @@ public sealed partial class MainWindow : Window, IDisposable
         _disposed = true;
         _exiting = true;
         _visible = false;
+        _companion.Configure(_host.Settings.Current.Companion, false, false);
         _codexVisibilityTimer.Stop();
         _host.Codex.SetVisible(false);
         _clockTimer.Stop();
@@ -950,6 +956,7 @@ public sealed partial class MainWindow : Window, IDisposable
         _appWindow.Closing -= AppWindow_Closing;
         Activated -= MainWindow_Activated;
         _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+        _companion.Dispose();
         _tray?.Dispose();
         _tray = null;
         _viewModel.Dispose();

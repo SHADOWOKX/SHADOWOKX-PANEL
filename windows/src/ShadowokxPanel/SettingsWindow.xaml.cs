@@ -40,6 +40,7 @@ public sealed partial class SettingsWindow : Window
         CustomAccentBox.Text = settings.CustomAccent;
         DensityCombo.SelectedIndex = settings.Density == LayoutDensity.Compact ? 0 : 1;
         AnimationsToggle.IsOn = settings.Animations;
+        CompanionCombo.SelectedIndex = Array.IndexOf(new[] { "robot", "codex", "octopus", "penguin" }, settings.Companion);
         CodexExecutableBox.Text = settings.CodexExecutablePath;
         CostEstimateToggle.IsOn = settings.ShowCostEstimate;
         EstimateModelCombo.ItemsSource = ApiPriceCatalog.Models.Select(p => p.Model).ToArray();
@@ -107,6 +108,7 @@ public sealed partial class SettingsWindow : Window
             CustomAccent = CustomAccentBox.Text,
             Density = DensityCombo.SelectedIndex == 0 ? LayoutDensity.Compact : LayoutDensity.Comfortable,
             Animations = AnimationsToggle.IsOn,
+            Companion = new[] { "robot", "codex", "octopus", "penguin" }[Math.Clamp(CompanionCombo.SelectedIndex, 0, 3)],
             ShowLifetimeTokens = LifetimeToggle.IsOn,
             ShowTokenHistory = HistoryToggle.IsOn,
             ShowUsageState = UsageStateToggle.IsOn,
@@ -173,6 +175,7 @@ public sealed partial class SettingsWindow : Window
             CustomAccent = defaults.CustomAccent,
             Density = defaults.Density,
             Animations = defaults.Animations,
+            Companion = defaults.Companion,
         };
         try
         {

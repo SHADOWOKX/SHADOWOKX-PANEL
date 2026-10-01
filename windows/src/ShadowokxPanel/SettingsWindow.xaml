@@ -33,6 +33,9 @@
                     <ComboBox x:Name="DensityCombo" Header="Layout density" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged">
                         <x:String>Compact</x:String><x:String>Comfortable</x:String>
                     </ComboBox>
+                    <ComboBox x:Name="CompanionCombo" Header="Animated companion" HorizontalAlignment="Stretch" SelectionChanged="SelectionChanged">
+                        <ComboBoxItem Content="Robot" /><ComboBoxItem Content="Codex" /><ComboBoxItem Content="Clawd" /><ComboBoxItem Content="Penguin" />
+                    </ComboBox>
                     <ToggleSwitch x:Name="AnimationsToggle" Header="Subtle animations" Toggled="SettingChanged" />
                 </StackPanel>
 

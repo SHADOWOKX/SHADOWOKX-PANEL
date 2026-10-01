@@ -6,6 +6,7 @@ on:
       - windows-port
       - codex/windows-major-performance
       - codex/windows-codex-limit-fix
+      - codex/windows-companions
     paths:
       - windows/**
       - .github/workflows/windows-ci.yml
