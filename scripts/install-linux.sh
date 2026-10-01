@@ -2,7 +2,7 @@
 # Install the verified release package; the same command updates an existing install.
 set -eu
 
-shadow_version='2.3.7'
+shadow_version='2.3.8'
 shadow_uuid='shadow-panel@shadowokx'
 shadow_release="https://github.com/SHADOWOKX/SHADOWOKX-PANEL/releases/download/linux-v$shadow_version"
 shadow_package="$shadow_uuid.shell-extension.zip"

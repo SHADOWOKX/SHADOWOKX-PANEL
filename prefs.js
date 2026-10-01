@@ -134,7 +134,7 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
         codex.add(comboRow(settings, 'mascot-character', 'Companion', [
             {value: 'robot', label: 'Shadow Robot'},
             {value: 'codex', label: 'Codex Companion'},
-            {value: 'octopus', label: 'Claude-style Octopus'},
+            {value: 'octopus', label: 'Clawd · Claude pixel companion'},
             {value: 'penguin', label: 'Penguin'},
         ], 'Each companion has its own wake, work and sleep motions.'));
         codex.add(switchRow(settings, 'show-codex-icon', 'Show Shadowokx mascot'));

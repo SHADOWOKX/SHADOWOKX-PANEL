@@ -129,6 +129,15 @@ export class MascotController {
         this._character = selectedCharacter(extension, settings);
         for (const name of FRAME_NAMES)
             this._icons.set(name, Gio.icon_new_for_string(mascotPath(extension, name, this._character)));
+        this._clawd = null;
+        if (this._character === 'octopus') {
+            const [, data] = GLib.file_get_contents(mascotPath(extension, 'animations.json', 'octopus'));
+            this._clawd = JSON.parse(new TextDecoder().decode(data));
+            for (const sequence of [this._clawd.wake, this._clawd.idle, ...this._clawd.active]) {
+                for (const [name] of sequence)
+                    this._icons.set(name, Gio.icon_new_for_string(mascotPath(extension, name, 'octopus')));
+            }
+        }
 
         this.actor = mascotIcon(
             extension,
@@ -242,7 +251,7 @@ export class MascotController {
             return;
         }
         this._state = MascotState.WAKING;
-        this._playSequence(WAKE_SEQUENCE, () => {
+        this._playSequence(this._clawd?.wake ?? WAKE_SEQUENCE, () => {
             if (this._codexActive)
                 this._enterActive();
             else
@@ -275,6 +284,10 @@ export class MascotController {
             return;
         }
         this._cancelMotion();
+        if (this._clawd) {
+            this._enterSleeping();
+            return;
+        }
         if (!this._canMove()) {
             this._enterSleeping();
             return;
@@ -310,7 +323,7 @@ export class MascotController {
             this._show(frame);
             this._activeId = GLib.timeout_add(
                 GLib.PRIORITY_DEFAULT,
-                Math.round(duration * ({codex: 0.90, octopus: 1.35, penguin: 1.15}[this._character] ?? 1)),
+                Math.round(duration * ({codex: 0.90, penguin: 1.15}[this._character] ?? 1)),
                 () => {
                     this._activeId = 0;
                     advance();
@@ -330,10 +343,11 @@ export class MascotController {
         this._lastActiveSequence = sequenceIndex;
         const custom = {
             codex: [1, 2, 3, 4, 5, 4, 3, 2],
-            octopus: [1, 3, 5, 7, 9, 11, 13, 11, 9, 7, 5, 3],
             penguin: [1, 4, 7, 10, 13, 10, 7, 4],
         }[this._character];
-        const sequence = custom
+        const sequence = this._clawd
+            ? this._clawd.active[sequenceIndex % this._clawd.active.length]
+            : custom
             ? custom.map(frame => [`robot-active-${String(frame).padStart(2, '0')}.svg`, 150])
             : ACTIVE_SEQUENCES[sequenceIndex];
         this._playSequence(sequence, () => {
@@ -356,7 +370,10 @@ export class MascotController {
             const sequence = twitch
                 ? [['robot-sleep-twitch.svg', 180], ['robot-sleep.svg', 180]]
                 : [['robot-sleep-breathe.svg', 320], ['robot-sleep.svg', 260]];
-            this._playSequence(sequence, () => this._scheduleSleepMotion());
+            this._playSequence(this._clawd?.idle ?? sequence, () => {
+                this._show('robot-sleep.svg');
+                this._scheduleSleepMotion();
+            });
             return GLib.SOURCE_REMOVE;
         });
     }

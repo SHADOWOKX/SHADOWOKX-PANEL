@@ -118,6 +118,15 @@ try {
                 throw new Error(`companion frame missing: ${character}/${frame}`);
         }
     }
+    const clawd = readJson('icons/mascot/octopus/animations.json');
+    for (const sequence of [clawd.wake, clawd.idle, ...clawd.active]) {
+        for (const [name, duration] of sequence) {
+            if (!Number.isFinite(duration) || duration <= 0 ||
+                !GLib.file_test(GLib.build_filenamev([projectDirectory, 'icons', 'mascot',
+                    'octopus', name]), GLib.FileTest.IS_REGULAR))
+                throw new Error('Clawd animation frame or timing is invalid');
+        }
+    }
 } catch (error) {
     printerr(`Release validation failed: ${error.message}`);
     System.exit(1);
