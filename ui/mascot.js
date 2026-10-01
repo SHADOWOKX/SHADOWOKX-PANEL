@@ -132,10 +132,12 @@ export class MascotController {
         for (const name of FRAME_NAMES)
             this._icons.set(name, Gio.icon_new_for_string(mascotPath(extension, name, this._character)));
         this._clawd = null;
+        this._workIntroNeeded = false;
         if (this._character === 'octopus') {
             const [, data] = GLib.file_get_contents(mascotPath(extension, 'animations.json', 'octopus'));
             this._clawd = JSON.parse(new TextDecoder().decode(data));
-            for (const sequence of [this._clawd.wake, this._clawd.idle, ...this._clawd.active]) {
+            for (const sequence of [this._clawd.wake, this._clawd.idle, ...this._clawd.active,
+                this._clawd.workIntro, this._clawd.workLoop, this._clawd.workOutro, this._clawd.complete]) {
                 for (const [name] of sequence)
                     this._icons.set(name, Gio.icon_new_for_string(mascotPath(extension, name, 'octopus')));
             }
@@ -194,7 +196,7 @@ export class MascotController {
         this._reconcileSemanticState();
     }
 
-    setState(state) {
+    setState(state, {completed = false} = {}) {
         const active = state === MascotState.ACTIVE;
         if (this._codexActive === active)
             return;
@@ -203,6 +205,10 @@ export class MascotController {
             this._clearPostCloseTimer();
             this._enterActive();
         } else {
+            if (this._clawd && completed) {
+                this._enterCompleted();
+                return;
+            }
             this._enterAwake();
             if (!this._popupOpen)
                 this._schedulePostCloseSleep();
@@ -267,6 +273,8 @@ export class MascotController {
     }
 
     _enterActive() {
+        if (this._state !== MascotState.ACTIVE)
+            this._workIntroNeeded = true;
         this._cancelMotion();
         this._state = MascotState.ACTIVE;
         if (!this._canMove()) {
@@ -274,6 +282,22 @@ export class MascotController {
             return;
         }
         this._startActiveSequence();
+    }
+
+    _enterCompleted() {
+        this._cancelMotion();
+        this._clearPostCloseTimer();
+        this._state = MascotState.AWAKE;
+        const finish = () => {
+            this._enterAwake();
+            if (!this._popupOpen)
+                this._schedulePostCloseSleep();
+        };
+        if (!this._canMove()) {
+            finish();
+            return;
+        }
+        this._playSequence([...this._clawd.workOutro, ...this._clawd.complete], finish);
     }
 
     _enterGoingToSleep() {
@@ -339,6 +363,15 @@ export class MascotController {
     _startActiveSequence() {
         if (!this._codexActive || this._state !== MascotState.ACTIVE || !this._canMove())
             return;
+        if (this._clawd) {
+            const sequence = this._workIntroNeeded ? this._clawd.workIntro : this._clawd.workLoop;
+            this._workIntroNeeded = false;
+            this._playSequence(sequence, () => {
+                if (this._codexActive && this._state === MascotState.ACTIVE && this._canMove())
+                    this._startActiveSequence();
+            });
+            return;
+        }
         let sequenceIndex = Math.floor(Math.random() * ACTIVE_SEQUENCES.length);
         if (ACTIVE_SEQUENCES.length > 1 && sequenceIndex === this._lastActiveSequence)
             sequenceIndex = (sequenceIndex + 1) % ACTIVE_SEQUENCES.length;
@@ -347,9 +380,7 @@ export class MascotController {
             codex: [1, 2, 3, 4, 5, 4, 3, 2],
             penguin: [1, 4, 7, 10, 13, 10, 7, 4],
         }[this._character];
-        const sequence = this._clawd
-            ? this._clawd.active[sequenceIndex % this._clawd.active.length]
-            : custom
+        const sequence = custom
             ? custom.map(frame => [`robot-active-${String(frame).padStart(2, '0')}.svg`, 150])
             : ACTIVE_SEQUENCES[sequenceIndex];
         this._playSequence(sequence, () => {

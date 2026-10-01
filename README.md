@@ -2,9 +2,10 @@
 
 A lightweight cross-platform panel for checking **ChatGPT Codex usage** and **local weather** from one place.
 
-Linux `2.3.9` · Windows `2.1 Preview 2`.
+Linux `2.3.10` · Windows `2.1 Preview 2`.
 
 - Weekly and 5-hour Codex limits
+- Clawd types on the original laptop animation during live Codex work and celebrates a successful completed turn
 - Four animated companions: Shadow Robot, Codex Companion, Clawd (official pixel companion) and Penguin
 - Terminal, Clay and Glacier themes alongside the existing surface presets
 - Compact account activity heatmap with daily and weekly views

@@ -12,6 +12,7 @@ Clawd is Anthropic's pixel character, replacing the earlier original orange octo
 - https://claude.ai/images/clawd/core/Clawd-CrabWalking.gif
 - https://claude.ai/images/clawd/core/Clawd-JumpingHappy.gif
 - https://claude.ai/images/clawd/core/Clawd-Pointing.gif
+- Clawd-Laptop.lottie.json (original Lottie export archived at https://github.com/HermannBjorgvin/Clawdmeter/blob/main/research/clawd-official/Clawd-Laptop.lottie.json)
 
 The source files, SHA-256 hashes and original frame durations are recorded in `animations.json`. The conversion samples the original pixel grid, removes only unused stage margins, and inks the enclosed transparent eye holes black for visibility. Original character artwork belongs to Anthropic; the project license does not claim ownership of it. Animations are bundled locally, with no requests to Claude during playback. Shadowokx Panel is independent and is not endorsed by Anthropic.
 
