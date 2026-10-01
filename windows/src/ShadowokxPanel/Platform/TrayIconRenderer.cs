@@ -7,7 +7,7 @@ internal static class TrayIconRenderer
 {
     private const int GlyphColor = unchecked((int)0xFFFFFFFF);
 
-    public static nint Create(int size, int? remainingPercent, string? companionPath = null)
+    public static nint Create(int size, int? remainingPercent, string? companionPath = null, Action<int[]>? inspectPixels = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size);
 
@@ -76,7 +76,8 @@ internal static class TrayIconRenderer
                         var previousBitmap = NativeMethods.SelectObject(dc, colorBitmap);
                         try
                         {
-                            NativeMethods.DrawIconEx(dc, (size-mascotSize)/2, 0, mascot, mascotSize, mascotSize, 0, 0, 3);
+                            if (!NativeMethods.DrawIconEx(dc, (size-mascotSize)/2, 0, mascot, mascotSize, mascotSize, 0, 0, 3))
+                                throw new InvalidOperationException("Tray companion could not be drawn.");
                             Marshal.Copy(bits, pixels, 0, pixels.Length);
                         }
                         finally { NativeMethods.SelectObject(dc, previousBitmap); }
@@ -88,6 +89,7 @@ internal static class TrayIconRenderer
                     }
                 }
             }
+            inspectPixels?.Invoke(pixels);
             var maskStride = ((size + 15) / 16) * 2;
             var maskPixels = new byte[checked(maskStride * size)];
             Array.Fill(maskPixels, byte.MaxValue);

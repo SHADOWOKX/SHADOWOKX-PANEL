@@ -79,6 +79,27 @@ public sealed partial class MainWindow
         if (Root.ActualHeight >= 680 && ((codexOverflow > 1 && !codexConstrained) || (weatherOverflow > 1 && !_heightConstrained)))
             throw new InvalidOperationException($"Normal content overflow: Codex {codexOverflow}, Weather {weatherOverflow}");
         if (ProviderTabs.Children.Count != 8) throw new InvalidOperationException("Provider logo tabs missing.");
+        var mascotPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Companions", "octopus", "waving-00.ico");
+        foreach (var size in new[] { 16, 32, 64 })
+        foreach (int? percent in new int?[] { 0, 11, 100, null })
+        {
+            int[]? pixels = null;
+            var icon = Platform.TrayIconRenderer.Create(size, percent, mascotPath, value => pixels = value);
+            Platform.NativeMethods.DestroyIcon(icon);
+            if (pixels is null || !pixels.Take(size * size / 2).Any(pixel => pixel != 0) ||
+                !pixels.Skip(size * size * 2 / 3).Any(pixel => pixel == -1))
+                throw new InvalidOperationException("Combined tray badge lost its companion or allowance.");
+            using var trayStream = new InMemoryRandomAccessStream();
+            var trayEncoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, trayStream);
+            var trayBytes = new byte[pixels.Length * sizeof(int)];
+            Buffer.BlockCopy(pixels, 0, trayBytes, 0, trayBytes.Length);
+            trayEncoder.SetPixelData(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied, (uint)size, (uint)size, 96, 96, trayBytes);
+            await trayEncoder.FlushAsync();
+            using var trayReader = new DataReader(trayStream.GetInputStreamAt(0));
+            await trayReader.LoadAsync((uint)trayStream.Size);
+            var png = new byte[(int)trayStream.Size]; trayReader.ReadBytes(png);
+            await File.WriteAllBytesAsync(Path.Combine(output, $"tray-{size}-{percent?.ToString() ?? "unknown"}.png"), png);
+        }
         var originalSettings = _host.Settings.Current;
         foreach (var single in new[] { "codex", "claude" })
         {

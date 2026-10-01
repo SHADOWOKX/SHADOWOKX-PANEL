@@ -218,3 +218,11 @@ A usage JSON file uses the same schema as Linux, for example:
 ```
 
 Activity is optional; reports without a current timestamp never animate. The activity lease is capped at two minutes and must be renewed by the source.
+
+## Windows 3.2.0
+
+Providers and Weather share one navigation strip. A single enabled page hides the strip automatically, whichever provider is selected. Settings use grouped General, Accounts, Appearance, Weather and Advanced pages with integrated minimize, maximize and close controls. Dusk, Mocha and Lavender join the existing themes and accent colors.
+
+The notification area now contains one combined companion and allowance icon. Windows uses square notification slots, so the companion sits above the digits within the same icon; the tooltip includes the full percentage. Switching animation frames preserves the percentage, and motion remains limited to actual work. Disabling the companion restores the larger digits-only icon.
+
+Native UI checks cover single-provider navigation, shared Weather navigation, settings previews, and combined icon rendering at 16, 32 and 64 pixels with 0, 11, 100 and unavailable allowances.
