@@ -70,3 +70,7 @@ The validated release files are written to `windows\artifacts\release`.
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).
+
+## Windows 3.1.2
+
+The Windows dashboard now includes provider-logo subscription tabs, account connection controls, expanded themes and accents, and the same centered Clawd frames as Linux. Work animations follow actual session events and stop on the final response. A separate companion notification icon appears beside the selected subscription percentage; Windows controls icon ordering and overflow. See [Windows setup and source formats](windows/README.md).
