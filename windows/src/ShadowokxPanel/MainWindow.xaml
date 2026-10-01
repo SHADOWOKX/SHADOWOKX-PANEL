@@ -37,7 +37,7 @@
                 </Button>
             </Grid>
 
-            <Border Grid.Row="1" Background="{ThemeResource CardBrush}" CornerRadius="14" Padding="4">
+            <Border x:Name="ProviderBorder" Grid.Row="1" Background="{ThemeResource CardBrush}" CornerRadius="14" Padding="4">
                 <Grid x:Name="ProviderTabs" ColumnSpacing="3" RowSpacing="3" />
             </Border>
             <Border

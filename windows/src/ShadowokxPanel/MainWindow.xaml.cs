@@ -378,6 +378,7 @@ public sealed partial class MainWindow : Window, IDisposable
         RenderProviderTabs();
         _companion.VaryWork = settings.VaryWorkAnimations;
         var weatherSelected = settings.ShowWeather && _viewModel.SelectedPage == "weather";
+        ProviderBorder.Visibility = weatherSelected ? Visibility.Collapsed : Visibility.Visible;
         _companion.Configure(settings.Companion, settings.ShowTrayCompanion || (_visible && !weatherSelected),
             settings.Animations && _uiSettings.AnimationsEnabled);
         CodexScroll.Visibility = weatherSelected ? Visibility.Collapsed : Visibility.Visible;
