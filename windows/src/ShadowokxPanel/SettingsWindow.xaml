@@ -331,16 +331,6 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Companion with tray percentage" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
-                                        <Grid Grid.Column="1">
-                                            <ToggleSwitch x:Name="TrayCompanionToggle" Toggled="SettingChanged" AutomationProperties.Name="Companion with tray percentage" HorizontalAlignment="Right" OnContent="" OffContent="" />
-                                        </Grid>
-                                    </Grid>
-                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
                                         <TextBlock Text="Vary work animations" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
                                         <Grid Grid.Column="1">
                                             <ToggleSwitch x:Name="VaryWorkToggle" Toggled="SettingChanged" AutomationProperties.Name="Vary work animations" HorizontalAlignment="Right" OnContent="" OffContent="" />

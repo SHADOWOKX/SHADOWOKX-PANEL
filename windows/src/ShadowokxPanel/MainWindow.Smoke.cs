@@ -79,16 +79,17 @@ public sealed partial class MainWindow
         if (Root.ActualHeight >= 680 && ((codexOverflow > 1 && !codexConstrained) || (weatherOverflow > 1 && !_heightConstrained)))
             throw new InvalidOperationException($"Normal content overflow: Codex {codexOverflow}, Weather {weatherOverflow}");
         if (ProviderTabs.Children.Count != 8 || ProviderTabs.RowDefinitions.Count != 1) throw new InvalidOperationException("Provider logo tabs missing.");
-        var mascotPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Companions", "octopus", "waving-00.ico");
         foreach (var size in new[] { 16, 32, 64 })
         foreach (int? percent in new int?[] { 0, 11, 100, null })
         {
             int[]? pixels = null;
-            var icon = Platform.TrayIconRenderer.Create(size, percent, mascotPath, value => pixels = value);
+            var icon = Platform.TrayIconRenderer.Create(size, percent, value => pixels = value);
             Platform.NativeMethods.DestroyIcon(icon);
-            if (pixels is null || !pixels.Take(size * size / 2).Any(pixel => ((uint)pixel >> 24) != 0) ||
-                !pixels.Skip(size * size * 2 / 3).Any(pixel => pixel == -1))
-                throw new InvalidOperationException("Combined tray badge lost its companion or allowance.");
+            if (pixels is null || !pixels.Any(pixel => pixel == -1) || pixels.Any(pixel => pixel != 0 && pixel != -1))
+                throw new InvalidOperationException("Tray must contain only the readable percentage glyph.");
+            var occupiedRows = Enumerable.Range(0,size).Count(row => pixels.Skip(row*size).Take(size).Any(pixel => pixel == -1));
+            if (occupiedRows < size / 2)
+                throw new InvalidOperationException("Tray percentage was reduced below its readable height.");
             using var trayStream = new InMemoryRandomAccessStream();
             var trayEncoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, trayStream);
             var trayBytes = new byte[pixels.Length * sizeof(int)];

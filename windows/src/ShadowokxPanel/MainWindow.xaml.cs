@@ -76,7 +76,6 @@ public sealed partial class MainWindow : Window, IDisposable
         _companion = new CompanionAnimator(WeeklyCompanion);
         _companion.ExternalWork = () => _host.AI.AnyWorking();
         _companion.CodexEnabled = () => _host.Settings.Current.VisibleProviders.Contains("codex") && !_host.Settings.Current.RemovedProviders.Contains("codex");
-        _companion.FrameChanged += (character, frame) => _tray?.UpdateCompanion(character,frame);
         _host.AI.Changed += AIChanged;
 
         StartupDiagnostics.Write("TokenGraphControl construction start");
@@ -187,7 +186,7 @@ public sealed partial class MainWindow : Window, IDisposable
         if (!_visible)
             return;
         _visible = false;
-        _companion.Configure(_host.Settings.Current.Companion, _host.Settings.Current.ShowTrayCompanion, _host.Settings.Current.Animations);
+        _companion.Configure(_host.Settings.Current.Companion, false, _host.Settings.Current.Animations);
         _codexVisibilityTimer.Stop();
         _host.Codex.SetVisible(false);
         _clockTimer.Stop();
@@ -378,7 +377,7 @@ public sealed partial class MainWindow : Window, IDisposable
         RenderProviderTabs();
         _companion.VaryWork = settings.VaryWorkAnimations;
         DashboardGrid.RowSpacing = 10;
-        _companion.Configure(settings.Companion, settings.ShowTrayCompanion || (_visible && !weatherSelected),
+        _companion.Configure(settings.Companion, _visible && !weatherSelected,
             settings.Animations && _uiSettings.AnimationsEnabled);
         CodexScroll.Visibility = weatherSelected ? Visibility.Collapsed : Visibility.Visible;
         WeatherScroll.Visibility = weatherSelected ? Visibility.Visible : Visibility.Collapsed;
@@ -669,10 +668,9 @@ public sealed partial class MainWindow : Window, IDisposable
         var state = _viewModel.Codex;
         double? remaining = SelectedAI == "codex" ? state.Weekly?.RemainingPercent ?? state.FiveHour?.RemainingPercent :
             _host.AI.State(SelectedAI).Usage?.Windows.Where(w=>w.ResetsAt is null || w.ResetsAt>DateTimeOffset.UtcNow).Select(w=>(double?)(100-w.UsedPercent)).FirstOrDefault();
-        _tray.SetCompanionVisible(_viewModel.Settings.ShowTrayCompanion);
         _companion.VaryWork = _viewModel.Settings.VaryWorkAnimations;
         _companion.Configure(_viewModel.Settings.Companion,
-            _viewModel.Settings.ShowTrayCompanion || (_visible && _viewModel.SelectedPage != "weather"),
+            _visible && _viewModel.SelectedPage != "weather",
             _viewModel.Settings.Animations && _uiSettings.AnimationsEnabled);
         var pace = _viewModel.Settings.ShowCodexStateIndicator ? _viewModel.UsagePace : UsagePace.Unknown;
         var lines = new List<string> { "Shadowokx Panel" };
@@ -960,7 +958,7 @@ public sealed partial class MainWindow : Window, IDisposable
         _disposed = true;
         _exiting = true;
         _visible = false;
-        _companion.Configure(_host.Settings.Current.Companion, _host.Settings.Current.ShowTrayCompanion, _host.Settings.Current.Animations);
+        _companion.Configure(_host.Settings.Current.Companion, false, _host.Settings.Current.Animations);
         _codexVisibilityTimer.Stop();
         _host.Codex.SetVisible(false);
         _clockTimer.Stop();

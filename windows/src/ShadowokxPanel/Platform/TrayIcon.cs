@@ -24,9 +24,6 @@ public sealed class TrayIcon : IDisposable
     private readonly nint _previousProcedure;
     private readonly uint _taskbarCreated;
     private nint _icon;
-    private bool _companionVisible;
-    private string _companionCharacter = "octopus";
-    private string _companionFrame = "robot-awake.png";
     private string _tooltip = "Shadowokx Panel";
     private int? _remainingPercent;
     private IconKey? _iconKey;
@@ -102,23 +99,6 @@ public sealed class TrayIcon : IDisposable
         _remainingPercent = normalizedPercent;
         UpdateIconAndTooltip();
     }
-
-    public void SetCompanionVisible(bool visible)
-    {
-        if (_disposed || _companionVisible == visible) return;
-        _companionVisible = visible;
-        UpdateIconAndTooltip();
-    }
-    public void UpdateCompanion(string character, string frame)
-    {
-        if (_disposed) return;
-        _companionCharacter = character;
-        _companionFrame = frame;
-        if (_companionVisible) UpdateIconAndTooltip();
-    }
-    private string? CompanionPath => _companionVisible
-        ? Path.Combine(AppContext.BaseDirectory, "Assets", "Companions", _companionCharacter, Path.ChangeExtension(_companionFrame, ".ico")) : null;
-    private IconKey CurrentKey => new(CurrentIconSize(), _remainingPercent, CompanionPath);
 
     private bool Add()
     {
@@ -238,10 +218,10 @@ public sealed class TrayIcon : IDisposable
 
     private void EnsureIcon()
     {
-        var key = CurrentKey;
+        var key = new IconKey(CurrentIconSize(), _remainingPercent);
         if (_icon != 0 && _iconKey == key)
             return;
-        var replacement = TrayIconRenderer.Create(key.Size, key.RemainingPercent, key.CompanionPath);
+        var replacement = TrayIconRenderer.Create(key.Size, key.RemainingPercent);
         var previous = _icon;
         _icon = replacement;
         _iconKey = key;
@@ -253,13 +233,13 @@ public sealed class TrayIcon : IDisposable
     {
         if (_disposed)
             return;
-        var desired = CurrentKey;
+        var desired = new IconKey(CurrentIconSize(), _remainingPercent);
         var replace = forceIcon || _icon == 0 || _iconKey != desired;
         nint replacement;
         try
         {
             replacement = replace
-                ? TrayIconRenderer.Create(desired.Size, desired.RemainingPercent, desired.CompanionPath)
+                ? TrayIconRenderer.Create(desired.Size, desired.RemainingPercent)
                 : _icon;
         }
         catch (InvalidOperationException error)
@@ -300,5 +280,5 @@ public sealed class TrayIcon : IDisposable
         GC.KeepAlive(_windowProcedure);
     }
 
-    private readonly record struct IconKey(int Size, int? RemainingPercent, string? CompanionPath);
+    private readonly record struct IconKey(int Size, int? RemainingPercent);
 }

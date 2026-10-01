@@ -39,7 +39,6 @@ public sealed record AppSettings
     public Dictionary<string, AI.AISource> AISources { get; init; } = [];
     public string SelectedProvider { get; init; } = "codex";
     public bool VaryWorkAnimations { get; init; } = true;
-    public bool ShowTrayCompanion { get; init; } = true;
     public string CodexExecutablePath { get; init; } = string.Empty;
     public bool StartWithWindows { get; init; }
     public bool ShowWeather { get; init; } = true;

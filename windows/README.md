@@ -226,3 +226,7 @@ Providers and Weather share one navigation strip. A single enabled page hides th
 The notification area now contains one combined companion and allowance icon. Windows uses square notification slots, so the companion sits above the digits within the same icon; the tooltip includes the full percentage. Switching animation frames preserves the percentage, and motion remains limited to actual work. Disabling the companion restores the larger digits-only icon.
 
 Native UI checks cover single-provider navigation, shared Weather navigation, settings previews, and combined icon rendering at 16, 32 and 64 pixels with 0, 11, 100 and unavailable allowances.
+
+## Windows 3.2.1
+
+Restores the larger percentage-only notification icon. The square Windows notification slot cannot fit a full-size companion beside readable digits. Existing installations automatically use the restored rendering, without changing settings. Companion animations remain in the panel and stop when the panel is hidden. The obsolete tray-companion toggle has been removed. Native UI checks verify percentage-only rendering at 16, 32 and 64 pixels for 0, 11, 100 and unavailable values.
