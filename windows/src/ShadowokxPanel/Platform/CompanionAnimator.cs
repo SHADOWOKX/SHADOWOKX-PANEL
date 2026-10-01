@@ -18,6 +18,8 @@ public sealed class CompanionAnimator : IDisposable
     private Action? _finished;
     private string _character = "octopus";
     private int _frame;
+    internal bool IsWorking => _active;
+    internal bool MotionRunning => _motion.IsEnabled;
     public event Action<string, string>? FrameChanged;
     public Func<bool>? ExternalWork { get; set; }
     public Func<bool>? CodexEnabled { get; set; }

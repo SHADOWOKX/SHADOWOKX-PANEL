@@ -77,6 +77,38 @@ public sealed partial class MainWindow
         var weatherOverflow = WeatherScroll.ScrollableHeight;
         if (Root.ActualHeight >= 680 && (codexOverflow > 1 || weatherOverflow > 1))
             throw new InvalidOperationException($"Normal content overflow: Codex {codexOverflow}, Weather {weatherOverflow}");
+        if (ProviderTabs.Children.Count != 7) throw new InvalidOperationException("Provider logo tabs missing.");
+        var claudePath = _host.AI.DefaultPath("claude");
+        Directory.CreateDirectory(Path.GetDirectoryName(claudePath)!);
+        await File.WriteAllTextAsync(claudePath, JsonSerializer.Serialize(new
+        {
+            updatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            windows = new[] { new { label = "Weekly allowance", usedPercent = 35 } },
+            activity = new { active = true, updatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() },
+        }));
+        await _host.Settings.SaveAsync(_host.Settings.Current with { SelectedProvider = "claude" });
+        await _host.AI.RefreshAsync();
+        await _viewModel.SelectPageAsync("codex");
+        await Task.Delay(2300);
+        Render();
+        if (AIScroll.Visibility != Microsoft.UI.Xaml.Visibility.Visible ||
+            !AIContent.Children.OfType<Microsoft.UI.Xaml.Controls.Border>().Any(border =>
+                border.Child is Microsoft.UI.Xaml.Controls.StackPanel stack &&
+                stack.Children.OfType<Microsoft.UI.Xaml.Controls.TextBlock>().Any(text => text.Text == "65% remaining")))
+            throw new InvalidOperationException("Selected provider allowance did not render.");
+        if (!_companion.IsWorking || !_companion.MotionRunning) throw new InvalidOperationException("Reported work did not animate.");
+        await CaptureAsync(Path.Combine(output, "claude.png"));
+        await File.WriteAllTextAsync(claudePath, JsonSerializer.Serialize(new
+        {
+            updatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            windows = new[] { new { label = "Weekly allowance", usedPercent = 35 } },
+            activity = new { active = false, updatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() },
+        }));
+        await _host.AI.RefreshAsync();
+        await Task.Delay(2300);
+        if (_companion.IsWorking || _companion.MotionRunning) throw new InvalidOperationException("Idle companion kept animating.");
+        await _host.Settings.SaveAsync(_host.Settings.Current with { SelectedProvider = "codex" });
+        File.Delete(claudePath);
         for (var i = 0; i < 20; i++) { HidePanel(); ShowPanel(); await Task.Delay(10); }
         HidePanel();
         if (_clockTimer.IsEnabled || CodexRefreshRing.IsActive || WeatherRefreshRing.IsActive)
