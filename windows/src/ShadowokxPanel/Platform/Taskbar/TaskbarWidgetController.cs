@@ -8,16 +8,19 @@ namespace ShadowokxPanel.Platform.Taskbar;
 // Owns the taskbar companion's lifetime, mode selection, placement, animation and
 // rollback. All provider/account/network logic stays in the main process; this type
 // only renders state that the panel already computed.
+//
+// The companion is optional: any failure while creating or rendering it disables it for
+// the session instead of propagating, so the panel, tray and providers keep running.
 internal sealed class TaskbarWidgetController : IDisposable
 {
-    private readonly TaskbarWidgetWindow _window;
-    private readonly TaskbarMascotFrames _frames;
-    private readonly TaskbarWidgetRenderer _renderer;
-    private readonly DispatcherQueueTimer _timer;
-    private readonly TaskbarInterop.WinEventProcedure _winEvent;
     private readonly Action _onClick;
-    private readonly nint _foregroundHook;
-    private readonly nint _locationHook;
+    private readonly TaskbarInterop.WinEventProcedure _winEvent;
+    private readonly TaskbarMascotFrames? _frames;
+    private readonly TaskbarWidgetRenderer? _renderer;
+    private readonly TaskbarWidgetWindow? _window;
+    private readonly DispatcherQueueTimer? _timer;
+    private nint _foregroundHook;
+    private nint _locationHook;
     private TaskbarSnapshot _snapshot = TaskbarSnapshot.Missing;
     private TaskbarCompatibility _compatibility = TaskbarCompatibility.Unknown("not evaluated");
     private TaskbarResolvedMode _mode = TaskbarResolvedMode.Overlay;
@@ -37,31 +40,42 @@ internal sealed class TaskbarWidgetController : IDisposable
         _requested = requested;
         _enabled = enabled;
         _onClick = onClick;
-        _frames = new TaskbarMascotFrames();
-        _renderer = new TaskbarWidgetRenderer(_frames);
-        _window = new TaskbarWidgetWindow();
-        _window.Clicked += _onClick;
-        _window.ShellChanged += OnShellEvent;
-        _timer = dispatcher.CreateTimer();
-        _timer.IsRepeating = false;
-        _timer.Tick += OnTimerTick;
         _winEvent = OnWinEvent;
-        _foregroundHook = TaskbarInterop.SetWinEventHook(
-            TaskbarInterop.EventSystemForeground, TaskbarInterop.EventSystemForeground, 0, _winEvent, 0, 0,
-            TaskbarInterop.WineventOutOfContext | TaskbarInterop.WineventSkipOwnProcess);
-        _locationHook = TaskbarInterop.SetWinEventHook(
-            TaskbarInterop.EventObjectLocationChange, TaskbarInterop.EventObjectLocationChange, 0, _winEvent, 0, 0,
-            TaskbarInterop.WineventOutOfContext | TaskbarInterop.WineventSkipOwnProcess);
-        OnShellEvent();
+        _foregroundHook = 0;
+        _locationHook = 0;
+        try
+        {
+            _frames = new TaskbarMascotFrames();
+            _renderer = new TaskbarWidgetRenderer(_frames);
+            _window = new TaskbarWidgetWindow();
+            _window.Clicked += _onClick;
+            _window.ShellChanged += OnShellEvent;
+            _timer = dispatcher.CreateTimer();
+            _timer.IsRepeating = false;
+            _timer.Tick += OnTimerTick;
+            _foregroundHook = TaskbarInterop.SetWinEventHook(
+                TaskbarInterop.EventSystemForeground, TaskbarInterop.EventSystemForeground, 0, _winEvent, 0, 0,
+                TaskbarInterop.WineventOutOfContext | TaskbarInterop.WineventSkipOwnProcess);
+            _locationHook = TaskbarInterop.SetWinEventHook(
+                TaskbarInterop.EventObjectLocationChange, TaskbarInterop.EventObjectLocationChange, 0, _winEvent, 0, 0,
+                TaskbarInterop.WineventOutOfContext | TaskbarInterop.WineventSkipOwnProcess);
+            OnShellEvent();
+        }
+        catch (Exception error)
+        {
+            // Never propagate: an optional overlay must not stop Shadowokx Panel.
+            Fail("initialization failed", error);
+        }
     }
 
+    internal bool IsDisabled { get; private set; }
     internal TaskbarResolvedMode Mode => _mode;
     internal TaskbarCompatibility Compatibility => _compatibility;
     internal TaskbarSnapshot Snapshot => _snapshot;
 
     internal void ApplySettings(bool enabled, TaskbarWidgetMode requested)
     {
-        if (_disposed || (_enabled == enabled && _requested == requested))
+        if (_disposed || IsDisabled || (_enabled == enabled && _requested == requested))
             return;
         _enabled = enabled;
         _requested = requested;
@@ -72,7 +86,7 @@ internal sealed class TaskbarWidgetController : IDisposable
     // recalculates allowance and never inspects processes.
     internal void Update(TaskbarWidgetState state)
     {
-        if (_disposed || state == _state)
+        if (_disposed || IsDisabled || state == _state)
             return;
         var busyChanged = state.Busy != _state.Busy;
         var providerChanged = state.ProviderId != _state.ProviderId || state.RemainingPercent != _state.RemainingPercent;
@@ -92,27 +106,34 @@ internal sealed class TaskbarWidgetController : IDisposable
 
     private void OnShellEvent()
     {
-        if (_disposed)
+        if (_disposed || IsDisabled)
             return;
-        _snapshot = TaskbarProbe.Capture();
-        var compatibility = TaskbarProbe.EvaluateCompatibility(_snapshot);
-        var resolved = TaskbarWidgetGeometry.Resolve(_requested, compatibility.State);
-        if (compatibility != _compatibility || resolved != _mode)
+        try
         {
-            _compatibility = compatibility;
-            _mode = resolved;
-            StartupDiagnostics.Write($"[TaskbarWidget] integration {compatibility.State}: {compatibility.Reason}");
-            StartupDiagnostics.Write(resolved == TaskbarResolvedMode.Integrated
-                ? "[TaskbarWidget] mode: integrated"
-                : "[TaskbarWidget] mode: overlay fallback");
+            _snapshot = TaskbarProbe.Capture();
+            var compatibility = TaskbarProbe.EvaluateCompatibility(_snapshot);
+            var resolved = TaskbarWidgetGeometry.Resolve(_requested, compatibility.State);
+            if (compatibility != _compatibility || resolved != _mode)
+            {
+                _compatibility = compatibility;
+                _mode = resolved;
+                StartupDiagnostics.Write($"[TaskbarWidget] integration {compatibility.State}: {compatibility.Reason}");
+                StartupDiagnostics.Write(resolved == TaskbarResolvedMode.Integrated
+                    ? "[TaskbarWidget] mode: integrated"
+                    : "[TaskbarWidget] mode: overlay fallback");
+            }
+            Redraw();
         }
-        Redraw();
+        catch (Exception error)
+        {
+            Fail("shell refresh failed", error);
+        }
     }
 
     private void OnWinEvent(nint hook, uint eventType, nint hwnd, int objectId, int childId,
         uint thread, uint time)
     {
-        if (_disposed)
+        if (_disposed || IsDisabled)
             return;
         if (eventType == TaskbarInterop.EventObjectLocationChange && hwnd != _snapshot.TaskbarHandle)
             return;
@@ -121,27 +142,36 @@ internal sealed class TaskbarWidgetController : IDisposable
 
     private void Redraw()
     {
-        if (_disposed)
+        if (_disposed || IsDisabled)
             return;
-        _snapshot = TaskbarProbe.Capture();
-        var show = TaskbarWidgetGeometry.ShouldShow(_enabled, _snapshot.Present && !_snapshot.Retracted,
-            false, false, _snapshot.FullscreenOccluded);
-        if (!show)
+        if (_renderer is null || _window is null)
+            return;
+        try
         {
-            _lastKey = string.Empty;
-            _window.Hide();
-            return;
+            _snapshot = TaskbarProbe.Capture();
+            var show = TaskbarWidgetGeometry.ShouldShow(_enabled, _snapshot.Present && !_snapshot.Retracted,
+                false, false, _snapshot.FullscreenOccluded);
+            if (!show)
+            {
+                _lastKey = string.Empty;
+                _window.Hide();
+                return;
+            }
+            var text = _state.RemainingPercent is { } percent ? $"{percent}%" : "—%";
+            var (red, green, blue) = ColorFor(_state.RemainingPercent);
+            var frameName = CurrentFrameName();
+            var rendered = _renderer.Render(new TaskbarRenderRequest(text, frameName, red, green, blue), _snapshot);
+            var bounds = TaskbarWidgetGeometry.Place(_snapshot.Taskbar, rendered.Width, rendered.Height);
+            var key = $"{bounds.X},{bounds.Y},{rendered.Width},{rendered.Height}|{text}|{frameName}|{red},{green},{blue}";
+            if (key == _lastKey)
+                return;
+            _lastKey = key;
+            _window.Apply(rendered.Pixels, rendered.Width, rendered.Height, bounds.X, bounds.Y, true);
         }
-        var text = _state.RemainingPercent is { } percent ? $"{percent}%" : "—%";
-        var (red, green, blue) = ColorFor(_state.RemainingPercent);
-        var frameName = CurrentFrameName();
-        var rendered = _renderer.Render(new TaskbarRenderRequest(text, frameName, red, green, blue), _snapshot);
-        var bounds = TaskbarWidgetGeometry.Place(_snapshot.Taskbar, rendered.Width, rendered.Height);
-        var key = $"{bounds.X},{bounds.Y},{rendered.Width},{rendered.Height}|{text}|{frameName}|{red},{green},{blue}";
-        if (key == _lastKey)
-            return;
-        _lastKey = key;
-        _window.Apply(rendered.Pixels, rendered.Width, rendered.Height, bounds.X, bounds.Y, true);
+        catch (Exception error)
+        {
+            Fail("render failed", error);
+        }
     }
 
     private string CurrentFrameName()
@@ -173,9 +203,11 @@ internal sealed class TaskbarWidgetController : IDisposable
 
     private void StartAnimation()
     {
-        _sequence = _frames.WorkIntro.Count > 0 ? _frames.WorkIntro : _frames.WorkLoop;
+        var intro = _frames?.WorkIntro ?? [];
+        var loop = _frames?.WorkLoop ?? [];
+        _sequence = intro.Count > 0 ? intro : loop;
         _frameIndex = 0;
-        _intro = _sequence.Count > 0 && _frames.WorkIntro.Count > 0;
+        _intro = _sequence.Count > 0 && intro.Count > 0;
         StartupDiagnostics.Write("[TaskbarWidget] mascot animation started");
         Redraw();
         ScheduleNextFrame();
@@ -183,7 +215,7 @@ internal sealed class TaskbarWidgetController : IDisposable
 
     private void StopAnimation()
     {
-        _timer.Stop();
+        _timer?.Stop();
         _sequence = [];
         _frameIndex = 0;
         _intro = true;
@@ -193,9 +225,9 @@ internal sealed class TaskbarWidgetController : IDisposable
 
     private void ScheduleNextFrame()
     {
-        if (_disposed || !_busy || _sequence.Count == 0)
+        if (_disposed || IsDisabled || !_busy || _sequence.Count == 0 || _timer is null)
         {
-            _timer.Stop();
+            _timer?.Stop();
             return;
         }
         var frame = _sequence[Math.Min(_frameIndex, _sequence.Count - 1)];
@@ -205,9 +237,9 @@ internal sealed class TaskbarWidgetController : IDisposable
 
     private void OnTimerTick(DispatcherQueueTimer sender, object args)
     {
-        if (_disposed || !_busy)
+        if (_disposed || IsDisabled || !_busy)
         {
-            _timer.Stop();
+            _timer?.Stop();
             return;
         }
         if (_sequence.Count > 0)
@@ -215,9 +247,9 @@ internal sealed class TaskbarWidgetController : IDisposable
             _frameIndex++;
             if (_frameIndex >= _sequence.Count)
             {
-                if (_intro && _frames.WorkLoop.Count > 0)
+                if (_intro && (_frames?.WorkLoop.Count ?? 0) > 0)
                 {
-                    _sequence = _frames.WorkLoop;
+                    _sequence = _frames!.WorkLoop;
                     _intro = false;
                 }
                 _frameIndex = 0;
@@ -227,20 +259,37 @@ internal sealed class TaskbarWidgetController : IDisposable
         ScheduleNextFrame();
     }
 
+    private void Fail(string stage, Exception error)
+    {
+        if (_disposed || IsDisabled)
+            return;
+        IsDisabled = true;
+        StartupTrace.Write($"[TaskbarWidget] {stage}: {error.GetType().FullName}: {error.Message}");
+        StartupDiagnostics.WriteException($"TaskbarWidget {stage}", error);
+        StartupTrace.Write("[TaskbarWidget] disabled for this session");
+        _timer?.Stop();
+        _window?.Hide();
+    }
+
     public void Dispose()
     {
         if (_disposed)
             return;
         _disposed = true;
-        _timer.Stop();
-        _timer.Tick -= OnTimerTick;
-        _window.Clicked -= _onClick;
+        _timer?.Stop();
+        if (_timer is not null)
+            _timer.Tick -= OnTimerTick;
+        if (_window is not null)
+        {
+            _window.Clicked -= _onClick;
+            _window.ShellChanged -= OnShellEvent;
+            _window.Dispose();
+        }
+        _renderer?.Dispose();
         if (_foregroundHook != 0)
             TaskbarInterop.UnhookWinEvent(_foregroundHook);
         if (_locationHook != 0)
             TaskbarInterop.UnhookWinEvent(_locationHook);
-        _window.Dispose();
-        _renderer.Dispose();
         GC.KeepAlive(_winEvent);
     }
 }

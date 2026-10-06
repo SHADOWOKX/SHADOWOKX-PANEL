@@ -158,7 +158,7 @@ internal static class TaskbarInterop
     [DllImport("user32.dll")]
     internal static extern nint SetCursor(nint cursor);
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", EntryPoint = "LoadCursorW", SetLastError = true)]
     internal static extern nint LoadCursor(nint instance, nint name);
 
     [DllImport("user32.dll")]
@@ -191,9 +191,10 @@ internal static class TaskbarInterop
     [DllImport("user32.dll", EntryPoint = "DrawTextW", CharSet = CharSet.Unicode)]
     internal static extern int DrawText(nint dc, string text, int length, ref NativeMethods.Rect rect, uint format);
 
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    // GDI text measurement (gdi32, not user32). Explicit Unicode entry point.
+    [DllImport("gdi32.dll", EntryPoint = "GetTextExtentPoint32W", CharSet = CharSet.Unicode, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    internal static extern bool GetTextExtentPoint32(nint dc, string text, int length, out Size32 size);
+    internal static extern bool GetTextExtentPoint32W(nint dc, string text, int length, out Size32 size);
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct Size32 { internal int Width; internal int Height; }

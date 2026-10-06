@@ -73,6 +73,40 @@ public sealed class TaskbarWidgetTests
     }
 
     [Fact]
+    public void OptionalFeatureReturnsTheInstanceWhenItInitializes()
+    {
+        var created = new object();
+        var failed = false;
+        var result = OptionalFeature.TryInitialize<object>(() => created,
+            (_, _) => failed = true);
+        Assert.Same(created, result);
+        Assert.False(failed);
+    }
+
+    [Fact]
+    public void OptionalFeatureIsolatesFailuresSoTheHostSurvives()
+    {
+        string? reported = null;
+        Exception? captured = null;
+        // Mirrors the real EntryPointNotFoundException from a bad native declaration.
+        var result = OptionalFeature.TryInitialize<object>(
+            () => throw new EntryPointNotFoundException("Unable to find an entry point named 'GetTextExtentPoint32' in DLL 'user32.dll'."),
+            (stage, error) => { reported = stage; captured = error; });
+        Assert.Null(result);
+        Assert.Equal("initialization failed", reported);
+        Assert.IsType<EntryPointNotFoundException>(captured);
+    }
+
+    [Fact]
+    public void OptionalFeatureAllowsAFeatureToDecline()
+    {
+        var failed = false;
+        var result = OptionalFeature.TryInitialize<object>(() => null, (_, _) => failed = true);
+        Assert.Null(result);
+        Assert.False(failed);
+    }
+
+    [Fact]
     public void PercentageMatchesTheSharedRemainingValue()
     {
         Assert.Equal(57, AllowanceValue.Normalize(57.4));

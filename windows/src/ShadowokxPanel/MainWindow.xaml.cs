@@ -65,6 +65,7 @@ public sealed partial class MainWindow : Window, IDisposable
     public MainWindow(AppHost host)
     {
         _host = host;
+        StartupTrace.Write("MainWindow constructor start");
         StartupDiagnostics.Write("MainWindow InitializeComponent start");
         try
         {
@@ -76,6 +77,7 @@ public sealed partial class MainWindow : Window, IDisposable
             throw;
         }
         StartupDiagnostics.Write("MainWindow InitializeComponent successful");
+        StartupTrace.Write("MainWindow InitializeComponent successful");
         _companion = new CompanionAnimator(WeeklyCompanion);
         _companion.ExternalWork = () => _host.AI.AnyWorking() || _host.CommandCodeBusy;
         _companion.CodexEnabled = () => _host.Settings.Current.VisibleProviders.Contains("codex") && !_host.Settings.Current.RemovedProviders.Contains("codex");
@@ -115,6 +117,7 @@ public sealed partial class MainWindow : Window, IDisposable
         };
         _clockTimer.Tick += ClockTimer_Tick;
         Render();
+        StartupTrace.Write("MainWindow constructed");
     }
 
     public void InitializeTray()
@@ -122,6 +125,7 @@ public sealed partial class MainWindow : Window, IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_tray is not null)
             return;
+        StartupTrace.Write("tray icon creating");
         _tray = new TrayIcon(
             _hwnd,
             TogglePanel,
@@ -139,17 +143,24 @@ public sealed partial class MainWindow : Window, IDisposable
                     _ = _host.ResumeAsync();
             },
             QueueDisplayChange);
-        try
-        {
-            _taskbarWidget = new TaskbarWidgetController(DispatcherQueue, TogglePanel,
-                _host.Settings.Current.TaskbarWidgetEnabled, _host.Settings.Current.TaskbarWidgetMode);
-        }
-        catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception)
-        {
-            // The taskbar companion is optional; the panel and tray remain fully usable.
-            StartupDiagnostics.WriteException("taskbar widget unavailable", error);
-            _taskbarWidget = null;
-        }
+        // The taskbar companion is optional. Any failure (including a bad native entry
+        // point) disables it for this session instead of stopping the panel.
+        _taskbarWidget = OptionalFeature.TryInitialize<TaskbarWidgetController>(
+            () => new TaskbarWidgetController(DispatcherQueue, TogglePanel,
+                _host.Settings.Current.TaskbarWidgetEnabled, _host.Settings.Current.TaskbarWidgetMode),
+            (stage, error) =>
+            {
+                StartupTrace.Write($"[TaskbarWidget] {stage}: {error.GetType().FullName}: {error.Message}");
+                StartupDiagnostics.WriteException($"TaskbarWidget {stage}", error);
+                StartupTrace.Write("[TaskbarWidget] disabled for this session");
+            });
+        if (_taskbarWidget is null)
+            StartupTrace.Write("[TaskbarWidget] unavailable; continuing without it");
+        else if (_taskbarWidget.IsDisabled)
+            StartupTrace.Write("[TaskbarWidget] created but disabled for this session");
+        else
+            StartupTrace.Write("taskbar widget controller created");
+        StartupTrace.Write("tray initialization complete");
         UpdateTray();
     }
 
@@ -167,6 +178,7 @@ public sealed partial class MainWindow : Window, IDisposable
         PositionNearTray();
         _appWindow.Show();
         Activate();
+        StartupTrace.Write("MainWindow shown and activated");
         _clockTimer.Start();
         if (!codexVisible && _host.ProvidersReady && _host.Settings.Current.RefreshOnOpen)
             _ = _host.Weather.RefreshAsync(false);
@@ -989,6 +1001,7 @@ public sealed partial class MainWindow : Window, IDisposable
         _disposed = true;
         _exiting = true;
         _visible = false;
+        StartupTrace.Write("MainWindow dispose start");
         _companion.Configure(_host.Settings.Current.Companion, false, _host.Settings.Current.Animations);
         _codexVisibilityTimer.Stop();
         _host.Codex.SetVisible(false);

@@ -64,7 +64,7 @@ internal sealed class TaskbarWidgetRenderer : IDisposable
         var previous = TaskbarInterop.SelectObject(_dc, _font);
         try
         {
-            return TaskbarInterop.GetTextExtentPoint32(_dc, text, text.Length, out var size) && size.Width > 0
+            return TaskbarInterop.GetTextExtentPoint32W(_dc, text, text.Length, out var size) && size.Width > 0
                 ? size.Width
                 : Math.Max(1, text.Length * (fontHeight / 2));
         }

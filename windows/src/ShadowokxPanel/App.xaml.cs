@@ -18,10 +18,12 @@ public partial class App : Application, IAsyncDisposable
     public App()
     {
         StartupDiagnostics.Write("App constructor entered");
+        StartupTrace.Write("App constructor entered");
         InitializeComponent();
         LogFrameworkResourceState();
         _dispatcher = DispatcherQueue.GetForCurrentThread();
         StartupDiagnostics.Write("App constructed");
+        StartupTrace.Write("App constructed");
     }
 
     private static void LogFrameworkResourceState()
@@ -55,41 +57,63 @@ public partial class App : Application, IAsyncDisposable
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
         StartupDiagnostics.Write("OnLaunched entered");
+        StartupTrace.Write("OnLaunched entered");
         try
         {
             StartupDiagnostics.Write("host initialization start");
+            StartupTrace.Write("host initialization start");
             await _host.InitializeAsync();
             StartupDiagnostics.Write("host initialization end");
+            StartupTrace.Write("host initialization end");
 
             StartupDiagnostics.Write("MainWindow construction start");
+            StartupTrace.Write("MainWindow construction start");
             _window = new MainWindow(_host);
             StartupDiagnostics.Write("MainWindow construction end");
+            StartupTrace.Write("MainWindow construction end");
 
             var startedWithWindows = Environment.GetCommandLineArgs()
                 .Any(value => value.Equals("--startup", StringComparison.OrdinalIgnoreCase));
+            StartupTrace.Write($"startup flag --startup: {startedWithWindows}");
             StartupDiagnostics.Write("tray initialization start");
+            StartupTrace.Write("tray initialization start");
             _window.InitializeTray();
             StartupDiagnostics.Write("tray initialization successful");
+            StartupTrace.Write("tray initialization successful");
 
             if (SmokeMode)
             {
+                StartupTrace.Write("UI smoke mode");
                 await _window.RunSmokeAsync();
                 await ExitAsync("UI smoke complete");
                 return;
             }
             StartupDiagnostics.Write("provider startup start");
+            StartupTrace.Write("provider startup start");
             await _host.StartProvidersAsync();
             StartupDiagnostics.Write("provider startup end");
+            StartupTrace.Write("provider startup end");
 
             if (!startedWithWindows || _showWhenReady)
+            {
+                StartupTrace.Write("showing panel");
                 _window.ShowPanel();
+                StartupTrace.Write("MainWindow activated");
+            }
+            else
+            {
+                StartupTrace.Write("started hidden (tray only)");
+            }
             _showWhenReady = false;
             StartupDiagnostics.Write("app entering steady-state");
+            StartupTrace.Write("startup completed");
         }
         catch (Exception error)
         {
             Environment.ExitCode = 1;
             StartupDiagnostics.WriteException("startup exception", error);
+            StartupTrace.Failure("startup exception", error);
+            StartupTrace.Exit("startup exception");
             try
             {
                 await ExitAsync("startup failure");
@@ -97,6 +121,7 @@ public partial class App : Application, IAsyncDisposable
             catch (Exception shutdownError)
             {
                 StartupDiagnostics.WriteException("startup cleanup failed", shutdownError);
+                StartupTrace.Failure("startup cleanup failed", shutdownError);
             }
         }
     }
@@ -104,6 +129,7 @@ public partial class App : Application, IAsyncDisposable
     internal void HandleRedirectedActivation()
     {
         StartupDiagnostics.Write("redirected activation dispatch requested");
+        StartupTrace.Write("redirected activation dispatch requested");
         if (!_dispatcher.TryEnqueue(() =>
             {
                 if (_window is null)
@@ -113,6 +139,7 @@ public partial class App : Application, IAsyncDisposable
             }))
         {
             StartupDiagnostics.Write("redirected activation dispatch rejected");
+            StartupTrace.Write("redirected activation dispatch rejected");
         }
     }
 
@@ -132,6 +159,7 @@ public partial class App : Application, IAsyncDisposable
             if (_exitTask is null)
             {
                 StartupDiagnostics.Write($"shutdown requested: {reason}");
+                StartupTrace.Exit($"app shutdown requested: {reason}");
                 _exitTask = ExitCoreAsync();
             }
             return _exitTask;
@@ -185,6 +213,7 @@ public partial class App : Application, IAsyncDisposable
     {
         var window = _window;
         _window = null;
+        StartupTrace.Write("application dispose start");
         try
         {
             window?.Dispose();
@@ -192,6 +221,7 @@ public partial class App : Application, IAsyncDisposable
         finally
         {
             await _host.DisposeAsync();
+            StartupTrace.Write("application dispose complete");
         }
     }
 }

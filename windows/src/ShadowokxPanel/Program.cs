@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
@@ -16,30 +17,45 @@ public static class Program
     [STAThread]
     public static void Main()
     {
-        StartupDiagnostics.Write("process entered");
+        StartupTrace.Begin(Environment.GetCommandLineArgs());
         try
         {
             WinRT.ComWrappersSupport.InitializeComWrappers();
-            StartupDiagnostics.Write("COM wrappers initialized");
+            StartupTrace.Write("COM wrappers initialized");
+            StartupTrace.Write("checking existing instance");
             var currentInstance = AppInstance.GetCurrent();
             var activation = currentInstance.GetActivatedEventArgs();
-            StartupDiagnostics.Write("AppInstance key lookup");
-            var keyInstance = AppInstance.FindOrRegisterForKey(Environment.GetCommandLineArgs().Contains("--ui-smoke")
-                ? InstanceKey + ".Smoke." + Environment.ProcessId : InstanceKey);
+            var keyName = Environment.GetCommandLineArgs().Contains("--ui-smoke")
+                ? InstanceKey + ".Smoke." + Environment.ProcessId : InstanceKey;
+            StartupTrace.Write($"instance key: {keyName}");
+            var keyInstance = AppInstance.FindOrRegisterForKey(keyName);
+            var otherInstances = CountOtherInstances();
+            StartupTrace.Write($"registered instance is current: {keyInstance.IsCurrent}");
+            StartupTrace.Write($"other running ShadowokxPanel processes: {otherInstances}");
             if (!keyInstance.IsCurrent)
             {
-                StartupDiagnostics.Write("instance decision: secondary");
-                StartupDiagnostics.Write("activation redirect start");
-                keyInstance.RedirectActivationToAsync(activation).AsTask()
-                    .WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
-                StartupDiagnostics.Write("activation redirect complete; secondary exiting");
-                return;
+                // A stale key on an unpackaged build must never leave the user with no
+                // window: only redirect when another instance is genuinely alive.
+                if (otherInstances == 0)
+                {
+                    StartupTrace.Write("instance key reported secondary but no live instance exists; continuing as primary");
+                }
+                else
+                {
+                    StartupTrace.Write("existing instance found: true");
+                    StartupTrace.Write("activation redirect start");
+                    keyInstance.RedirectActivationToAsync(activation).AsTask()
+                        .WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
+                    StartupTrace.Write("activation redirect complete");
+                    StartupTrace.Exit("secondary instance: redirected activation to the primary instance");
+                    return;
+                }
             }
 
-            StartupDiagnostics.Write("instance decision: primary");
+            StartupTrace.Write("primary instance");
             _primaryInstance = keyInstance;
             keyInstance.Activated += PrimaryInstance_Activated;
-            StartupDiagnostics.Write("WinUI dispatcher entering");
+            StartupTrace.Write("entering WinUI dispatcher");
             Application.Start(_ =>
             {
                 try
@@ -47,13 +63,14 @@ public static class Program
                     var dispatcher = DispatcherQueue.GetForCurrentThread();
                     SynchronizationContext.SetSynchronizationContext(
                         new DispatcherQueueSynchronizationContext(dispatcher));
-                    StartupDiagnostics.Write("WinUI application start callback");
+                    StartupTrace.Write("WinUI application start callback");
                     AttachApplication(new App());
                 }
                 catch (Exception error)
                 {
                     Environment.ExitCode = 1;
-                    StartupDiagnostics.WriteException("App construction failed", error);
+                    StartupTrace.Failure("App construction failed", error);
+                    StartupTrace.Exit("App construction failed");
                     throw;
                 }
             });
@@ -65,23 +82,25 @@ public static class Program
             if (application is null)
             {
                 Environment.ExitCode = 1;
-                StartupDiagnostics.Write("primary dispatcher exited before App was attached");
+                StartupTrace.Exit("dispatcher exited before App was attached");
             }
             else
             {
                 if (!application.IsShutdownRequested)
                 {
                     Environment.ExitCode = 1;
-                    StartupDiagnostics.Write("primary dispatcher exited without a shutdown request");
+                    StartupTrace.Exit("dispatcher exited without a shutdown request");
                 }
                 application.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                StartupTrace.Write("application disposed");
             }
-            StartupDiagnostics.Write("primary dispatcher exited");
+            StartupTrace.Write("dispatcher exited");
         }
         catch (Exception error)
         {
             Environment.ExitCode = 1;
-            StartupDiagnostics.WriteException("fatal startup exception", error);
+            StartupTrace.Failure("fatal startup exception", error);
+            StartupTrace.Exit("fatal startup exception");
             SynchronizationContext.SetSynchronizationContext(null);
             App? application;
             lock (LifecycleSync)
@@ -94,7 +113,7 @@ public static class Program
                 }
                 catch (Exception cleanupError)
                 {
-                    StartupDiagnostics.WriteException("fatal startup cleanup failed", cleanupError);
+                    StartupTrace.Failure("fatal startup cleanup failed", cleanupError);
                 }
             }
         }
@@ -110,13 +129,36 @@ public static class Program
                 }
                 catch (Exception error)
                 {
-                    StartupDiagnostics.WriteException("AppInstance key cleanup failed", error);
+                    StartupTrace.Failure("AppInstance key cleanup failed", error);
                 }
             }
             lock (LifecycleSync)
                 _application = null;
             _primaryInstance = null;
-            StartupDiagnostics.Write($"process exiting with code {Environment.ExitCode}");
+            StartupTrace.Write($"process exiting code={Environment.ExitCode}");
+        }
+    }
+
+    private static int CountOtherInstances()
+    {
+        try
+        {
+            using var self = Process.GetCurrentProcess();
+            var count = 0;
+            foreach (var process in Process.GetProcessesByName(self.ProcessName))
+            {
+                using (process)
+                {
+                    if (process.Id != Environment.ProcessId)
+                        count++;
+                }
+            }
+            return count;
+        }
+        catch (Exception error)
+        {
+            StartupTrace.Failure("instance enumeration failed", error);
+            return -1;
         }
     }
 
@@ -135,7 +177,7 @@ public static class Program
 
     private static void PrimaryInstance_Activated(object? sender, AppActivationArguments eventArgs)
     {
-        StartupDiagnostics.Write("redirected activation received by primary");
+        StartupTrace.Write("redirected activation received by primary");
         App? application;
         lock (LifecycleSync)
         {

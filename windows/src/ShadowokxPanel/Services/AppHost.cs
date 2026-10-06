@@ -55,7 +55,15 @@ public sealed class AppHost : IAsyncDisposable
             ObjectDisposedException.ThrowIf(_disposed, this);
             if (_initialized)
                 return;
+            StartupTrace.Write($"data root: {Paths.Root}");
+            StartupTrace.Write($"settings file: {Paths.SettingsFile} exists={File.Exists(Paths.SettingsFile)}");
             var settings = await Settings.LoadAsync(cancellationToken);
+            StartupTrace.Write(
+                $"settings loaded: schema={settings.SettingsSchemaVersion} theme={settings.Theme} accent={settings.Accent} " +
+                $"showWeather={settings.ShowWeather} startWithWindows={settings.StartWithWindows} " +
+                $"rememberLastPage={settings.RememberLastPage} lastPage={settings.LastPage} " +
+                $"taskbarWidget={settings.TaskbarWidgetEnabled} mode={settings.TaskbarWidgetMode} " +
+                $"visibleProviders={settings.VisibleProviders.Length} removedProviders={settings.RemovedProviders.Length}");
             AI = new Core.AI.AIProviderService(Paths, Settings);
             var logger = new RedactingLogger(Paths, () => Settings.Current.DebugLogging);
             _codex = new CodexProvider(
@@ -92,6 +100,7 @@ public sealed class AppHost : IAsyncDisposable
             if (!_initialized || _codex is null || _weather is null)
                 throw new InvalidOperationException("The application host has not been initialized.");
             _started = true;
+            StartupTrace.Write("providers starting");
             AI.Start();
             _commandCodeTasks = new Core.AI.CommandCodeTaskMonitor();
             _commandCodeProcesses = new Core.AI.CommandCodeProcessMonitor();
@@ -103,9 +112,11 @@ public sealed class AppHost : IAsyncDisposable
                     Codex.StartAsync(cancellationToken),
                     Weather.StartAsync(cancellationToken));
                 ProvidersReady = true;
+                StartupTrace.Write("providers ready");
             }
-            catch
+            catch (Exception error)
             {
+                StartupTrace.Failure("provider startup failed", error);
                 _started = false;
                 throw;
             }
@@ -210,6 +221,7 @@ public sealed class AppHost : IAsyncDisposable
 
     private async Task DisposeCoreAsync()
     {
+        StartupTrace.Write("app host disposing");
         CodexProvider? codex;
         WeatherProvider? weather;
         await _lifecycle.WaitAsync().ConfigureAwait(false);
