@@ -3,7 +3,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using ShadowokxPanel.Core.Settings;
 using ShadowokxPanel.Core.Codex;
-using ShadowokxPanel.Core.Presentation.Taskbar;
 using ShadowokxPanel.Platform;
 using ShadowokxPanel.Services;
 using Windows.Graphics;
@@ -12,7 +11,6 @@ namespace ShadowokxPanel;
 
 public sealed partial class SettingsWindow : Window
 {
-    private static readonly string[] Companions = ["robot", "codex", "octopus", "penguin"];
     private readonly AppHost _host;
     private readonly AppWindow _appWindow;
     private bool _loading = true;
@@ -73,10 +71,6 @@ public sealed partial class SettingsWindow : Window
         CustomAccentBox.Text = settings.CustomAccent;
         DensityCombo.SelectedIndex = settings.Density == LayoutDensity.Compact ? 0 : 1;
         AnimationsToggle.IsOn = settings.Animations;
-        VaryWorkToggle.IsOn = settings.VaryWorkAnimations;
-        TaskbarWidgetToggle.IsOn = settings.TaskbarWidgetEnabled;
-        TaskbarModeCombo.SelectedIndex = (int)settings.TaskbarWidgetMode;
-        CompanionCombo.SelectedIndex = Array.IndexOf(Companions, settings.Companion);
         CodexExecutableBox.Text = settings.CodexExecutablePath;
         CostEstimateToggle.IsOn = settings.ShowCostEstimate;
         EstimateModelCombo.ItemsSource = ApiPriceCatalog.Models.Select(p => p.Model).ToArray();
@@ -144,10 +138,6 @@ public sealed partial class SettingsWindow : Window
             CustomAccent = CustomAccentBox.Text,
             Density = DensityCombo.SelectedIndex == 0 ? LayoutDensity.Compact : LayoutDensity.Comfortable,
             Animations = AnimationsToggle.IsOn,
-            VaryWorkAnimations = VaryWorkToggle.IsOn,
-            TaskbarWidgetEnabled = TaskbarWidgetToggle.IsOn,
-            TaskbarWidgetMode = (TaskbarWidgetMode)Math.Clamp(TaskbarModeCombo.SelectedIndex, 0, 2),
-            Companion = Companions[Math.Clamp(CompanionCombo.SelectedIndex, 0, 3)],
             ShowLifetimeTokens = LifetimeToggle.IsOn,
             ShowTokenHistory = HistoryToggle.IsOn,
             ShowUsageState = UsageStateToggle.IsOn,
@@ -215,7 +205,6 @@ public sealed partial class SettingsWindow : Window
             CustomAccent = defaults.CustomAccent,
             Density = defaults.Density,
             Animations = defaults.Animations,
-            Companion = defaults.Companion,
         };
         try
         {

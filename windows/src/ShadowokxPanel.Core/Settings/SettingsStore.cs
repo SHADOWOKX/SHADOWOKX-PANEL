@@ -1,6 +1,5 @@
 using ShadowokxPanel.Core.Storage;
 using ShadowokxPanel.Core.Codex;
-using ShadowokxPanel.Core.Presentation.Taskbar;
 
 namespace ShadowokxPanel.Core.Settings;
 
@@ -65,7 +64,6 @@ public sealed class SettingsStore
             Theme = Enum.IsDefined(settings.Theme) ? settings.Theme : ThemePreset.System,
             Accent = accentPreset,
             Density = Enum.IsDefined(settings.Density) ? settings.Density : LayoutDensity.Comfortable,
-            TaskbarWidgetMode = Enum.IsDefined(settings.TaskbarWidgetMode) ? settings.TaskbarWidgetMode : TaskbarWidgetMode.Auto,
             CustomAccent = accent.ToLowerInvariant(),
             WeatherLocation = NormalizeLocation(settings.WeatherLocation),
             TemperatureUnit = settings.TemperatureUnit == "fahrenheit" ? "fahrenheit" : "celsius",

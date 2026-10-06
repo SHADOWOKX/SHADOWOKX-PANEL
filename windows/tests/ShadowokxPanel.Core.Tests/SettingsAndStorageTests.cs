@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ShadowokxPanel.Core.Settings;
 using ShadowokxPanel.Core.Storage;
 
@@ -5,6 +6,8 @@ namespace ShadowokxPanel.Core.Tests;
 
 public sealed class SettingsAndStorageTests
 {
+    private static readonly JsonSerializerOptions LegacyOptions = new(JsonSerializerDefaults.Web);
+
     [Fact]
     public async Task SettingsPersistInPerUserRoot()
     {
@@ -71,6 +74,29 @@ public sealed class SettingsAndStorageTests
         await File.WriteAllTextAsync(path, "{broken");
         var store = new JsonFileStore<Dictionary<string, string>>(path);
         Assert.Null(await store.ReadAsync());
+    }
+
+    [Fact]
+    public void RemovedTaskbarAndCompanionSettingsLoadSafely()
+    {
+        // Existing settings.json files may still carry the removed taskbar-widget and
+        // companion fields. They must be ignored, not fatal, and unrelated values kept.
+        const string legacy = """
+        {
+          "selectedProvider": "commandcode",
+          "animations": false,
+          "companion": "penguin",
+          "varyWorkAnimations": false,
+          "taskbarWidgetEnabled": false,
+          "taskbarWidgetMode": 2,
+          "someFutureField": { "nested": true }
+        }
+        """;
+        var deserialized = JsonSerializer.Deserialize<AppSettings>(legacy, LegacyOptions);
+        Assert.NotNull(deserialized);
+        var value = SettingsStore.Validate(deserialized);
+        Assert.Equal("commandcode", value.SelectedProvider);
+        Assert.False(value.Animations);
     }
 
     [Fact]

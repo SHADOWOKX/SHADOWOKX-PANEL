@@ -151,10 +151,6 @@ public sealed partial class MainWindow
                 border.Child is Microsoft.UI.Xaml.Controls.StackPanel stack &&
                 stack.Children.OfType<Microsoft.UI.Xaml.Controls.TextBlock>().Any(text => text.Text == "65% remaining")))
             throw new InvalidOperationException("Selected provider allowance did not render.");
-        if (_uiSettings.AnimationsEnabled && (!_companion.IsWorking || !_companion.MotionRunning))
-            throw new InvalidOperationException("Reported work did not animate.");
-        if (!_uiSettings.AnimationsEnabled && _companion.MotionRunning)
-            throw new InvalidOperationException("Reduced-motion preference was ignored.");
         await CaptureAsync(Path.Combine(output, "claude.png"));
         await File.WriteAllTextAsync(claudePath, JsonSerializer.Serialize(new
         {
@@ -164,7 +160,6 @@ public sealed partial class MainWindow
         }));
         await _host.AI.RefreshAsync();
         await Task.Delay(2300);
-        if (_companion.IsWorking || _companion.MotionRunning) throw new InvalidOperationException("Idle companion kept animating.");
         await _host.Settings.SaveAsync(_host.Settings.Current with { SelectedProvider = "codex" });
         File.Delete(claudePath);
         for (var i = 0; i < 20; i++) { HidePanel(); ShowPanel(); await Task.Delay(10); }

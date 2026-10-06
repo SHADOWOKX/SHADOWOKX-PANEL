@@ -9,10 +9,8 @@ using ShadowokxPanel.Controls;
 using ShadowokxPanel.Core.History;
 using ShadowokxPanel.Core.Models;
 using ShadowokxPanel.Core.Presentation;
-using ShadowokxPanel.Core.Presentation.Taskbar;
 using ShadowokxPanel.Core.Settings;
 using ShadowokxPanel.Platform;
-using ShadowokxPanel.Platform.Taskbar;
 using ShadowokxPanel.Services;
 using ShadowokxPanel.ViewModels;
 using Windows.Graphics;
@@ -37,10 +35,8 @@ public sealed partial class MainWindow : Window, IDisposable
     private string? _renderedForecastTimeZone;
     private bool _renderedForecastPrecipitation;
     private TrayIcon? _tray;
-    private TaskbarWidgetController? _taskbarWidget;
     private SettingsWindow? _settingsWindow;
     private bool _visible;
-    private readonly CompanionAnimator _companion;
     private bool _exiting;
     private bool _disposed;
     private int _positionedHeight;
@@ -78,9 +74,6 @@ public sealed partial class MainWindow : Window, IDisposable
         }
         StartupDiagnostics.Write("MainWindow InitializeComponent successful");
         StartupTrace.Write("MainWindow InitializeComponent successful");
-        _companion = new CompanionAnimator(WeeklyCompanion);
-        _companion.ExternalWork = () => _host.AI.AnyWorking() || _host.CommandCodeBusy;
-        _companion.CodexEnabled = () => _host.Settings.Current.VisibleProviders.Contains("codex") && !_host.Settings.Current.RemovedProviders.Contains("codex");
         _host.AI.Changed += AIChanged;
 
         StartupDiagnostics.Write("TokenGraphControl construction start");
@@ -143,23 +136,6 @@ public sealed partial class MainWindow : Window, IDisposable
                     _ = _host.ResumeAsync();
             },
             QueueDisplayChange);
-        // The taskbar companion is optional. Any failure (including a bad native entry
-        // point) disables it for this session instead of stopping the panel.
-        _taskbarWidget = OptionalFeature.TryInitialize<TaskbarWidgetController>(
-            () => new TaskbarWidgetController(DispatcherQueue, TogglePanel,
-                _host.Settings.Current.TaskbarWidgetEnabled, _host.Settings.Current.TaskbarWidgetMode),
-            (stage, error) =>
-            {
-                StartupTrace.Write($"[TaskbarWidget] {stage}: {error.GetType().FullName}: {error.Message}");
-                StartupDiagnostics.WriteException($"TaskbarWidget {stage}", error);
-                StartupTrace.Write("[TaskbarWidget] disabled for this session");
-            });
-        if (_taskbarWidget is null)
-            StartupTrace.Write("[TaskbarWidget] unavailable; continuing without it");
-        else if (_taskbarWidget.IsDisabled)
-            StartupTrace.Write("[TaskbarWidget] created but disabled for this session");
-        else
-            StartupTrace.Write("taskbar widget controller created");
         StartupTrace.Write("tray initialization complete");
         UpdateTray();
     }
@@ -212,7 +188,6 @@ public sealed partial class MainWindow : Window, IDisposable
         if (!_visible)
             return;
         _visible = false;
-        _companion.Configure(_host.Settings.Current.Companion, false, _host.Settings.Current.Animations);
         _codexVisibilityTimer.Stop();
         _host.Codex.SetVisible(false);
         _clockTimer.Stop();
@@ -401,10 +376,7 @@ public sealed partial class MainWindow : Window, IDisposable
         ApplyThemeIfChanged(settings);
         var weatherSelected = settings.ShowWeather && _viewModel.SelectedPage == "weather";
         RenderProviderTabs();
-        _companion.VaryWork = settings.VaryWorkAnimations;
         DashboardGrid.RowSpacing = 10;
-        _companion.Configure(settings.Companion, _visible && !weatherSelected,
-            settings.Animations && _uiSettings.AnimationsEnabled);
         CodexScroll.Visibility = weatherSelected ? Visibility.Collapsed : Visibility.Visible;
         WeatherScroll.Visibility = weatherSelected ? Visibility.Visible : Visibility.Collapsed;
         if (weatherSelected)
@@ -689,6 +661,8 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void UpdateTray()
     {
+        if (_tray is null)
+            return;
         var state = _viewModel.Codex;
         var aiState = _host.AI.State(SelectedAI);
         // Stale Command Code percentages are hidden from the top bar, matching Linux.
@@ -697,15 +671,6 @@ public sealed partial class MainWindow : Window, IDisposable
             aiState.Usage?.Windows
                 .Where(w => (w.ResetsAt is null || w.ResetsAt > DateTimeOffset.UtcNow) && w.UsedPercent is not null)
                 .Select(w => (double?)(100 - w.UsedPercent!.Value)).FirstOrDefault();
-        // One canonical percentage feeds the tray icon and the taskbar companion.
-        var percent = AllowanceValue.Normalize(remaining);
-        UpdateTaskbarWidget(percent);
-        _companion.VaryWork = _viewModel.Settings.VaryWorkAnimations;
-        _companion.Configure(_viewModel.Settings.Companion,
-            _visible && _viewModel.SelectedPage != "weather",
-            _viewModel.Settings.Animations && _uiSettings.AnimationsEnabled);
-        if (_tray is null)
-            return;
         var pace = _viewModel.Settings.ShowCodexStateIndicator ? _viewModel.UsagePace : UsagePace.Unknown;
         var lines = new List<string> { "Shadowokx Panel" };
         lines.Add(remaining.HasValue
@@ -714,18 +679,9 @@ public sealed partial class MainWindow : Window, IDisposable
             : $"{AICatalogName()}: unavailable");
         if (_viewModel.Settings.ShowWeatherInTrayTooltip && _viewModel.Weather.Current is { } weather)
             lines.Add($"Weather: {Math.Round(weather.Temperature):0}° · {weather.Condition.Label}");
-        _tray.Update(string.Join('\n', lines), percent);
-    }
-
-    // The companion mirrors the exact value the panel shows; it never recalculates
-    // allowance and never inspects processes. Busy is task-only.
-    private void UpdateTaskbarWidget(int? percent)
-    {
-        if (_taskbarWidget is null)
-            return;
-        _taskbarWidget.ApplySettings(_viewModel.Settings.TaskbarWidgetEnabled, _viewModel.Settings.TaskbarWidgetMode);
-        _taskbarWidget.Update(TaskbarWidgetState.From(_host.CodexBusy, _host.CommandCodeBusy, percent,
-            SelectedAI, AICatalogName()));
+        int? displayedPercent = remaining.HasValue
+            ? (int)Math.Round(remaining.Value, MidpointRounding.AwayFromZero) : null;
+        _tray.Update(string.Join('\n', lines), displayedPercent);
     }
 
     private string AICatalogName() => Core.AI.AICatalog.Providers.GetValueOrDefault(SelectedAI) ?? "AI";
@@ -1002,7 +958,6 @@ public sealed partial class MainWindow : Window, IDisposable
         _exiting = true;
         _visible = false;
         StartupTrace.Write("MainWindow dispose start");
-        _companion.Configure(_host.Settings.Current.Companion, false, _host.Settings.Current.Animations);
         _codexVisibilityTimer.Stop();
         _host.Codex.SetVisible(false);
         _clockTimer.Stop();
@@ -1011,9 +966,6 @@ public sealed partial class MainWindow : Window, IDisposable
         Activated -= MainWindow_Activated;
         _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
         _host.AI.Changed -= AIChanged;
-        _companion.Dispose();
-        _taskbarWidget?.Dispose();
-        _taskbarWidget = null;
         _tray?.Dispose();
         _tray = null;
         _viewModel.Dispose();

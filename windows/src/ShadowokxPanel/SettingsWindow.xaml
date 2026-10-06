@@ -316,58 +316,9 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Animated companion" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <TextBlock Text="Interface animations" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
                                         <Grid Grid.Column="1">
-                                            <ComboBox x:Name="CompanionCombo" HorizontalAlignment="Right" SelectionChanged="SelectionChanged" AutomationProperties.Name="Animated companion" Width="205">
-                                                <ComboBoxItem Content="Robot" />
-                                                <ComboBoxItem Content="Codex" />
-                                                <ComboBoxItem Content="Clawd" />
-                                                <ComboBoxItem Content="Penguin" />
-                                            </ComboBox>
-                                        </Grid>
-                                    </Grid>
-                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Vary work animations" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
-                                        <Grid Grid.Column="1">
-                                            <ToggleSwitch x:Name="VaryWorkToggle" Toggled="SettingChanged" AutomationProperties.Name="Vary work animations" HorizontalAlignment="Right" OnContent="" OffContent="" />
-                                        </Grid>
-                                    </Grid>
-                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Animate only during active work" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
-                                        <Grid Grid.Column="1">
-                                            <ToggleSwitch x:Name="AnimationsToggle" Toggled="SettingChanged" AutomationProperties.Name="Animate only during active work" HorizontalAlignment="Right" OnContent="" OffContent="" />
-                                        </Grid>
-                                    </Grid>
-                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Taskbar widget" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
-                                        <Grid Grid.Column="1">
-                                            <ToggleSwitch x:Name="TaskbarWidgetToggle" Toggled="SettingChanged" AutomationProperties.Name="Taskbar widget" HorizontalAlignment="Right" OnContent="" OffContent="" />
-                                        </Grid>
-                                    </Grid>
-                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Taskbar integration" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
-                                        <Grid Grid.Column="1">
-                                            <ComboBox x:Name="TaskbarModeCombo" HorizontalAlignment="Right" SelectionChanged="SelectionChanged" AutomationProperties.Name="Taskbar integration" Width="205">
-                                                <x:String>Auto (recommended)</x:String>
-                                                <x:String>Integrated</x:String>
-                                                <x:String>Overlay</x:String>
-                                            </ComboBox>
+                                            <ToggleSwitch x:Name="AnimationsToggle" Toggled="SettingChanged" AutomationProperties.Name="Interface animations" HorizontalAlignment="Right" OnContent="" OffContent="" />
                                         </Grid>
                                     </Grid>
                                 </StackPanel>

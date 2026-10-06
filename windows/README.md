@@ -233,9 +233,10 @@ Restores the larger percentage-only notification icon. The square Windows notifi
 
 ## Windows taskbar companion
 
-An optional companion shows `[ 🐙 57% ]` at the extreme left of the Windows 11 taskbar, using the selected provider's remaining allowance. The mascot is static while a client is open but idle, and animates only while a real Codex or Command Code task is running. Clicking it toggles the panel; it never steals focus and never duplicates the process.
-
-Because stock Windows 11 exposes no safe API to reserve an in-taskbar region (DeskBands were removed and the XAML taskbar cannot be extended without patching explorer), the companion runs as a transparent, non-activating, taskbar-attached overlay. The compatibility layer reports the build as unsupported for a reserved slot and `Auto` resolves to the overlay; a future supported build can enable integrated mode behind the same check. Modes are Auto / Integrated / Overlay in **Settings → Appearance**. See [the taskbar companion documentation](docs/TASKBAR-WIDGET.md).
+Removed. Shadowokx Panel for Windows is a normal tray-resident panel again: no taskbar
+overlay, no taskbar mascot, and no task/activity-driven animation. Command Code account
+usage, Codex usage and the tray icon are unaffected. See
+[the Command Code documentation](docs/COMMANDCODE.md) for the account integration.
 # Command Code usage capability
 
 Command Code now uses **native live account usage**, matching the current Linux
@@ -246,9 +247,8 @@ settings, JSON or logs. Usage refreshes every **three minutes** with manual refr
 reset countdowns and consumption/request totals. Missing fields stay **Unavailable**;
 a monthly percentage is not invented because the verified API returns no monthly cap.
 
-The mascot animates only for a real in-flight Command Code turn, detected from the
-desktop app's own electron-log at `%APPDATA%\Command Code\logs\main.log`
-(`[send] turn running` / `[send] turn resolved`). An open, idle Command Code window
-stays static. Legacy usage JSON files remain an explicitly labeled advanced source,
-**Check login** still verifies the CLI login, and **Open CommandCode Usage** opens
-the browser. See [sources, setup and limitations](docs/COMMANDCODE.md).
+Windows does not animate a mascot and does not monitor Command Code task activity; the
+account integration is independent of whether Command Code is running. Legacy usage JSON
+files remain an explicitly labeled advanced source, **Check login** still verifies the
+CLI login, and **Open CommandCode Usage** opens the browser. See
+[sources, setup and limitations](docs/COMMANDCODE.md).

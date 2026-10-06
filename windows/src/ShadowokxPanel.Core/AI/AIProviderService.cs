@@ -196,8 +196,6 @@ public sealed class AIProviderService : IDisposable
         await _settings.SaveAsync(_settings.Current with { AISources = sources }, cancellationToken).ConfigureAwait(false);
     }
 
-    public bool AnyWorking() => _settings.Current.VisibleProviders.Where(id=>id!="codex" && !_settings.Current.RemovedProviders.Contains(id))
-        .Any(id=>State(id).Usage?.IsWorking(DateTimeOffset.UtcNow)==true);
     public void Dispose()
     {
         if (_disposed) return; _disposed=true;
