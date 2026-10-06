@@ -315,7 +315,7 @@ public sealed partial class MainWindow : Window, IDisposable
             new ScreenRect(info.rcMonitor.Left, info.rcMonitor.Top,
                 info.rcMonitor.Right - info.rcMonitor.Left, info.rcMonitor.Bottom - info.rcMonitor.Top),
             cursor.X, cursor.Y, scale,
-            _host.Settings.Current.Density == Core.Settings.LayoutDensity.Compact ? 400 : 430,
+            _host.Settings.Current.Density == Core.Settings.LayoutDensity.Compact ? 500 : 530,
             desiredHeight);
         var width = bounds.Width;
         var height = bounds.Height;

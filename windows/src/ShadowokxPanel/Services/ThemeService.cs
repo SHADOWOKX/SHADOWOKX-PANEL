@@ -63,13 +63,22 @@ public static class ThemeService
         }
         var palette = Palettes[preset];
         root.RequestedTheme = settings.Theme == ThemePreset.System ? ElementTheme.Default : palette.BaseTheme;
-        Set("AppBackgroundBrush", palette.Background);
+        var dark = palette.BaseTheme == ElementTheme.Dark;
+        // Dark hierarchy: the window sits clearly below the cards, the border is a
+        // low-contrast stroke (not a bright outline), and meta text is dimmer than
+        // secondary text. Light themes keep their curated surfaces.
+        var background = dark ? Scale(palette.Background, 0.78) : palette.Background;
+        var border = dark ? Blend(palette.Card, palette.Hover, 0.5) : palette.Border;
+        var track = dark ? Blend(palette.Card, palette.Hover, 0.65) : "#d5d6d1";
+        var meta = dark ? Blend(palette.Secondary, background, 0.30) : Blend(palette.Secondary, palette.Card, 0.25);
+        Set("AppBackgroundBrush", background);
         Set("CardBrush", palette.Card);
         Set("CardHoverBrush", palette.Hover);
-        Set("CardBorderBrush", palette.Border);
+        Set("CardBorderBrush", border);
         Set("PrimaryTextBrush", palette.Primary);
         Set("SecondaryTextBrush", palette.Secondary);
-        Set("TrackBrush", preset == ThemePreset.Light ? "#d5d6d1" : "#373c3e");
+        Set("MetaTextBrush", meta);
+        Set("TrackBrush", track);
         var accent = settings.Accent == AccentPreset.Custom
             ? settings.CustomAccent
             : Accents.GetValueOrDefault(settings.Accent, "#f97316");
@@ -104,4 +113,28 @@ public static class ThemeService
             Convert.ToByte(clean.Substring(2, 2), 16),
             Convert.ToByte(clean.Substring(4, 2), 16));
     }
+
+    // Multiply each channel toward black (factor < 1) or white (factor > 1).
+    private static string Scale(string hex, double factor)
+    {
+        var color = Parse(hex);
+        return Format(color.R * factor, color.G * factor, color.B * factor);
+    }
+
+    // Linear blend from `from` toward `to`.
+    private static string Blend(string from, string to, double amount)
+    {
+        var a = Parse(from);
+        var b = Parse(to);
+        return Format(
+            a.R + (b.R - a.R) * amount,
+            a.G + (b.G - a.G) * amount,
+            a.B + (b.B - a.B) * amount);
+    }
+
+    private static string Format(double red, double green, double blue) =>
+        $"#{Channel(red):X2}{Channel(green):X2}{Channel(blue):X2}";
+
+    private static byte Channel(double value) =>
+        (byte)Math.Clamp((int)Math.Round(value, MidpointRounding.AwayFromZero), 0, 255);
 }

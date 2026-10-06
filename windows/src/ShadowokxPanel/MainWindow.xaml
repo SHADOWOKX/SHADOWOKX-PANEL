@@ -7,8 +7,8 @@
         Background="{ThemeResource AppBackgroundBrush}"
         BorderBrush="{ThemeResource CardBorderBrush}"
         BorderThickness="1"
-        CornerRadius="22"
-        Padding="14"
+        CornerRadius="16"
+        Padding="12"
         KeyDown="Root_KeyDown">
         <Grid x:Name="DashboardGrid" RowSpacing="10">
             <Grid.RowDefinitions>
@@ -20,9 +20,7 @@
             <Grid Grid.Row="0">
                 <TextBlock
                     Text="Shadowokx Panel"
-                    Foreground="{ThemeResource PrimaryTextBrush}"
-                    FontSize="15"
-                    FontWeight="SemiBold"
+                    Style="{StaticResource PanelTitleStyle}"
                     VerticalAlignment="Center" />
                 <Button
                     x:Name="SettingsButton"
@@ -32,11 +30,11 @@
                     ToolTipService.ToolTip="Settings"
                     AutomationProperties.Name="Open settings"
                     Click="SettingsButton_Click">
-                    <FontIcon Glyph="&#xE713;" FontSize="16" />
+                    <FontIcon Glyph="&#xE713;" FontSize="15" />
                 </Button>
             </Grid>
 
-            <Border x:Name="ProviderBorder" Grid.Row="1" Background="{ThemeResource CardBrush}" CornerRadius="14" Padding="4">
+            <Border x:Name="ProviderBorder" Grid.Row="1" Background="{ThemeResource CardBrush}" CornerRadius="11" Padding="3">
                 <Grid x:Name="ProviderTabs" ColumnSpacing="3" RowSpacing="3" />
             </Border>
             <Grid Grid.Row="2">
@@ -56,7 +54,7 @@
                                 <TextBlock
                                     Text="Codex Usage"
                                     Foreground="{ThemeResource PrimaryTextBrush}"
-                                    FontSize="14"
+                                    FontSize="17"
                                     FontWeight="SemiBold"
                                     VerticalAlignment="Center" />
                             </StackPanel>
@@ -89,7 +87,7 @@
 
                         <StackPanel x:Name="CodexContent" Spacing="10">
                             <Border x:Name="WeeklyCard" Style="{StaticResource CardStyle}">
-                                <StackPanel Spacing="6">
+                                <StackPanel Spacing="5">
                                     <Grid>
                                         <TextBlock x:Name="AllowanceTitle" Text="Weekly allowance" Style="{StaticResource CardTitleStyle}" />
                                         <Border x:Name="CapacityPill" HorizontalAlignment="Right" Background="{ThemeResource CardHoverBrush}" CornerRadius="9" Padding="9,4">
@@ -109,14 +107,14 @@
                                             <TextBlock x:Name="WeeklyAvailable" HorizontalAlignment="Right" Foreground="{ThemeResource SecondaryTextBrush}" FontSize="10" />
                                         </StackPanel>
                                     </Grid>
-                                    <Grid x:Name="WeeklyTrack" Height="9" Background="{ThemeResource TrackBrush}" CornerRadius="5">
+                                    <Grid x:Name="WeeklyTrack" Height="7" Background="{ThemeResource TrackBrush}" CornerRadius="4">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition x:Name="RemainingColumn" Width="0*" />
                                             <ColumnDefinition x:Name="UsedColumn" Width="100*" />
                                         </Grid.ColumnDefinitions>
-                                        <Border x:Name="WeeklyFill" Background="{ThemeResource AccentBrush}" CornerRadius="5" />
+                                        <Border x:Name="WeeklyFill" Background="{ThemeResource AccentBrush}" CornerRadius="4" />
                                     </Grid>
-                                    <StackPanel x:Name="CostRows" Spacing="4">
+                                    <StackPanel x:Name="CostRows" Spacing="3">
                                         <TextBlock Text="ACCOUNT TOKENS" FontSize="9" Foreground="{ThemeResource SecondaryTextBrush}" />
                                         <Grid><TextBlock x:Name="TodayAccountLabel" Text="Today" FontSize="11" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="TodayCost" Text="Pending" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" /></Grid>
                                         <Grid><TextBlock x:Name="YesterdayAccountLabel" Text="Yesterday" FontSize="11" Foreground="{ThemeResource SecondaryTextBrush}" /><TextBlock x:Name="YesterdayCost" Text="—" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" /></Grid>
@@ -232,7 +230,7 @@
                     HorizontalScrollMode="Disabled">
                     <StackPanel Spacing="10" Padding="0,0,0,3">
                         <Grid Margin="0,2,0,2">
-                            <TextBlock Text="Weather" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Text="Weather" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
                             <Button
                                 x:Name="WeatherRefreshButton"
                                 HorizontalAlignment="Right"

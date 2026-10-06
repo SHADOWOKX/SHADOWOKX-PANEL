@@ -7,60 +7,107 @@
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
-            <Color x:Key="AppBackgroundColor">#FF252623</Color>
-            <Color x:Key="CardColor">#FF30312F</Color>
-            <Color x:Key="CardHoverColor">#FF383936</Color>
-            <Color x:Key="BorderColor">#FF464742</Color>
-            <Color x:Key="PrimaryTextColor">#FFF5F3ED</Color>
-            <Color x:Key="SecondaryTextColor">#FFB6B4AC</Color>
+
+            <!-- Default surfaces: a clearly darker window with slightly lighter cards
+                 and a low-contrast 1px border. ThemeService refines these per theme. -->
+            <Color x:Key="AppBackgroundColor">#FF252625</Color>
+            <Color x:Key="CardColor">#FF393A38</Color>
+            <Color x:Key="CardHoverColor">#FF3B3C3A</Color>
+            <Color x:Key="BorderColor">#FF3A3B39</Color>
+            <Color x:Key="PrimaryTextColor">#FFF4F4F4</Color>
+            <Color x:Key="SecondaryTextColor">#FFA6A9A6</Color>
+            <Color x:Key="MetaTextColor">#FF838480</Color>
             <Color x:Key="AccentColor">#FFF97316</Color>
-            <Color x:Key="TrackColor">#FF4D4E49</Color>
+            <Color x:Key="TrackColor">#FF3B3C3A</Color>
             <SolidColorBrush x:Key="AppBackgroundBrush" Color="{StaticResource AppBackgroundColor}" />
             <SolidColorBrush x:Key="CardBrush" Color="{StaticResource CardColor}" />
             <SolidColorBrush x:Key="CardHoverBrush" Color="{StaticResource CardHoverColor}" />
             <SolidColorBrush x:Key="CardBorderBrush" Color="{StaticResource BorderColor}" />
             <SolidColorBrush x:Key="PrimaryTextBrush" Color="{StaticResource PrimaryTextColor}" />
             <SolidColorBrush x:Key="SecondaryTextBrush" Color="{StaticResource SecondaryTextColor}" />
+            <SolidColorBrush x:Key="MetaTextBrush" Color="{StaticResource MetaTextColor}" />
             <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
             <SolidColorBrush x:Key="TrackBrush" Color="{StaticResource TrackColor}" />
-            <x:Double x:Key="ProgressBarMinHeight">9</x:Double>
-            <x:Double x:Key="ProgressBarTrackHeight">9</x:Double>
-            <CornerRadius x:Key="ProgressBarTrackCornerRadius">5</CornerRadius>
+
+            <x:Double x:Key="ProgressBarMinHeight">7</x:Double>
+            <x:Double x:Key="ProgressBarTrackHeight">7</x:Double>
+            <CornerRadius x:Key="ProgressBarTrackCornerRadius">4</CornerRadius>
+
+            <!-- Surfaces -->
             <Style x:Key="CardStyle" TargetType="Border">
                 <Setter Property="Background" Value="{ThemeResource CardBrush}" />
                 <Setter Property="BorderBrush" Value="{ThemeResource CardBorderBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="16" />
-                <Setter Property="Padding" Value="12" />
+                <Setter Property="CornerRadius" Value="14" />
+                <Setter Property="Padding" Value="14" />
+            </Style>
+
+            <!-- Typography hierarchy -->
+            <Style x:Key="PanelTitleStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource PrimaryTextBrush}" />
+                <Setter Property="FontSize" Value="19" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+            <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource PrimaryTextBrush}" />
+                <Setter Property="FontSize" Value="17" />
+                <Setter Property="FontWeight" Value="SemiBold" />
             </Style>
             <Style x:Key="CardTitleStyle" TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{ThemeResource PrimaryTextBrush}" />
-                <Setter Property="FontSize" Value="12" />
+                <Setter Property="FontSize" Value="14" />
                 <Setter Property="FontWeight" Value="SemiBold" />
             </Style>
             <Style x:Key="SectionLabelStyle" TargetType="TextBlock">
-                <Setter Property="Foreground" Value="{ThemeResource SecondaryTextBrush}" />
-                <Setter Property="FontSize" Value="11" />
+                <Setter Property="Foreground" Value="{ThemeResource MetaTextBrush}" />
+                <Setter Property="FontSize" Value="10" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="CharacterSpacing" Value="70" />
             </Style>
             <Style x:Key="MetricLabelStyle" TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{ThemeResource SecondaryTextBrush}" />
-                <Setter Property="FontSize" Value="11" />
+                <Setter Property="FontSize" Value="12" />
             </Style>
             <Style x:Key="MetricValueStyle" TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{ThemeResource PrimaryTextBrush}" />
                 <Setter Property="FontSize" Value="13" />
                 <Setter Property="FontWeight" Value="SemiBold" />
             </Style>
+            <Style x:Key="MetaTextStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource MetaTextBrush}" />
+                <Setter Property="FontSize" Value="11" />
+            </Style>
+
+            <!-- Controls -->
             <Style x:Key="IconButtonStyle" TargetType="Button">
                 <Setter Property="Background" Value="{ThemeResource CardHoverBrush}" />
                 <Setter Property="Foreground" Value="{ThemeResource PrimaryTextBrush}" />
                 <Setter Property="BorderThickness" Value="0" />
-                <Setter Property="CornerRadius" Value="10" />
-                <Setter Property="MinWidth" Value="36" />
-                <Setter Property="MinHeight" Value="36" />
-                <Setter Property="Padding" Value="8" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="MinWidth" Value="32" />
+                <Setter Property="MinHeight" Value="32" />
+                <Setter Property="Padding" Value="6" />
+            </Style>
+            <Style x:Key="ToolbarButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="{ThemeResource CardHoverBrush}" />
+                <Setter Property="Foreground" Value="{ThemeResource PrimaryTextBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource CardBorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Height" Value="32" />
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="Padding" Value="12,0" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+            </Style>
+            <Style x:Key="StatusPillStyle" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource CardHoverBrush}" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Padding" Value="8,3" />
+                <Setter Property="MinHeight" Value="26" />
+                <Setter Property="VerticalAlignment" Value="Center" />
             </Style>
         </ResourceDictionary>
     </Application.Resources>
