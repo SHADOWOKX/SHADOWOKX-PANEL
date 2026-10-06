@@ -42,11 +42,25 @@ public sealed class CommandCodeTests
     [Fact]
     public void LinuxDiscoveryAvoidsDesktopName()
     {
-        using var directory = TemporaryDirectory.Create();
-        File.WriteAllText(Path.Combine(directory.Root, "command-code"), "");
-        Assert.Null(CommandCodeStatus.Discover(directory.Root, false));
-        File.WriteAllText(Path.Combine(directory.Root, "cmdc"), "");
-        Assert.NotNull(CommandCodeStatus.Discover(directory.Root, false));
+        // Deterministic POSIX fixture: no host paths, no real files, no OS checks.
+        const string bin = "/home/tester/.local/bin";
+        const string otherBin = "/usr/local/bin";
+        var fileSystem = new FakePosixFileSystem()
+            .Add(FakePosixFileSystem.Combine(bin, "command-code"))
+            .Add(FakePosixFileSystem.Combine(otherBin, "cmd"));
+
+        // The desktop application binary name must never be discovered as the CLI.
+        Assert.Null(CommandCodeStatus.Discover(bin, windows: false,
+            fileSystem.Exists, FakePosixFileSystem.IsAbsolute, FakePosixFileSystem.Combine));
+
+        // A later PATH entry is searched and the CLI path is returned exactly, with no
+        // script entry point (that behavior is Windows-only).
+        var found = CommandCodeStatus.Discover($"{bin}:{otherBin}", windows: false,
+            fileSystem.Exists, FakePosixFileSystem.IsAbsolute, FakePosixFileSystem.Combine);
+        Assert.NotNull(found);
+        var resolved = found!.Value;
+        Assert.Equal(FakePosixFileSystem.Combine(otherBin, "cmd"), resolved.Binary);
+        Assert.Null(resolved.Script);
     }
     [Fact]
     public async Task MissingProcessDoesNotExposeExceptionPaths()

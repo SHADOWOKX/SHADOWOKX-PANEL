@@ -191,7 +191,7 @@ internal static class TaskbarInterop
     [DllImport("user32.dll", EntryPoint = "DrawTextW", CharSet = CharSet.Unicode)]
     internal static extern int DrawText(nint dc, string text, int length, ref NativeMethods.Rect rect, uint format);
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool GetTextExtentPoint32(nint dc, string text, int length, out Size32 size);
 

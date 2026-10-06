@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using ShadowokxPanel.Services;
 
 namespace ShadowokxPanel.Platform.Taskbar;
 
@@ -79,7 +80,7 @@ internal sealed class TaskbarWidgetWindow : IDisposable
         }
         finally
         {
-            TaskbarInterop.ReleaseDC(0, screenDc);
+            _ = TaskbarInterop.ReleaseDC(0, screenDc);
         }
         if (!visible)
         {

@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using ShadowokxPanel.Core.Presentation.Taskbar;
 
 namespace ShadowokxPanel.Platform.Taskbar;
 
@@ -103,10 +104,10 @@ internal sealed class TaskbarWidgetRenderer : IDisposable
         var previousFont = TaskbarInterop.SelectObject(memoryDc, _font);
         try
         {
-            TaskbarInterop.SetBkMode(memoryDc, TaskbarInterop.Transparent);
-            TaskbarInterop.SetTextColor(memoryDc, 0x00FFFFFF);
+            _ = TaskbarInterop.SetBkMode(memoryDc, TaskbarInterop.Transparent);
+            _ = TaskbarInterop.SetTextColor(memoryDc, 0x00FFFFFF);
             var rect = new NativeMethods.Rect { Left = 0, Top = 0, Right = width, Bottom = height };
-            TaskbarInterop.DrawText(memoryDc, text, text.Length, ref rect,
+            _ = TaskbarInterop.DrawText(memoryDc, text, text.Length, ref rect,
                 TaskbarInterop.DtLeft | TaskbarInterop.DtVCenter | TaskbarInterop.DtSingleLine | TaskbarInterop.DtNoPrefix);
             var pixels = new byte[width * height * 4];
             Marshal.Copy(bits, pixels, 0, pixels.Length);

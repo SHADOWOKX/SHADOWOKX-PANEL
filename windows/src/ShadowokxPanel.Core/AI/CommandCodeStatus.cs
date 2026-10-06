@@ -45,21 +45,31 @@ public static class CommandCodeStatus
     }) + Limitation;
 
     // npm's Windows .cmd shim is resolved to its JS entry point, never passed to a shell.
-    public static (string Binary, string? Script)? Discover(string? path = null, bool? windows = null)
+    public static (string Binary, string? Script)? Discover(string? path = null, bool? windows = null) =>
+        Discover(path, windows ?? OperatingSystem.IsWindows(), File.Exists, Path.IsPathFullyQualified,
+            static (directory, name) => Path.Combine(directory, name));
+
+    // Dependency-injected core: the platform flag, filesystem and path semantics are
+    // parameters, so discovery is deterministic and never depends on the host OS.
+    internal static (string Binary, string? Script)? Discover(string? path, bool windows,
+        Func<string, bool> fileExists, Func<string, bool> isFullyQualified, Func<string, string, string> combine)
     {
-        var win = windows ?? OperatingSystem.IsWindows();
-        var directories = (path ?? Environment.GetEnvironmentVariable("PATH") ?? "").Split(win ? ';' : ':');
-        foreach (var directory in directories.Where(Path.IsPathFullyQualified))
+        var value = path ?? Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        var directories = value.Split(windows ? ';' : ':');
+        var names = windows ? new[] { "cmdc.exe", "commandcode.exe" } : new[] { "cmdc", "commandcode", "cmd" };
+        foreach (var directory in directories.Where(isFullyQualified))
         {
-            foreach (var name in win ? new[] { "cmdc.exe", "commandcode.exe" } : new[] { "cmdc", "commandcode", "cmd" })
+            foreach (var name in names)
             {
-                var binary = Path.Combine(directory, name);
-                if (File.Exists(binary)) return (binary, null);
+                var binary = combine(directory, name);
+                if (fileExists(binary)) return (binary, null);
             }
-            if (!win) continue;
-            var script = Path.Combine(directory, "node_modules", "command-code", "dist", "index.mjs");
-            if (!File.Exists(script)) continue;
-            var node = directories.Where(Path.IsPathFullyQualified).Select(d => Path.Combine(d, "node.exe")).FirstOrDefault(File.Exists);
+            if (!windows) continue;
+            var script = combine(combine(combine(combine(directory, "node_modules"), "command-code"), "dist"),
+                "index.mjs");
+            if (!fileExists(script)) continue;
+            var node = directories.Where(isFullyQualified).Select(d => combine(d, "node.exe"))
+                .FirstOrDefault(fileExists);
             if (node is not null) return (node, script);
         }
         return null;

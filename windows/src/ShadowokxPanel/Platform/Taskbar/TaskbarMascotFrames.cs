@@ -24,7 +24,7 @@ internal sealed class TaskbarMascotFrames
     public IReadOnlyList<MascotFrame> WorkIntro { get; }
     public IReadOnlyList<MascotFrame> WorkLoop { get; }
 
-    private (IReadOnlyList<MascotFrame> Intro, IReadOnlyList<MascotFrame> Loop) LoadSequences()
+    private (List<MascotFrame> Intro, List<MascotFrame> Loop) LoadSequences()
     {
         try
         {
@@ -37,7 +37,7 @@ internal sealed class TaskbarMascotFrames
         }
     }
 
-    private static IReadOnlyList<MascotFrame> ReadSequence(JsonElement root, string name)
+    private static List<MascotFrame> ReadSequence(JsonElement root, string name)
     {
         if (!root.TryGetProperty(name, out var sequence) || sequence.ValueKind != JsonValueKind.Array)
             return [];
@@ -133,7 +133,7 @@ internal sealed class TaskbarMascotFrames
         }
         finally
         {
-            TaskbarInterop.ReleaseDC(0, dc);
+            _ = TaskbarInterop.ReleaseDC(0, dc);
         }
         if (copied == 0)
             return null;
