@@ -1,14 +1,41 @@
 using System.Text.Json;
 namespace ShadowokxPanel.Core.AI;
 
-public sealed record AISource(string Path = "", string KeyFile = "");
-public sealed record AIWindow(string Label, double UsedPercent, DateTimeOffset? ResetsAt);
+public sealed record AISource(string Path = "", string KeyFile = "", string Mode = "", long AuthRevision = 0);
+public sealed record AIWindow(string Label, double? UsedPercent, DateTimeOffset? ResetsAt,
+    double? Used = null, double? Cap = null, bool? Exceeded = null);
 public sealed record AIBalance(double Amount, string Currency);
+public sealed record AICreditBalance(string Label, double Amount);
+public sealed record AIConsumption(double? UsedCredits, double? MonthlyUsedCredits, double? PurchasedUsedCredits,
+    double? FreeUsedCredits, long? Requests, string? PeriodBasis, DateTimeOffset? PeriodStart, DateTimeOffset? PeriodEnd);
 public sealed record AIUsage(IReadOnlyList<AIWindow> Windows, IReadOnlyList<AIBalance> Balances,
     double? Tokens, string? Account, string? Plan, DateTimeOffset UpdatedAt,
     bool Active, DateTimeOffset? ActivityAt, DateTimeOffset? ExpiresAt)
 {
+    public string Source { get; init; } = "json";
+    public string? PlanStatus { get; init; }
+    public IReadOnlyList<AICreditBalance> CreditBalances { get; init; } = [];
+    public AIConsumption? Consumption { get; init; }
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+    public DateTimeOffset? RetryAt { get; init; }
+
     public bool IsWorking(DateTimeOffset now) => Active && ActivityAt <= now.AddSeconds(5) && ExpiresAt > now;
+
+    public static AIUsage FromCommandCode(CommandCodeUsage usage) =>
+        new(usage.Windows.Select(window => new AIWindow(window.Label,
+                window.UsedPercent is { } percent ? Math.Clamp(percent, 0, 100) : null,
+                window.ResetsAt, window.Used, window.Cap, window.Exceeded)).ToArray(),
+            [], null, usage.Account, usage.Plan, usage.UpdatedAt, false, null, null)
+        {
+            Source = "commandcode-api",
+            PlanStatus = usage.PlanStatus,
+            CreditBalances = usage.CreditBalances.Select(balance => new AICreditBalance(balance.Label, balance.Amount)).ToArray(),
+            Consumption = new AIConsumption(usage.Consumption.UsedCredits, usage.Consumption.MonthlyUsedCredits,
+                usage.Consumption.PurchasedUsedCredits, usage.Consumption.FreeUsedCredits, usage.Consumption.Requests,
+                usage.Consumption.PeriodBasis, usage.Consumption.PeriodStart, usage.Consumption.PeriodEnd),
+            Warnings = usage.Warnings,
+            RetryAt = usage.RetryAt,
+        };
 }
 public static class AICatalog
 {

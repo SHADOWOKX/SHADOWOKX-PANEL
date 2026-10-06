@@ -103,7 +103,7 @@
                             <Border Background="{ThemeResource CardBrush}" BorderBrush="{ThemeResource CardBorderBrush}" BorderThickness="1" CornerRadius="14">
                                 <StackPanel Spacing="1">
                                     <Border Padding="14,10">
-                                        <TextBlock Text="Codex uses your existing CLI login. Connect Claude usage with the button below; connect DeepSeek with an API key. Other providers use a usage JSON file. Updates appear as soon as the source changes." TextWrapping="Wrap" FontSize="12" />
+                                        <TextBlock Text="Codex uses your existing CLI login. Connect Claude usage with the button below; connect DeepSeek with an API key. Command Code uses a read-only API key stored in Windows Credential Manager; other providers use a usage JSON file. Updates appear as soon as the source changes." TextWrapping="Wrap" FontSize="12" />
                                     </Border>
                                     <Border Padding="14,10">
                                         <StackPanel x:Name="ProviderSettings" Spacing="10" />
@@ -344,6 +344,30 @@
                                         <TextBlock Text="Animate only during active work" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
                                         <Grid Grid.Column="1">
                                             <ToggleSwitch x:Name="AnimationsToggle" Toggled="SettingChanged" AutomationProperties.Name="Animate only during active work" HorizontalAlignment="Right" OnContent="" OffContent="" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Taskbar widget" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ToggleSwitch x:Name="TaskbarWidgetToggle" Toggled="SettingChanged" AutomationProperties.Name="Taskbar widget" HorizontalAlignment="Right" OnContent="" OffContent="" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid MinHeight="54" ColumnSpacing="18" Padding="14,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Taskbar integration" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource PrimaryTextBrush}" FontSize="14" />
+                                        <Grid Grid.Column="1">
+                                            <ComboBox x:Name="TaskbarModeCombo" HorizontalAlignment="Right" SelectionChanged="SelectionChanged" AutomationProperties.Name="Taskbar integration" Width="205">
+                                                <x:String>Auto (recommended)</x:String>
+                                                <x:String>Integrated</x:String>
+                                                <x:String>Overlay</x:String>
+                                            </ComboBox>
                                         </Grid>
                                     </Grid>
                                 </StackPanel>

@@ -17,8 +17,19 @@ public sealed class AIProviderService : IDisposable
     private readonly CancellationTokenSource _stop = new();
     private readonly Dictionary<string,AIState> _states = [];
     private readonly List<FileSystemWatcher> _watchers = [];
+    private readonly CommandCodeApi _commandCodeApi;
+    private readonly ICommandCodeKeyStore _commandCodeKeys;
+    private readonly bool _ownsCommandCodeApi;
     private bool _disposed;
-    public AIProviderService(ApplicationPaths paths, SettingsStore settings) { _paths=paths; _settings=settings; }
+    private DateTimeOffset _commandCodeAttempt;
+    public AIProviderService(ApplicationPaths paths, SettingsStore settings,
+        CommandCodeApi? commandCodeApi = null, ICommandCodeKeyStore? commandCodeKeys = null)
+    {
+        _paths=paths; _settings=settings;
+        _commandCodeApi = commandCodeApi ?? new CommandCodeApi();
+        _ownsCommandCodeApi = commandCodeApi is null;
+        _commandCodeKeys = commandCodeKeys ?? WindowsCredentialKeyStore.Instance;
+    }
     public event EventHandler? Changed;
     public string DefaultPath(string id) => System.IO.Path.Combine(_paths.Root,"usage",id+".json");
     public AIState State(string id) { lock (_states) return _states.GetValueOrDefault(id) ?? new(); }
@@ -27,7 +38,7 @@ public sealed class AIProviderService : IDisposable
         _settings.Changed += SettingsChanged;
         Watch(); _ = PollAsync();
     }
-    private void SettingsChanged(object? sender, AppSettings settings) { Watch(); _ = RefreshAsync(); }
+    private void SettingsChanged(object? sender, AppSettings settings) { _commandCodeAttempt = default; Watch(); _ = RefreshAsync(); }
     private void Watch()
     {
         foreach (var watcher in _watchers) watcher.Dispose(); _watchers.Clear();
@@ -50,10 +61,10 @@ public sealed class AIProviderService : IDisposable
     private void FileChanged(object sender, FileSystemEventArgs args) => _ = RefreshAsync();
     private async Task PollAsync()
     {
-        try { while (!_stop.IsCancellationRequested) { await RefreshAsync(); await Task.Delay(TimeSpan.FromSeconds(30),_stop.Token).ConfigureAwait(false); } }
+        try { while (!_stop.IsCancellationRequested) { await RefreshAsync(false); await Task.Delay(TimeSpan.FromSeconds(30),_stop.Token).ConfigureAwait(false); } }
         catch (OperationCanceledException) { }
     }
-    public async Task RefreshAsync()
+    public async Task RefreshAsync(bool force = true)
     {
         if (_disposed) return;
         try
@@ -65,6 +76,13 @@ public sealed class AIProviderService : IDisposable
                 {
                     if (_stop.IsCancellationRequested) return;
                     var source = _settings.Current.AISources.GetValueOrDefault(id) ?? new();
+                    if (id == "commandcode" && CommandCodeIsNative(source))
+                    {
+                        if (!force && DateTimeOffset.UtcNow - _commandCodeAttempt < TimeSpan.FromSeconds(CommandCodeApi.IntervalSeconds)) continue;
+                        _commandCodeAttempt = DateTimeOffset.UtcNow;
+                        await RefreshCommandCodeNativeAsync().ConfigureAwait(false);
+                        continue;
+                    }
                     try
                     {
                         string json;
@@ -98,7 +116,8 @@ public sealed class AIProviderService : IDisposable
                     catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException or HttpRequestException or ArgumentException or OperationCanceledException)
                     {
                         if (_stop.IsCancellationRequested) return;
-                        lock (_states) _states[id]=new(_states.GetValueOrDefault(id)?.Usage,"Connect a usage source in Settings, or check your connection.");
+                        lock (_states) _states[id]=new(id == "commandcode" ? null : _states.GetValueOrDefault(id)?.Usage,
+                            id == "commandcode" ? "Configured usage JSON could not be read. Subscription metrics are unavailable. Check the source in Settings." : "Connect a usage source in Settings, or check your connection.");
                     }
                 }
                 Changed?.Invoke(this,EventArgs.Empty);
@@ -107,6 +126,76 @@ public sealed class AIProviderService : IDisposable
         }
         catch (OperationCanceledException) { }
     }
+
+    // Command Code is native when it is explicitly in API mode, or when no JSON
+    // source is configured. A configured/default JSON file remains the advanced path.
+    private bool CommandCodeIsNative(AISource source) =>
+        source.Mode == "api" || (source.Path.Length == 0 && !File.Exists(DefaultPath("commandcode")));
+
+    private async Task RefreshCommandCodeNativeAsync()
+    {
+        if (_stop.IsCancellationRequested) return;
+        try
+        {
+            var key = await _commandCodeKeys.ReadAsync(_stop.Token).ConfigureAwait(false);
+            if (key is null)
+            {
+                lock (_states) _states["commandcode"] = new(null, new CommandCodeException("authentication-required").Message);
+                return;
+            }
+            var usage = await _commandCodeApi.FetchAsync(key, _stop.Token).ConfigureAwait(false);
+            lock (_states) _states["commandcode"] = new(AIUsage.FromCommandCode(usage));
+        }
+        catch (Exception error) when (error is CommandCodeException or OperationCanceledException)
+        {
+            if (_stop.IsCancellationRequested) return;
+            var commandCode = (CommandCodeException)error;
+            var clearData = commandCode.Code is "authentication-required" or "authentication-failed" or
+                "keyring-locked" or "keyring-unavailable";
+            var retention = clearData ? null : _states.GetValueOrDefault("commandcode")?.Usage;
+            if (retention is { } data)
+            {
+                data = data with { Windows = data.Windows
+                    .Where(window => window.ResetsAt is null || window.ResetsAt > DateTimeOffset.UtcNow).ToArray() };
+                if (data.Windows.Count == 0 && data.CreditBalances.Count == 0 && data.Tokens is null) data = null;
+            }
+            lock (_states) _states["commandcode"] = new(retention, commandCode.Message);
+        }
+    }
+
+    // Validates the key against live read-only account requests, then stores it in
+    // Windows Credential Manager and switches Command Code to native API mode.
+    public async Task<AIUsage> ConnectCommandCodeAsync(string key, CancellationToken cancellationToken = default)
+    {
+        var usage = await _commandCodeApi.FetchAsync(key, cancellationToken).ConfigureAwait(false);
+        await _commandCodeKeys.SaveAsync(key, cancellationToken).ConfigureAwait(false);
+        var sources = new Dictionary<string, AISource>(_settings.Current.AISources)
+        {
+            ["commandcode"] = new(Mode: "api", Path: string.Empty, KeyFile: string.Empty,
+                AuthRevision: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
+        };
+        await _settings.SaveAsync(_settings.Current with { AISources = sources }, cancellationToken).ConfigureAwait(false);
+        return AIUsage.FromCommandCode(usage);
+    }
+
+    public async Task<AIUsage> CheckCommandCodeAsync(CancellationToken cancellationToken = default)
+    {
+        var key = await _commandCodeKeys.ReadAsync(cancellationToken).ConfigureAwait(false)
+            ?? throw new CommandCodeException("authentication-required");
+        return AIUsage.FromCommandCode(await _commandCodeApi.FetchAsync(key, cancellationToken).ConfigureAwait(false));
+    }
+
+    public async Task DisconnectCommandCodeAsync(CancellationToken cancellationToken = default)
+    {
+        await _commandCodeKeys.ClearAsync(cancellationToken).ConfigureAwait(false);
+        var sources = new Dictionary<string, AISource>(_settings.Current.AISources)
+        {
+            ["commandcode"] = new(Mode: "api", Path: string.Empty, KeyFile: string.Empty,
+                AuthRevision: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
+        };
+        await _settings.SaveAsync(_settings.Current with { AISources = sources }, cancellationToken).ConfigureAwait(false);
+    }
+
     public bool AnyWorking() => _settings.Current.VisibleProviders.Where(id=>id!="codex" && !_settings.Current.RemovedProviders.Contains(id))
         .Any(id=>State(id).Usage?.IsWorking(DateTimeOffset.UtcNow)==true);
     public void Dispose()
@@ -114,6 +203,7 @@ public sealed class AIProviderService : IDisposable
         if (_disposed) return; _disposed=true;
         _settings.Changed-=SettingsChanged; _stop.Cancel();
         foreach (var watcher in _watchers) watcher.Dispose(); _watchers.Clear();
+        if (_ownsCommandCodeApi) _commandCodeApi.Dispose();
         _http.Dispose(); GC.SuppressFinalize(this);
     }
 }

@@ -7,7 +7,7 @@ public sealed class AIUsageTests
     private static AIUsage Parse(string json,string id="claude")
     { using var doc=JsonDocument.Parse(json);return AIUsageNormalizer.Normalize(doc.RootElement,id,DateTimeOffset.FromUnixTimeSeconds(1000)); }
     [Fact] public void QuotaChangesDoNotMeanWork()
-    { var usage=Parse("""{"weekly":{"usedPercent":85}}""");Assert.Equal(85,usage.Windows[0].UsedPercent);Assert.False(usage.IsWorking(DateTimeOffset.FromUnixTimeSeconds(1000))); }
+    { var usage=Parse("""{"weekly":{"usedPercent":85}}""");Assert.Equal(85d,usage.Windows[0].UsedPercent);Assert.False(usage.IsWorking(DateTimeOffset.FromUnixTimeSeconds(1000))); }
     [Fact] public void ExpiredWindowsAreNotNewAllowance()
     { Assert.Throws<JsonException>(()=>Parse("""{"weekly":{"usedPercent":85,"resetsAt":999}}""")); }
     [Fact] public void ExplicitActivityExpires()

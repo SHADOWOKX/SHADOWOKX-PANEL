@@ -1,3 +1,5 @@
+using ShadowokxPanel.Core.Presentation.Taskbar;
+
 namespace ShadowokxPanel.Core.Settings;
 
 public enum ThemePreset
@@ -53,6 +55,10 @@ public sealed record AppSettings
     public LayoutDensity Density { get; init; } = LayoutDensity.Comfortable;
     public bool Animations { get; init; } = true;
     public string Companion { get; init; } = "octopus";
+    // Taskbar companion. Auto uses integrated only when a reserved slot is genuinely
+    // supported; otherwise it uses the overlay.
+    public bool TaskbarWidgetEnabled { get; init; } = true;
+    public TaskbarWidgetMode TaskbarWidgetMode { get; init; } = TaskbarWidgetMode.Auto;
     public bool ShowCostEstimate { get; init; } = true;
     public string EstimateModel { get; init; } = "gpt-5.6-sol";
     // Explicit initial reference: 100% uncached input at standard context rates.

@@ -1,5 +1,6 @@
 using ShadowokxPanel.Core.Storage;
 using ShadowokxPanel.Core.Codex;
+using ShadowokxPanel.Core.Presentation.Taskbar;
 
 namespace ShadowokxPanel.Core.Settings;
 
@@ -53,7 +54,7 @@ public sealed class SettingsStore
             VisibleProviders = (settings.VisibleProviders ?? ["codex"]).Where(AI.AICatalog.Contains).Distinct().ToArray(),
             RemovedProviders = (settings.RemovedProviders ?? []).Where(AI.AICatalog.Contains).Distinct().ToArray(),
             AISources = (settings.AISources ?? []).Where(pair => AI.AICatalog.Contains(pair.Key) && pair.Value is not null)
-                .ToDictionary(pair => pair.Key, pair => pair.Value with { Path = pair.Value.Path ?? string.Empty, KeyFile = pair.Value.KeyFile ?? string.Empty }),
+                .ToDictionary(pair => pair.Key, pair => pair.Value with { Path = pair.Value.Path ?? string.Empty, KeyFile = pair.Value.KeyFile ?? string.Empty, Mode = pair.Value.Mode ?? string.Empty }),
             SelectedProvider = AI.AICatalog.Contains(settings.SelectedProvider) ? settings.SelectedProvider : "codex",
             CodexExecutablePath = (settings.CodexExecutablePath ?? string.Empty).Trim(),
             EstimateModel = ApiPriceCatalog.Find(settings.EstimateModel)?.Model ?? "gpt-5.6-sol",
@@ -64,6 +65,7 @@ public sealed class SettingsStore
             Theme = Enum.IsDefined(settings.Theme) ? settings.Theme : ThemePreset.System,
             Accent = accentPreset,
             Density = Enum.IsDefined(settings.Density) ? settings.Density : LayoutDensity.Comfortable,
+            TaskbarWidgetMode = Enum.IsDefined(settings.TaskbarWidgetMode) ? settings.TaskbarWidgetMode : TaskbarWidgetMode.Auto,
             CustomAccent = accent.ToLowerInvariant(),
             WeatherLocation = NormalizeLocation(settings.WeatherLocation),
             TemperatureUnit = settings.TemperatureUnit == "fahrenheit" ? "fahrenheit" : "celsius",

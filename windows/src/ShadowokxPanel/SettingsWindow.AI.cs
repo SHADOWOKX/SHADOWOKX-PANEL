@@ -1,6 +1,8 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using ShadowokxPanel.Core.AI;
+using ShadowokxPanel.Core.Presentation;
+using System.Net.Http;
 using System.Text.Json.Nodes;
 using Windows.Storage.Pickers;
 namespace ShadowokxPanel;
@@ -14,6 +16,9 @@ public sealed partial class SettingsWindow
             var row=new StackPanel { Spacing=6 };
             var removed=_host.Settings.Current.RemovedProviders.Contains(id);
             row.Children.Add(new TextBlock { Text=name,FontWeight=Microsoft.UI.Text.FontWeights.SemiBold });
+            if (id == "commandcode")
+                row.Children.Add(new TextBlock { Text="Add your Command Code API key to read live account usage with direct read-only requests every 3 minutes. The key is validated, then stored only in Windows Credential Manager; it is never written to settings, JSON or logs. " + CommandCodeStatus.Limitation,
+                    TextWrapping=TextWrapping.Wrap,FontSize=12 });
             var visible=new CheckBox { Content="Show in panel",IsChecked=_host.Settings.Current.VisibleProviders.Contains(id) && !removed,IsEnabled=!removed };
             visible.Click+=async (_,_)=>
             {
@@ -24,15 +29,19 @@ public sealed partial class SettingsWindow
             var actions=new StackPanel { Orientation=Orientation.Horizontal,Spacing=5 };
             if (id!="codex" && !removed)
             {
+                if (id == "commandcode") AddCommandCodeActions(row, actions);
                 var choose=new Button { Content="Usage file" };choose.Click+=async (_,_)=>await ChooseSourceAsync(id,false);actions.Children.Add(choose);
                 if (id=="claude") { var connect=new Button { Content="Connect Claude" };connect.Click+=async (_,_)=>await ConnectClaudeAsync();actions.Children.Add(connect); }
                 if (id=="deepseek") { var connect=new Button { Content="API key" };connect.Click+=async (_,_)=>await ConnectDeepSeekAsync();actions.Children.Add(connect); }
-                var disconnect=new Button { Content="Disconnect" };disconnect.Click+=async (_,_)=>
+                if (id != "commandcode")
                 {
-                    var sources=new Dictionary<string,AISource>(_host.Settings.Current.AISources);
-                    sources[id]=new(Path.Combine(_host.Paths.Root,"disconnected",id+".json"));
-                    await SaveProviderAsync(_host.Settings.Current with { AISources=sources });
-                };actions.Children.Add(disconnect);
+                    var disconnect=new Button { Content="Disconnect" };disconnect.Click+=async (_,_)=>
+                    {
+                        var sources=new Dictionary<string,AISource>(_host.Settings.Current.AISources);
+                        sources[id]=new(Path.Combine(_host.Paths.Root,"disconnected",id+".json"));
+                        await SaveProviderAsync(_host.Settings.Current with { AISources=sources });
+                    };actions.Children.Add(disconnect);
+                }
             }
             var remove=new Button { Content=removed?"Add back":"Remove" };remove.Click+=async (_,_)=>
             {
@@ -44,6 +53,118 @@ public sealed partial class SettingsWindow
             ProviderSettings.Children.Add(row);
         }
     }
+
+    private void AddCommandCodeActions(StackPanel row, StackPanel actions)
+    {
+        var keyBox = new PasswordBox { Header = "Command Code API key", PlaceholderText = "Paste your key", MaxLength = 4096 };
+        row.Children.Add(keyBox);
+        var apply = new Button { Content = "Apply key" };
+        var check = new Button { Content = "Check connection" };
+        var forget = new Button { Content = "Forget key" };
+        void Busy(bool value) { apply.IsEnabled = check.IsEnabled = forget.IsEnabled = !value; keyBox.IsEnabled = !value; }
+        apply.Click += async (_, _) =>
+        {
+            var token = keyBox.Password.Trim();
+            keyBox.Password = string.Empty;
+            if (token.Length == 0)
+            {
+                ConnectionMessage.Text = "Enter your Command Code API key.";
+                return;
+            }
+            Busy(true);
+            ConnectionMessage.Text = "Verifying Command Code account usage…";
+            try
+            {
+                var usage = await _host.AI.ConnectCommandCodeAsync(token);
+                ConnectionMessage.Text = "Command Code connected securely. " + Describe(usage);
+            }
+            catch (Exception error) when (error is CommandCodeException or IOException or UnauthorizedAccessException or HttpRequestException or OperationCanceledException)
+            {
+                ConnectionMessage.Text = error.Message;
+            }
+            finally
+            {
+                token = string.Empty;
+                Busy(false);
+                RenderProviderSettings();
+            }
+        };
+        check.Click += async (_, _) =>
+        {
+            Busy(true);
+            try
+            {
+                var usage = await _host.AI.CheckCommandCodeAsync();
+                ConnectionMessage.Text = Describe(usage);
+                await _host.AI.RefreshAsync();
+            }
+            catch (Exception error) when (error is CommandCodeException or IOException or UnauthorizedAccessException or HttpRequestException or OperationCanceledException)
+            {
+                ConnectionMessage.Text = error.Message;
+            }
+            finally
+            {
+                Busy(false);
+            }
+        };
+        forget.Click += async (_, _) =>
+        {
+            Busy(true);
+            try
+            {
+                await _host.AI.DisconnectCommandCodeAsync();
+                ConnectionMessage.Text = "Command Code API key removed from Windows Credential Manager.";
+            }
+            catch (Exception error) when (error is CommandCodeException or IOException or UnauthorizedAccessException or OperationCanceledException)
+            {
+                ConnectionMessage.Text = error.Message;
+            }
+            finally
+            {
+                Busy(false);
+                RenderProviderSettings();
+            }
+        };
+        actions.Children.Add(apply);
+        actions.Children.Add(check);
+        actions.Children.Add(forget);
+
+        var checkLogin = new Button { Content = "Check login" };
+        checkLogin.Click += async (_, _) =>
+        {
+            checkLogin.IsEnabled = false;
+            ConnectionMessage.Text = CommandCodeStatus.Message(await CommandCodeStatus.ReadAsync());
+            checkLogin.IsEnabled = true;
+        };
+        row.Children.Add(checkLogin);
+        var openUsage = new Button { Content = "Open CommandCode Usage" };
+        openUsage.Click += async (_, _) =>
+        {
+            try
+            {
+                if (!await Windows.System.Launcher.LaunchUriAsync(CommandCodeReference.UsageUri))
+                    ConnectionMessage.Text = "Could not open usage. Check your default browser.";
+            }
+            catch (Exception error) when (error is System.Runtime.InteropServices.COMException or InvalidOperationException)
+            {
+                ConnectionMessage.Text = "Could not open usage. Check your default browser.";
+            }
+        };
+        row.Children.Add(openUsage);
+        var reference = CommandCodeReference.Goat;
+        row.Children.Add(new TextBlock { Text=$"{reference.Title}: {reference.Price}. {reference.Limits}. {reference.Note} {reference.Checked}.",
+            TextWrapping=TextWrapping.Wrap,FontSize=12 });
+    }
+
+    private static string Describe(AIUsage usage)
+    {
+        var window = usage.Windows.FirstOrDefault(w => w.Label == "Weekly allowance") ?? usage.Windows.FirstOrDefault();
+        var remaining = window is null ? null : AllowanceStatus.Remaining(window.UsedPercent);
+        return remaining is { } value
+            ? $"{usage.Plan ?? "Plan unavailable"} · {value:0}% weekly remaining."
+            : $"{usage.Plan ?? "Plan unavailable"} · Account usage received.";
+    }
+
     private async Task SaveProviderAsync(Core.Settings.AppSettings settings)
     {
         try { await _host.Settings.SaveAsync(settings);ConnectionMessage.Text="Saved. Usage updates appear automatically."; }
@@ -51,6 +172,9 @@ public sealed partial class SettingsWindow
     }
     private async Task SetSourceAsync(string id,AISource source)
     {
+        // Choosing a usage JSON file switches Command Code to its labeled advanced JSON
+        // mode; reconnecting the secure API switches it back without deleting the file.
+        if (id == "commandcode" && source.Path.Length > 0) source = source with { Mode = "json" };
         var settings=_host.Settings.Current;var sources=new Dictionary<string,AISource>(settings.AISources) { [id]=source };
         await SaveProviderAsync(settings with { AISources=sources,VisibleProviders=settings.VisibleProviders.Append(id).Distinct().ToArray(),RemovedProviders=settings.RemovedProviders.Where(p=>p!=id).ToArray() });
         RenderProviderSettings();await _host.AI.RefreshAsync();

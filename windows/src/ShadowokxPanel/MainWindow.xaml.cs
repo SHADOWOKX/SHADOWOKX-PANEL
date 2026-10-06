@@ -9,8 +9,10 @@ using ShadowokxPanel.Controls;
 using ShadowokxPanel.Core.History;
 using ShadowokxPanel.Core.Models;
 using ShadowokxPanel.Core.Presentation;
+using ShadowokxPanel.Core.Presentation.Taskbar;
 using ShadowokxPanel.Core.Settings;
 using ShadowokxPanel.Platform;
+using ShadowokxPanel.Platform.Taskbar;
 using ShadowokxPanel.Services;
 using ShadowokxPanel.ViewModels;
 using Windows.Graphics;
@@ -35,6 +37,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private string? _renderedForecastTimeZone;
     private bool _renderedForecastPrecipitation;
     private TrayIcon? _tray;
+    private TaskbarWidgetController? _taskbarWidget;
     private SettingsWindow? _settingsWindow;
     private bool _visible;
     private readonly CompanionAnimator _companion;
@@ -74,7 +77,7 @@ public sealed partial class MainWindow : Window, IDisposable
         }
         StartupDiagnostics.Write("MainWindow InitializeComponent successful");
         _companion = new CompanionAnimator(WeeklyCompanion);
-        _companion.ExternalWork = () => _host.AI.AnyWorking();
+        _companion.ExternalWork = () => _host.AI.AnyWorking() || _host.CommandCodeBusy;
         _companion.CodexEnabled = () => _host.Settings.Current.VisibleProviders.Contains("codex") && !_host.Settings.Current.RemovedProviders.Contains("codex");
         _host.AI.Changed += AIChanged;
 
@@ -136,6 +139,17 @@ public sealed partial class MainWindow : Window, IDisposable
                     _ = _host.ResumeAsync();
             },
             QueueDisplayChange);
+        try
+        {
+            _taskbarWidget = new TaskbarWidgetController(DispatcherQueue, TogglePanel,
+                _host.Settings.Current.TaskbarWidgetEnabled, _host.Settings.Current.TaskbarWidgetMode);
+        }
+        catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            // The taskbar companion is optional; the panel and tray remain fully usable.
+            StartupDiagnostics.WriteException("taskbar widget unavailable", error);
+            _taskbarWidget = null;
+        }
         UpdateTray();
     }
 
@@ -663,15 +677,23 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void UpdateTray()
     {
-        if (_tray is null)
-            return;
         var state = _viewModel.Codex;
+        var aiState = _host.AI.State(SelectedAI);
+        // Stale Command Code percentages are hidden from the top bar, matching Linux.
         double? remaining = SelectedAI == "codex" ? state.Weekly?.RemainingPercent ?? state.FiveHour?.RemainingPercent :
-            _host.AI.State(SelectedAI).Usage?.Windows.Where(w=>w.ResetsAt is null || w.ResetsAt>DateTimeOffset.UtcNow).Select(w=>(double?)(100-w.UsedPercent)).FirstOrDefault();
+            SelectedAI == "commandcode" && aiState.Stale ? null :
+            aiState.Usage?.Windows
+                .Where(w => (w.ResetsAt is null || w.ResetsAt > DateTimeOffset.UtcNow) && w.UsedPercent is not null)
+                .Select(w => (double?)(100 - w.UsedPercent!.Value)).FirstOrDefault();
+        // One canonical percentage feeds the tray icon and the taskbar companion.
+        var percent = AllowanceValue.Normalize(remaining);
+        UpdateTaskbarWidget(percent);
         _companion.VaryWork = _viewModel.Settings.VaryWorkAnimations;
         _companion.Configure(_viewModel.Settings.Companion,
             _visible && _viewModel.SelectedPage != "weather",
             _viewModel.Settings.Animations && _uiSettings.AnimationsEnabled);
+        if (_tray is null)
+            return;
         var pace = _viewModel.Settings.ShowCodexStateIndicator ? _viewModel.UsagePace : UsagePace.Unknown;
         var lines = new List<string> { "Shadowokx Panel" };
         lines.Add(remaining.HasValue
@@ -680,9 +702,18 @@ public sealed partial class MainWindow : Window, IDisposable
             : $"{AICatalogName()}: unavailable");
         if (_viewModel.Settings.ShowWeatherInTrayTooltip && _viewModel.Weather.Current is { } weather)
             lines.Add($"Weather: {Math.Round(weather.Temperature):0}° · {weather.Condition.Label}");
-        int? displayedPercent = remaining.HasValue
-            ? (int)Math.Round(remaining.Value, MidpointRounding.AwayFromZero) : null;
-        _tray.Update(string.Join('\n', lines), displayedPercent);
+        _tray.Update(string.Join('\n', lines), percent);
+    }
+
+    // The companion mirrors the exact value the panel shows; it never recalculates
+    // allowance and never inspects processes. Busy is task-only.
+    private void UpdateTaskbarWidget(int? percent)
+    {
+        if (_taskbarWidget is null)
+            return;
+        _taskbarWidget.ApplySettings(_viewModel.Settings.TaskbarWidgetEnabled, _viewModel.Settings.TaskbarWidgetMode);
+        _taskbarWidget.Update(TaskbarWidgetState.From(_host.CodexBusy, _host.CommandCodeBusy, percent,
+            SelectedAI, AICatalogName()));
     }
 
     private string AICatalogName() => Core.AI.AICatalog.Providers.GetValueOrDefault(SelectedAI) ?? "AI";
@@ -968,6 +999,8 @@ public sealed partial class MainWindow : Window, IDisposable
         _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
         _host.AI.Changed -= AIChanged;
         _companion.Dispose();
+        _taskbarWidget?.Dispose();
+        _taskbarWidget = null;
         _tray?.Dispose();
         _tray = null;
         _viewModel.Dispose();

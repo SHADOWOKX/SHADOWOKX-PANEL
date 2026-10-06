@@ -11,6 +11,12 @@ public sealed class AppHost : IAsyncDisposable
     private readonly object _disposeSync = new();
     private CodexProvider? _codex;
     private WeatherProvider? _weather;
+    private Core.AI.CommandCodeTaskMonitor? _commandCodeTasks;
+    private Core.AI.CommandCodeProcessMonitor? _commandCodeProcesses;
+    private readonly Core.Codex.CompanionActivityReader _codexActivity = new();
+    private CancellationTokenSource? _commandCodeStop;
+    private bool _commandCodeOpen;
+    private bool _codexBusy;
     private Task? _disposeTask;
     private bool _started;
     private bool _initialized;
@@ -28,6 +34,14 @@ public sealed class AppHost : IAsyncDisposable
     public ApplicationPaths Paths { get; }
     public SettingsStore Settings { get; }
     public bool ProvidersReady { get; private set; }
+    // Real in-flight Command Code turn (from the desktop app's own log). Drives the
+    // mascot. Application presence is tracked separately and never animates.
+    public bool CommandCodeBusy => _commandCodeTasks?.Current.Busy ?? false;
+    public bool CommandCodeOpen => _commandCodeOpen;
+    public string? CommandCodeLogPath => _commandCodeTasks?.LogPath;
+    // Always-on Codex task state so the taskbar companion can animate while the panel
+    // is closed. Reuses the existing CompanionActivityReader; it is not a new detector.
+    public bool CodexBusy => _codexBusy;
     public CodexProvider Codex => _codex ??
         throw new InvalidOperationException("The application host has not started.");
     public WeatherProvider Weather => _weather ??
@@ -79,6 +93,10 @@ public sealed class AppHost : IAsyncDisposable
                 throw new InvalidOperationException("The application host has not been initialized.");
             _started = true;
             AI.Start();
+            _commandCodeTasks = new Core.AI.CommandCodeTaskMonitor();
+            _commandCodeProcesses = new Core.AI.CommandCodeProcessMonitor();
+            _commandCodeStop = new CancellationTokenSource();
+            _ = ObserveCommandCodeAsync(_commandCodeStop.Token);
             try
             {
                 await Task.WhenAll(
@@ -120,6 +138,47 @@ public sealed class AppHost : IAsyncDisposable
         await Codex.ClearHistoryAsync(cancellationToken);
     }
 
+    // One observer for the whole session: application presence (evidence-based,
+    // never animates) plus the desktop app's own turn lifecycle (animates while a
+    // real command is running). The single timer is stopped in DisposeAsync.
+    private async Task ObserveCommandCodeAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var iteration = 0;
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                // Application presence changes slowly (3-second cadence, matching the
+                // Linux observer); the turn log is polled every second.
+                if (iteration % 3 == 0 && _commandCodeProcesses is not null)
+                {
+                    var presence = _commandCodeProcesses.Sample();
+                    _commandCodeOpen = presence.Open;
+                    _commandCodeTasks?.SetApplicationOpen(presence.Open);
+                }
+                // Codex task state for the taskbar companion (2-second cadence).
+                if (iteration % 2 == 0)
+                {
+                    try
+                    {
+                        var activity = await _codexActivity.ReadAsync().ConfigureAwait(false);
+                        _codexBusy = activity.Active;
+                    }
+                    catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                    {
+                        _codexBusy = false;
+                    }
+                }
+                if (_commandCodeTasks is not null)
+                    await _commandCodeTasks.RefreshAsync().ConfigureAwait(false);
+                iteration++;
+                await Task.Delay(TimeSpan.FromSeconds(Core.AI.CommandCodeTaskMonitor.PollSeconds), cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
     private void OnSettingsChanged(object? sender, AppSettings settings)
     {
         if (settings.CodexExecutablePath != _appliedSettings.CodexExecutablePath)
@@ -159,6 +218,10 @@ public sealed class AppHost : IAsyncDisposable
             if (_disposed)
                 return;
             _disposed = true;
+            _commandCodeStop?.Cancel();
+            _commandCodeTasks?.Dispose();
+            _commandCodeTasks = null;
+            _commandCodeProcesses = null;
             AI?.Dispose();
             if (_settingsSubscribed)
             {

@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using ShadowokxPanel.Core.Settings;
 using ShadowokxPanel.Core.Codex;
+using ShadowokxPanel.Core.Presentation.Taskbar;
 using ShadowokxPanel.Platform;
 using ShadowokxPanel.Services;
 using Windows.Graphics;
@@ -73,6 +74,8 @@ public sealed partial class SettingsWindow : Window
         DensityCombo.SelectedIndex = settings.Density == LayoutDensity.Compact ? 0 : 1;
         AnimationsToggle.IsOn = settings.Animations;
         VaryWorkToggle.IsOn = settings.VaryWorkAnimations;
+        TaskbarWidgetToggle.IsOn = settings.TaskbarWidgetEnabled;
+        TaskbarModeCombo.SelectedIndex = (int)settings.TaskbarWidgetMode;
         CompanionCombo.SelectedIndex = Array.IndexOf(Companions, settings.Companion);
         CodexExecutableBox.Text = settings.CodexExecutablePath;
         CostEstimateToggle.IsOn = settings.ShowCostEstimate;
@@ -142,6 +145,8 @@ public sealed partial class SettingsWindow : Window
             Density = DensityCombo.SelectedIndex == 0 ? LayoutDensity.Compact : LayoutDensity.Comfortable,
             Animations = AnimationsToggle.IsOn,
             VaryWorkAnimations = VaryWorkToggle.IsOn,
+            TaskbarWidgetEnabled = TaskbarWidgetToggle.IsOn,
+            TaskbarWidgetMode = (TaskbarWidgetMode)Math.Clamp(TaskbarModeCombo.SelectedIndex, 0, 2),
             Companion = Companions[Math.Clamp(CompanionCombo.SelectedIndex, 0, 3)],
             ShowLifetimeTokens = LifetimeToggle.IsOn,
             ShowTokenHistory = HistoryToggle.IsOn,
