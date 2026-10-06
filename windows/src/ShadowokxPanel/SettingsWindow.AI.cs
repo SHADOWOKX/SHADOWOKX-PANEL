@@ -158,7 +158,9 @@ public sealed partial class SettingsWindow
 
     private static string Describe(AIUsage usage)
     {
-        var window = usage.Windows.FirstOrDefault(w => w.Label == "Weekly allowance") ?? usage.Windows.FirstOrDefault();
+        var window = usage.Windows.FirstOrDefault(w => w.Label == "Weekly allowance");
+        if (window is null && usage.Windows.Count > 0)
+            window = usage.Windows[0];
         var remaining = window is null ? null : AllowanceStatus.Remaining(window.UsedPercent);
         return remaining is { } value
             ? $"{usage.Plan ?? "Plan unavailable"} · {value:0}% weekly remaining."

@@ -150,8 +150,8 @@ public sealed partial class MainWindow
         {
             var color = CapacityColor(remaining);
             var valueRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
-            var value = new TextBlock { Text = $"{remaining:0}%", FontSize = 34, FontWeight = Microsoft.UI.Text.FontWeights.Bold, Foreground = new SolidColorBrush(color) };
-            valueRow.Children.Add(value);
+            var weeklyValue = new TextBlock { Text = $"{remaining:0}%", FontSize = 34, FontWeight = Microsoft.UI.Text.FontWeights.Bold, Foreground = new SolidColorBrush(color) };
+            valueRow.Children.Add(weeklyValue);
             valueRow.Children.Add(new TextBlock { Text = "remaining", FontSize = 11, Foreground = ResourceBrush("SecondaryTextBrush"), VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 6) });
             if (weekly is { } window)
                 ToolTipService.SetToolTip(valueRow, $"{Amount(window.Used)} / {Amount(window.Cap)} credits consumed · {window.UsedPercent:0.##}% used");
@@ -237,7 +237,7 @@ public sealed partial class MainWindow
         AIContent.Children.Add(footer);
     }
 
-    private UIElement CommandCodeActions()
+    private StackPanel CommandCodeActions()
     {
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
         var open = new Button { Content = "Open CommandCode Usage" };
@@ -259,7 +259,7 @@ public sealed partial class MainWindow
         return actions;
     }
 
-    private Border StatusPill(AIState state, AIUsage data, double? percent)
+    private static Border StatusPill(AIState state, AIUsage data, double? percent)
     {
         var text = state.Stale ? "Stale" : data.Warnings.Count > 0 ? "Partial"
             : percent is null ? "Unavailable" : UsageAnalytics.CapacityLabel(percent);
@@ -274,7 +274,7 @@ public sealed partial class MainWindow
 
     // Text and fill derive from the same canonical remaining percentage, so the
     // visible fill always matches the displayed value.
-    private Grid ProgressMeter(double remaining, Windows.UI.Color color)
+    private static Grid ProgressMeter(double remaining, Windows.UI.Color color)
     {
         var track = new Grid { Height = 9, Background = ResourceBrush("TrackBrush"), CornerRadius = new CornerRadius(5), Margin = new Thickness(0, 2, 0, 2) };
         track.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(remaining, GridUnitType.Star) });
@@ -286,14 +286,14 @@ public sealed partial class MainWindow
         return track;
     }
 
-    private Border CardFrame(UIElement child, string background = "CardBrush") => new()
+    private static Border CardFrame(UIElement child, string background = "CardBrush") => new()
     {
         Child = child, Padding = new Thickness(16), CornerRadius = new CornerRadius(16),
         Background = ResourceBrush(background), BorderBrush = ResourceBrush("CardBorderBrush"),
         BorderThickness = new Thickness(1),
     };
 
-    private Grid StatRow(string title, string value, string? tooltip = null)
+    private static Grid StatRow(string title, string value, string? tooltip = null)
     {
         var row = new Grid();
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -306,7 +306,7 @@ public sealed partial class MainWindow
         return row;
     }
 
-    private Windows.UI.Color CapacityColor(double remaining)
+    private static Windows.UI.Color CapacityColor(double remaining)
     {
         var (red, green, blue) = UsageAnalytics.CapacityColor(remaining);
         return Windows.UI.Color.FromArgb(255, red, green, blue);
