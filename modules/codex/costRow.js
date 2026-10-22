@@ -47,16 +47,40 @@ export function costRow(accountUsage, localUsage, accountUsageStatus) {
     caption.add_child(accountStatusLabel);
     box._shadowAccountStatusLabel = accountStatusLabel;
     box.add_child(caption);
+    const estimates = new Map();
+    if (localUsage?.available && localUsage.today === todayDate) {
+        const weekStart = shiftDate(todayDate, -6);
+        const days = localUsage.days.filter(day => day.date >= weekStart && day.date <= todayDate);
+        const week = {cost: 0, tokens: 0, unknownTokens: 0, invalidRecords: 0};
+        for (const day of days) {
+            for (const field of ['cost', 'tokens', 'unknownTokens', 'invalidRecords'])
+                week[field] += day[field] ?? 0;
+        }
+        for (const [id, period] of [['today', days.find(day => day.date === todayDate)],
+            ['yesterday', days.find(day => day.date === yesterdayDate)], ['week', week]]) {
+            if (!period) continue;
+            const priced = period.tokens > period.unknownTokens || (period.tokens === 0 &&
+                !period.invalidRecords && !localUsage.failedFiles);
+            const partial = Boolean(period.unknownTokens || period.invalidRecords || localUsage.failedFiles);
+            estimates.set(id, {text: priced ? `≈${formatCost(period.cost)}${partial ? ' *' : ''}`
+                : period.unknownTokens > 0 ? 'Unpriced' : '—',
+                hint: partial ? 'Partial device estimate · some records are unpriced. Not an account bill.'
+                    : 'Device estimate · not an account bill. Account tokens and device costs have separate sources.'});
+        }
+    }
     const periods = [
         {
+            id: 'today',
             title: `Today · ${formatDate(todayDate)}`,
             tokens: todayTokens,
         },
         {
+            id: 'yesterday',
             title: `Yesterday · ${formatDate(yesterdayDate)}`,
             tokens: accountTokensForDate(accountUsage, yesterdayDate),
         },
         {
+            id: 'week',
             title: accountUsage?.dailyBuckets?.length
                 ? `Last 7 days · ${accountUsage.dailyBuckets.length} reported` : 'Last 7 days',
             tokens: accountUsage?.sevenDayTokens,
@@ -78,11 +102,18 @@ export function costRow(accountUsage, localUsage, accountUsageStatus) {
                 style_class: 'shadow-cost-amount',
             }));
         }
+        const estimate = estimates.get(period.id);
+        if (estimate) {
+            const price = new St.Label({text: estimate.text, style_class: 'shadow-cost-amount shadow-muted'});
+            attachTooltip(price, estimate.hint);
+            row.add_child(price);
+        }
         row.accessible_name = `${period.title}: ${Number.isSafeInteger(period.tokens)
             ? `${tokensFormatter.format(period.tokens)} account tokens`
             : period.title.startsWith('Today') && accountUsage
                 ? 'Codex account has not reported this date yet'
                 : 'account token total unavailable'}`;
+        if (estimate) row.accessible_name += ` · ${estimate.text} device estimate`;
         box.add_child(row);
     }
 
@@ -105,41 +136,6 @@ export function costRow(accountUsage, localUsage, accountUsageStatus) {
         box.add_child(note);
     }
 
-    if (!localUsage?.available || localUsage.today !== todayDate) {
-        box.accessible_name = 'Token totals reported by your Codex account. Missing dates are not estimated.';
-        return box;
-    }
-    const spend = new St.BoxLayout({style_class: 'shadow-spend-summary', x_expand: true});
-    const weekStart = shiftDate(todayDate, -6);
-    const localDays = localUsage.days.filter(day => day.date >= weekStart && day.date <= todayDate);
-    const today = localDays?.find(day => day.date === todayDate);
-    const periodsCost = [today, localDays ? {cost: localDays.reduce((sum, day) => sum + day.cost, 0),
-        tokens: localDays.reduce((sum, day) => sum + day.tokens, 0),
-        unknownTokens: localDays.reduce((sum, day) => sum + day.unknownTokens, 0),
-        invalidRecords: localDays.reduce((sum, day) => sum + (day.invalidRecords ?? 0), 0)} : null];
-    const amounts = periodsCost.map(period => period &&
-        (period.tokens > period.unknownTokens || (period.tokens === 0 &&
-            !period.invalidRecords && !localUsage.failedFiles)) ? period.cost : null);
-    const incomplete = periodsCost.map(period => Boolean(period && (
-        period.unknownTokens > 0 || period.invalidRecords > 0 || localUsage?.failedFiles > 0)));
-    for (const [index, title] of ['Today', '7 days'].entries()) {
-        const cell = new St.BoxLayout({vertical: true, x_expand: true,
-            style_class: 'shadow-spend-cell'});
-        cell.add_child(new St.Label({text: `${title} · device estimate`,
-            style_class: 'shadow-muted shadow-spend-caption'}));
-        const amount = new St.Label({text: Number.isFinite(amounts[index])
-            ? `≈${formatCost(amounts[index])}${incomplete[index] ? ' *' : ''}`
-            : periodsCost[index]?.unknownTokens > 0 ? 'Unpriced' : '—',
-            style_class: 'shadow-spend-value'});
-        if (Number.isFinite(amounts[index])) {
-            attachTooltip(amount, incomplete[index]
-                ? 'Partial device estimate · some records are unpriced.'
-                : 'Device estimate · not an account bill.');
-        }
-        cell.add_child(amount);
-        spend.add_child(cell);
-    }
-    box.add_child(spend);
-    box.accessible_name = 'Token totals reported by your Codex account. Missing dates are not estimated.';
+    box.accessible_name = 'Account token totals with separate device cost estimates. Missing dates are not estimated.';
     return box;
 }

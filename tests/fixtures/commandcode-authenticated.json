@@ -1,0 +1,14 @@
+{
+  "capturedAt": 1791023294018,
+  "whoami": {"success": true, "user": {"userName": "redacted-account"}, "org": null},
+  "credits": {
+    "credits": {"monthlyCredits": 68.6523194712, "purchasedCredits": 0, "freeCredits": 0},
+    "windowLimits": {
+      "limited": true, "exceeded": null,
+      "fiveHour": {"used": 0.002814784, "cap": 14, "exceeded": false, "resetAt": 1791039150962},
+      "weekly": {"used": 1.3476805288, "cap": 35, "exceeded": false, "resetAt": 1791549905361}
+    }
+  },
+  "subscription": {"success": true, "data": {"planId": "individual-goat", "status": "active", "currentPeriodStart": 1790943618000, "currentPeriodEnd": 1793622018000}},
+  "summary": {"totalCount": 304, "totalCredits": 1.3453037698, "totalMonthlyCredits": 1.3453037698, "totalPurchasedCredits": 0, "totalFreeCredits": 0, "periodBasis": "billing-period"}
+}

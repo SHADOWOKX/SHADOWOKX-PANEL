@@ -25,3 +25,10 @@ schemas/gschemas.compiled
 .vscode/
 *~
 .DS_Store
+
+# Python prototype/test bytecode
+__pycache__/
+*.py[cod]
+
+# Local command-code development notes
+/.commandcode/

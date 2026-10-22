@@ -212,7 +212,9 @@ export default class UiSmokeExtension extends Extension {
             usageStateSetting: indicator._settings.get_boolean('show-codex-usage-state'),
             usageStateKey: indicator._lastUsageState,
             usageStateVisible: indicator._codexPaceIcon.visible,
-            expectedTimerCount: (services?.weatherProvider ? 3 : 2) + (services?.aiProviders?.size ?? 0),
+            // +1 for the single Command Code task observer timer.
+            expectedTimerCount: (services?.weatherProvider ? 3 : 2) + (services?.aiProviders?.size ?? 0) +
+                (services?.aiProviders?.has?.('commandcode') ? 1 : 0) + 1,
         };
 
         const originalMascotSetting = indicator._settings.get_boolean('animated-mascot');
@@ -393,7 +395,7 @@ export default class UiSmokeExtension extends Extension {
                     const provider = services.codexProvider;
                     const originalState = provider.getState();
                     report.progressGeometry = [];
-                    for (const remainingPercent of [98, 100]) {
+                    for (const remainingPercent of [100, 98, 75, 57, 50, 17, 1, 0]) {
                         page._lastWeeklyPercent = null;
                         provider._setState({
                             ...originalState,
@@ -408,8 +410,53 @@ export default class UiSmokeExtension extends Extension {
                             remainingPercent,
                             ...progressAllocation(findStyle(page.actor, 'shadow-progress-track')),
                         });
+                        await captureScreenshot(GLib.getenv(`SHADOW_UI_CODEX_${remainingPercent}_SCREENSHOT`));
                     }
                     page._lastWeeklyPercent = null;
+                    provider._setState(originalState);
+                    await settle();
+                }
+                if (!report.animatedProgress) {
+                    const provider = services.codexProvider;
+                    const originalState = provider.getState();
+                    // A value change while the popup is open animates the fill;
+                    // it must still settle at the true remaining fraction.
+                    page._lastWeeklyPercent = 57;
+                    provider._setState({
+                        ...originalState,
+                        weekly: {...originalState.weekly, remainingPercent: 17, usedPercent: 83},
+                    });
+                    await settle(60);
+                    const mid = progressAllocation(findStyle(page.actor, 'shadow-progress-track'));
+                    await settle(500);
+                    const end = progressAllocation(findStyle(page.actor, 'shadow-progress-track'));
+                    report.animatedProgress = {
+                        remainingPercent: 17,
+                        midFillWidth: mid.fillWidth,
+                        fillWidth: end.fillWidth,
+                        usableWidth: end.usableWidth,
+                    };
+                    page._lastWeeklyPercent = null;
+                    provider._setState(originalState);
+                    await settle();
+                }
+                if (!report.codexProgressAfterSwitch) {
+                    const provider = services.codexProvider;
+                    const originalState = provider.getState();
+                    page._lastWeeklyPercent = null;
+                    provider._setState({
+                        ...originalState,
+                        weekly: {...originalState.weekly, remainingPercent: 17, usedPercent: 83},
+                    });
+                    await settle();
+                    page.actor.hide();
+                    await settle(120);
+                    page.actor.show();
+                    await settle(400);
+                    report.codexProgressAfterSwitch = {
+                        remainingPercent: 17,
+                        ...progressAllocation(findStyle(page.actor, 'shadow-progress-track')),
+                    };
                     provider._setState(originalState);
                     await settle();
                 }
@@ -434,6 +481,55 @@ export default class UiSmokeExtension extends Extension {
                     ellipsize: location?.clutter_text?.ellipsize ?? null,
                 };
             }
+        }
+        // Rendered fill must equal the displayed remaining percent in the real
+        // CommandCode native view too (weekly 15.22 / 35 => 57%).
+        if (!report.commandCodeProgressGeometry && services.aiProviders?.has('commandcode')) {
+            const provider = services.aiProviders.get('commandcode');
+            const page = indicator._pages.get('commandcode');
+            const original = provider.getState();
+            const used = 15.22;
+            const cap = 35;
+            const usedPercent = used / cap * 100;
+            indicator._select('commandcode');
+            await settle();
+            provider._setState({
+                status: 'ready', refreshing: false, error: null, retryAt: 0,
+                data: {
+                    source: 'commandcode-api', account: 'smoke', plan: 'GOAT', planStatus: 'active',
+                    windows: [
+                        {label: 'Weekly allowance', used, cap, usedPercent, exceeded: false,
+                            resetsAt: Date.now() + 86_400_000},
+                        {label: 'Five-hour allowance', used: 1, cap: 14, usedPercent: 1 / 14 * 100,
+                            exceeded: false, resetsAt: Date.now() + 3_600_000},
+                    ],
+                    creditBalances: [], balances: [], tokens: null, warnings: [],
+                    consumption: {
+                        usedCredits: 15.22, monthlyUsedCredits: 15.22, purchasedUsedCredits: 0,
+                        freeUsedCredits: 0, requests: 4, periodBasis: 'billing-period',
+                        periodStart: Date.now() - 86_400_000, periodEnd: Date.now() + 86_400_000,
+                    },
+                    updatedAt: Date.now(),
+                },
+            });
+            await settle();
+            report.commandCodeProgressGeometry = {
+                remainingPercent: Math.round(100 - usedPercent),
+                ...progressAllocation(findStyle(page.actor, 'shadow-progress-track')),
+            };
+            // Reproduce the reported glitch: after showing the page again (tab
+            // switch) the fill must still equal the remaining percentage.
+            page.actor.hide();
+            await settle(120);
+            page.actor.show();
+            await settle(400);
+            report.commandCodeProgressAfterSwitch = {
+                remainingPercent: Math.round(100 - usedPercent),
+                ...progressAllocation(findStyle(page.actor, 'shadow-progress-track')),
+            };
+            await captureScreenshot(GLib.getenv('SHADOW_UI_CC_SCREENSHOT'));
+            provider._setState(original);
+            await settle();
         }
         const codexPage = indicator._pages.get('codex');
         const codexAdjustment = codexPage?._scroll?.vadjustment ??
@@ -652,13 +748,52 @@ export default class UiSmokeExtension extends Extension {
         octopus.destroy();
         indicator._syncMascotActivity = originalSyncMascotActivity;
         indicator._syncMascotActivity();
+        // Command Code: the application being open is NOT activity. Only a real
+        // in-flight turn (from the app's own log) animates the mascot.
+        const commandCodeTasks = services.commandCodeTasks;
+        const logPath = `${GLib.getenv('XDG_CONFIG_HOME')}/Command Code/logs/main.log`;
+        GLib.mkdir_with_parents(`${GLib.getenv('XDG_CONFIG_HOME')}/Command Code/logs`, 0o700);
+        const setTurnLog = async (content, expectedBusy) => {
+            GLib.file_set_contents(logPath, content);
+            // Race with the observer's own one-second poll: retry a clean read.
+            for (let attempt = 0; attempt < 25; attempt++) {
+                await settle(90);
+                commandCodeTasks._offset = 0;
+                commandCodeTasks._pending = new Uint8Array(0);
+                await commandCodeTasks.refresh();
+                if (commandCodeTasks.getState().busy === expectedBusy)
+                    break;
+            }
+            indicator._syncMascotActivity();
+        };
+        const pad = (value, width = 2) => String(value).padStart(width, '0');
+        const now = new Date();
+        const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ` +
+            `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}.${pad(now.getMilliseconds(), 3)}`;
+        const running = `[${stamp}] [info]  [send] turn running ` +
+            '{"sessionId":"smoke","chars":1,"images":0}\n';
+        const resolved = `[${stamp}] [info]  [send] turn resolved ` +
+            '{"sessionId":"smoke","stopReason":"end_turn","pendingSteers":[]}\n';
+        indicator._applicationState = {openIds: ['commandcode'], focusedId: null};
+        await setTurnLog('', false);
+        report.commandCodeOpenIsIdle = indicator._mascot._codexActive === false;
+        await setTurnLog(running, true);
+        report.commandCodeTaskAnimates = indicator._mascot._codexActive === true &&
+            indicator._mascot._state === 'active';
+        await setTurnLog(running + resolved, false);
+        report.commandCodeTaskStops = indicator._mascot._codexActive === false;
+        indicator._applicationState = {openIds: [], focusedId: null};
+        indicator._syncMascotActivity();
+        await settle(40);
         report.aiPages = [];
         for (const [id, provider] of services.aiProviders ?? []) {
             indicator._select(id);
             await settle();
             const page = indicator._pages.get(id);
             report.aiPages.push({id, width: page.actor.width, height: page.actor.height,
-                ready: findStyles(page.actor, 'shadow-text-button').some(button => button.label === 'Open provider dashboard')});
+                ready: findStyles(page.actor, 'shadow-text-button').some(button =>
+                    button.label === 'Open provider dashboard' ||
+                    button.label === 'Open CommandCode Usage')});
         }
         const claudeProvider = services.aiProviders?.get('claude');
         if (claudeProvider) {

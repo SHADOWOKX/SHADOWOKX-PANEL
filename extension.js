@@ -5,6 +5,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {AIActivityMonitor} from './services/aiActivity.js';
+import {CommandCodeTaskMonitor} from './services/commandCodeTasks.js';
 import {AIProvider} from './modules/ai/provider.js';
 import {visibleModules} from './lib/moduleConfig.js';
 import {CodexProvider} from './modules/codex/provider.js';
@@ -170,10 +171,18 @@ export default class ShadowPanelExtension extends Extension {
                     const application = window.get_wm_class() || window.get_gtk_application_id() || '';
                     // Include terminal/browser titles for CLI and browser clients.
                     return {application: /terminal|console|chrome|firefox|chromium|brave|edge/i.test(application)
-                        ? window.get_title() : application, focused: window.has_focus()};
+                        ? window.get_title() : application, focused: window.has_focus(),
+                        visible: !window.minimized && window.showing_on_its_workspace()};
                 }));
             this._services.aiActivityMonitor = monitor;
             monitor.start();
+        }
+        // One Command Code task observer for the whole session (the app writes
+        // the in-flight turn lifecycle to its own log); cleaned up in disable().
+        if (!this._services.commandCodeTasks) {
+            const tasks = new CommandCodeTaskMonitor(this._scheduler);
+            this._services.commandCodeTasks = tasks;
+            tasks.start();
         }
         this._services.aiProviders ??= new Map();
         const visible = visibleModules(this._settings);

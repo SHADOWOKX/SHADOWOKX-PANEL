@@ -2,7 +2,7 @@
 
 A lightweight panel for checking **AI subscription usage** and **local weather**. Linux 3.0 adds provider logo tabs for Codex, Claude, OpenCode, Command Code, DeepSeek, GLM and Gemini; connection capabilities are detailed below. Windows remains on the Codex and Weather preview.
 
-Linux `3.1.2` · Windows `2.1 Preview 2`.
+Linux `3.1.3` · Windows `2.1 Preview 2`.
 
 - Provider logo buttons with settings to add, hide or remove panel connections
 - Weekly and 5-hour Codex limits
@@ -171,13 +171,13 @@ GPL-3.0-or-later. See [LICENSE](LICENSE).
 
 ## AI subscriptions · 3.0
 
-The top selector switches between Codex, Claude, OpenCode, Command Code, DeepSeek, GLM / Z.ai, Gemini and Weather. With several providers enabled it uses compact logo buttons with tooltips and arrow-key navigation. Settings → AI providers lets you hide a provider without losing its connection, remove its panel connection, and add it again. Removing a provider never cancels the subscription or deletes provider credentials. Connections refresh every minute and when their page opens. Settings changes appear after the popup closes.
+The top selector switches between Codex, Claude, OpenCode, Command Code, DeepSeek, GLM / Z.ai, Gemini and Weather. With several providers enabled it uses compact logo buttons with tooltips and arrow-key navigation. Settings → AI providers lets you hide a provider without losing its connection, remove its panel connection, and add it again. Removing a provider never cancels the subscription or deletes provider credentials. Connections refresh every minute and when their page opens; native Command Code uses a three-minute interval and avoids extra requests on popup opens. Settings changes appear after the popup closes.
 
 Codex continues to read the local app-server. Claude uses the official Claude Code status-line `rate_limits` fields. In Settings → AI providers → Claude, press **Connect**, restart Claude Code and send a prompt. Existing custom status lines are automatically chained, and a private `settings.shadow-panel-backup.json` preserves the original settings. The exporter stores only allowance fields, never conversation content. [Claude status-line documentation](https://code.claude.com/docs/en/statusline).
 
 For DeepSeek, select a private text file containing only your API key. Leave the usage JSON path empty to read the official `GET https://api.deepseek.com/user/balance` endpoint. This reports **API balance**, not an invented subscription percentage. The token is read only when needed and is never stored in GSettings or logged. [DeepSeek balance documentation](https://api-docs.deepseek.com/api/get-user-balance/).
 
-OpenCode, Command Code, GLM and Gemini currently use a **usage JSON export**. These buttons alone do not automatically retrieve account limits. Configure a source produced by your provider integration, or write it to `$XDG_CONFIG_HOME/shadow-panel/usage/<provider>.json` (default `~/.config/shadow-panel/usage/`). All non-Codex providers also accept a custom usage JSON file. The source must report real account allowance or balance, rather than context-window utilization:
+OpenCode, GLM and Gemini currently use a **usage JSON export**. Command Code now uses native read-only API tracking with a key in GNOME Secret Service; existing JSON sources remain an advanced compatibility option. OpenCode, GLM and Gemini need a real usage export. Configure a source produced by your provider integration, or write it to `$XDG_CONFIG_HOME/shadow-panel/usage/<provider>.json` (default `~/.config/shadow-panel/usage/`). All non-Codex providers also accept a custom usage JSON file. The source must report real account allowance or balance, rather than context-window utilization:
 
 ```json
 {
@@ -193,6 +193,8 @@ OpenCode, Command Code, GLM and Gemini currently use a **usage JSON export**. Th
 
 Optional values remain hidden when absent. Missing or malformed sources show a connection message; stale sources and failed refreshes are marked, and expired windows are discarded. Authentication files do not contain enough information to infer remaining allowances, so they are not treated as usage sources. Use **Open provider dashboard** to view billing directly.
 
+Command Code now displays **native live GOAT account usage** through direct asynchronous read-only requests. In Settings → AI providers → Command Code, enter your API key in the masked field and apply it; the key is validated and stored only in **GNOME Secret Service**. Usage refreshes every **3 minutes**, with manual refresh, last-success time, error/partial/stale indicators, window reset countdowns and reported monthly consumption/request totals. No CLI session or inference request is started. Published GOAT limits remain separate, and a monthly percentage stays Unavailable because the verified API does not return a monthly cap. Existing JSON sources, optional CLI login checks and the usage-page action are preserved. These user-authorized alpha endpoints are verified but undocumented and can change. See [data sources, secure setup and limitations](modules/ai/COMMANDCODE.md).
+
 Appearance includes Dracula, Catppuccin, Ocean and Rosé Pine, plus the existing ten surface presets, light/dark/system mode, thirteen accent colors and the custom color picker.
 
 ## Companion and quick connections · 3.1
@@ -201,7 +203,7 @@ Appearance includes Dracula, Catppuccin, Ocean and Rosé Pine, plus the existing
 
 Clawd uses a fixed 26px icon allocation in every state, with vector frames centered inside that allocation. Laptop frames use the same visible character width as standing frames, so the companion does not shrink while typing.
 
-In **Settings → AI providers**, use **Connect** for Claude, paste a DeepSeek key into its password entry and press the apply arrow, or use **Choose file…** for another provider's exported usage JSON. The file picker validates usage before connecting. Files are watched for changes, so updated exports appear immediately without waiting for the minute polling interval. Signing into the provider dashboard by itself does not make its subscription limits available: OpenCode, Command Code, GLM and Gemini still require a usage export.
+In **Settings → AI providers**, use **Connect** for Claude, paste a DeepSeek key into its password entry and press the apply arrow, or use **Choose file…** for another provider's exported usage JSON. The file picker validates usage before connecting. Files are watched for changes, so updated exports appear immediately without waiting for the minute polling interval. Signing into the provider dashboard by itself does not make its subscription limits available: OpenCode, GLM and Gemini still require a usage export. Command Code instead uses its separate secure API-key connection.
 
 ### Work-only animation · 3.1.2
 

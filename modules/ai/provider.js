@@ -4,6 +4,9 @@ import Soup from 'gi://Soup?version=3.0';
 import {Observable} from '../../services/observable.js';
 import {JsonStore} from '../../services/jsonStore.js';
 import {normalizeUsage, sourceConfig} from './normalize.js';
+import {CommandCodeApi, COMMANDCODE_API_INTERVAL} from './commandcodeApi.js';
+import {lookupCommandCodeKey} from './commandcodeCredentials.js';
+import {CommandCodeError} from '../../lib/commandcodeUsage.js';
 
 Gio._promisify(Soup.Session.prototype, 'send_async', 'send_finish');
 Gio._promisify(Gio.InputStream.prototype, 'read_bytes_async', 'read_bytes_finish');
@@ -17,7 +20,7 @@ function expandPath(path) {
 }
 
 export class AIProvider extends Observable {
-    constructor(id, settings, scheduler) {
+    constructor(id, settings, scheduler, {commandCodeApi = null, lookupKey = lookupCommandCodeKey} = {}) {
         super({status: 'loading', data: null, error: null});
         this.id = id;
         this._settings = settings;
@@ -29,10 +32,16 @@ export class AIProvider extends Observable {
         this._generation = 0;
         this._sourceMonitor = null;
         this._sourceRefreshId = 0;
+        this._lastAttempt = 0;
+        this._lastSuccessfulRefresh = null;
+        this._commandCodeApi = id === 'commandcode' ? commandCodeApi ?? new CommandCodeApi({session: this._session}) : null;
+        this._lookupCommandCodeKey = lookupKey;
         this._settingsId = settings.connect('changed::ai-sources', () => {
             this._generation++;
             this._cancellable.cancel();
             this._cancellable = new Gio.Cancellable();
+            this._lastAttempt = 0;
+            this._lastSuccessfulRefresh = null;
             this._setState({status: 'loading', data: null, error: null});
             this._watchSource();
             // Finish cancelling the previous source before reading the replacement.
@@ -42,7 +51,7 @@ export class AIProvider extends Observable {
 
     start() {
         this._watchSource();
-        this._scheduler.every(`ai-${this.id}`, 60, () => this.refresh());
+        this._scheduler.every(`ai-${this.id}`, this.id === 'commandcode' ? COMMANDCODE_API_INTERVAL : 60, () => this.refresh(this.id === 'commandcode'));
         return this.refresh();
     }
 
@@ -50,6 +59,7 @@ export class AIProvider extends Observable {
         this._sourceMonitor?.cancel();
         this._sourceMonitor = null;
         const config = sourceConfig(this._settings, this.id);
+        if (this.id === 'commandcode' && config.mode === 'api') return;
         const path = expandPath(config.path) || (this.id === 'deepseek' && config.keyFile
             ? expandPath(config.keyFile) : GLib.build_filenamev([
                 GLib.get_user_config_dir(), 'shadow-panel', 'usage', `${this.id}.json`,
@@ -75,35 +85,57 @@ export class AIProvider extends Observable {
         } catch { /* Minute polling remains available without file monitoring. */ }
     }
 
-    refresh() {
+    refresh(force = true) {
         if (this._destroyed)
             return Promise.resolve();
         if (this._inFlight)
             return this._inFlight;
+        if (this.id === 'commandcode' && !force && GLib.get_monotonic_time() / 1000 - this._lastAttempt < COMMANDCODE_API_INTERVAL * 1000)
+            return Promise.resolve();
+        if (this.id === 'commandcode' && force)
+            this._scheduler.every(`ai-${this.id}`, COMMANDCODE_API_INTERVAL, () => this.refresh());
+        this._lastAttempt = GLib.get_monotonic_time() / 1000;
         const generation = this._generation;
         const cancellable = this._cancellable;
         this._inFlight = this._read(cancellable).then(data => {
-            if (!this._destroyed && generation === this._generation)
-                this._setState({status: Date.now() - data.updatedAt > 300000 ? 'stale' : 'ready',
-                    data, error: null});
+            if (!this._destroyed && generation === this._generation) {
+                this._lastSuccessfulRefresh = data.updatedAt;
+                this._setState({status: Date.now() - data.updatedAt > 300000 ? 'stale' : data.warnings?.length ? 'partial' : 'ready',
+                    data, error: null, errorCode: null, retryAt: data.retryAt ?? 0,
+                    lastSuccessfulRefresh: this._lastSuccessfulRefresh, refreshing: false});
+            }
         }).catch(error => {
             if (this._destroyed || generation !== this._generation)
                 return;
             // Keep the last valid value clearly marked as stale during an outage.
             let data = this.getState().data;
+            if (this.id === 'commandcode' && ['authentication-required', 'authentication-failed',
+                'keyring-locked', 'keyring-unavailable'].includes(error.code)) data = null;
             if (data) {
                 data = {...data, windows: data.windows.filter(window =>
                     !window.resetsAt || window.resetsAt > Date.now())};
-                if (!data.windows.length && !data.balances.length && data.tokens === null)
+                if (!data.windows.length && !data.balances.length && !data.creditBalances?.length && data.tokens === null)
                     data = null;
             }
-            this._setState({status: data ? 'stale' : 'unavailable', data, error: error.message});
+            const safe = this.id === 'commandcode' && !(error instanceof CommandCodeError)
+                ? new CommandCodeError('api-changed') : error;
+            this._setState({status: data ? 'stale' : 'unavailable', data, error: safe.message,
+                errorCode: safe.code ?? null, retryAt: safe.retryAt ?? 0,
+                lastSuccessfulRefresh: this._lastSuccessfulRefresh, refreshing: false});
         }).finally(() => { this._inFlight = null; });
+        if (this.id === 'commandcode') this._setState({...this.getState(), refreshing: true});
         return this._inFlight;
     }
 
     async _read(cancellable) {
         const config = sourceConfig(this._settings, this.id);
+        if (this.id === 'commandcode' && (config.mode === 'api' || (!config.path && !Gio.File.new_for_path(GLib.build_filenamev([
+            GLib.get_user_config_dir(), 'shadow-panel', 'usage', 'commandcode.json',
+        ])).query_exists(null)))) {
+            const key = await this._lookupCommandCodeKey(cancellable);
+            if (!key) throw new CommandCodeError('authentication-required');
+            return this._commandCodeApi.fetch(key, cancellable);
+        }
         let raw;
         let reportedAt = Date.now();
         if (this.id === 'deepseek' && config.keyFile && !config.path) {
@@ -185,6 +217,7 @@ export class AIProvider extends Observable {
         this._sourceRefreshId = 0;
         this._cancellable.cancel();
         this._session.abort();
+        this._commandCodeApi?.destroy();
         this._scheduler.cancel(`ai-${this.id}`);
         this._settings.disconnect(this._settingsId);
         super.destroy();

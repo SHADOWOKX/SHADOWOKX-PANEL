@@ -246,7 +246,6 @@ export class ProgressMeter {
         const {value} = progressFillGeometry(percent, 0);
         this.actor = new St.Widget({
             style_class: 'shadow-progress-track',
-            layout_manager: new Clutter.FixedLayout(),
             x_expand: true,
             height: 9,
             clip_to_allocation: true,
@@ -258,7 +257,12 @@ export class ProgressMeter {
             height: 9,
             style: `background-color: ${accent};`,
         });
-        this.actor.add_child(this._fill);
+        // A plain Clutter.Actor holder keeps the fill's width out of the track's
+        // preferred-width calculation (a St.Widget child would feed its own
+        // width back into the track, shrinking the bar on show/hide).
+        this._holder = new Clutter.Actor({width: 0, height: 9});
+        this._holder.add_child(this._fill);
+        this.actor.add_child(this._holder);
         this._value = value;
         this._animate = animate;
         this._animated = false;
@@ -283,7 +287,8 @@ export class ProgressMeter {
         const bottom = Math.max(top, Math.min(height, Math.round(content.y2)));
         const geometry = progressFillGeometry(this._value, width, start, width - end);
         const fillHeight = Math.max(0, bottom - top);
-        this._fill.set_position(geometry.start, top);
+        this._holder.set_position(geometry.start, top);
+        this._fill.set_position(0, 0);
         this._fill.height = fillHeight;
         this._fill.remove_all_transitions();
         if (allowAnimation && this._animate && !this._animated && geometry.fillWidth > 0) {

@@ -365,6 +365,17 @@ function testProgressGeometry() {
         'progress values clamp only at the upper bound');
     equal(progressFillGeometry(98.5, 200).fillWidth, 197,
         'fractional progress retains proportional precision');
+    // One canonical normalisation: an integer 0..100 percent maps exactly once
+    // to a 0..1 fraction for the fill (57 => 57% of the track, not 0.57%).
+    for (const [percent, fraction] of [
+        [100, 1], [75, 0.75], [57, 0.57], [50, 0.5], [17, 0.17], [1, 0.01], [0, 0],
+    ]) {
+        const track = 400;
+        equal(progressFillGeometry(percent, track).fillWidth, Math.round(track * fraction),
+            `${percent}% maps once to the ${fraction} track fraction`);
+    }
+    equal(progressFillGeometry(57, 400).fillWidth, 228,
+        'a 0..100 percent is never divided by 100 twice');
 }
 
 function testSchedulerLifecycle() {

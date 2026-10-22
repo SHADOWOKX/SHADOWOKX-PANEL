@@ -16,6 +16,7 @@ import {usageTaskActive} from '../modules/ai/normalize.js';
 import {chooseInitialModule, visibleModules} from '../lib/moduleConfig.js';
 import {
     codexRemainingSummary,
+    reportedAllowanceSummary,
     codexLimitColor,
     codexUsagePace,
     weatherSummaryTemperature,
@@ -74,6 +75,9 @@ class ShadowIndicator extends PanelMenu.Button {
         this._codexTaskActive = false;
         this._weatherState = null;
         this._applicationState = {openIds: [], focusedId: null};
+        this._mascotVisualState = 'idle';
+        this._commandCodeOpen = false;
+        this._commandCodeBusy = false;
         this._notificationSource = null;
         this._lastUsageState = null;
         this._visibleRefreshId = 0;
@@ -271,6 +275,14 @@ class ShadowIndicator extends PanelMenu.Button {
             this._syncMascotActivity();
             this._syncIndicator();
         }));
+        // Command Code real-task state drives the mascot; subscribe so a BUSY
+        // transition shows up within the observer's one-second poll.
+        if (services.commandCodeTasks) {
+            this._subscriptions.push(services.commandCodeTasks.subscribe(() => {
+                if (!this._destroyed)
+                    this._syncMascotActivity();
+            }));
+        }
         for (const provider of services.aiProviders.values()) {
             this._subscriptions.push(provider.subscribe(() => {
                 this._syncMascotActivity();
@@ -429,12 +441,50 @@ class ShadowIndicator extends PanelMenu.Button {
             this._settings.set_string('last-selected-tab', id);
     }
 
+    // Single owner of the top-bar mascot's state. IDLE / ACTIVE / BUSY.
+    // MascotController itself refuses overlapping loops, so at most one
+    // animation sequence can ever run for the persistent icon.
+    _setMascotVisualState(state) {
+        const next = state === 'busy' ? 'busy' : state === 'active' ? 'active' : 'idle';
+        if (next === this._mascotVisualState)
+            return;
+        const previous = this._mascotVisualState;
+        this._mascotVisualState = next;
+        console.warn(`[CommandCode] mascot: ${previous} -> ${next}`);
+        this._mascot?.setState(next);
+    }
+
     _syncMascotActivity() {
         const services = this._extension.getRuntimeServices();
-        const reported = [...(services.aiProviders?.values() ?? [])].some(provider =>
-            usageTaskActive(provider.getState()?.data));
-        const active = (this._moduleIds.includes('codex') && this._codexTaskActive) || reported;
-        this._mascot?.setState(active ? 'active' : 'idle');
+        const providers = services.aiProviders ?? new Map();
+        // Application presence only (visible window / desktop main process /
+        // CLI). The app being open is NOT activity and never animates.
+        const open = this._applicationState?.openIds?.includes('commandcode') ?? false;
+        if (open !== this._commandCodeOpen) {
+            console.warn(`[CommandCode] application: ${this._commandCodeOpen ? 'open -> closed' : 'closed -> open'}`);
+            this._commandCodeOpen = open;
+        }
+        // Real in-flight task, from the app's own turn lifecycle log.
+        services.commandCodeTasks?.setApplicationOpen(open);
+        const task = services.commandCodeTasks?.getState() ?? {busy: false, source: null};
+        if (task.busy !== this._commandCodeBusy) {
+            this._commandCodeBusy = task.busy;
+            if (task.busy) {
+                console.warn('[CommandCode] task: idle -> busy');
+                console.warn(`[CommandCode] busy source: ${task.source}`);
+            } else {
+                console.warn('[CommandCode] task: busy -> idle');
+                console.warn('[CommandCode] task completed');
+            }
+        }
+
+        // Other providers keep their existing reported-activity behavior; usage
+        // data is never used for Command Code.
+        const reported = [...providers.entries()].some(([id, provider]) =>
+            id !== 'commandcode' && usageTaskActive(provider.getState()?.data));
+        const animating = (this._moduleIds.includes('codex') && this._codexTaskActive) ||
+            reported || task.busy;
+        this._setMascotVisualState(animating ? 'active' : 'idle');
     }
 
     _activeSubscriptionSummary() {
@@ -445,9 +495,8 @@ class ShadowIndicator extends PanelMenu.Button {
             window: this._codexState?.weekly ?? this._codexState?.fiveHour,
             percent: codexRemainingSummary(this._codexState)};
         const state = this._extension.getRuntimeServices().aiProviders?.get(id)?.getState();
-        const window = state?.data?.windows.find(value => /week/i.test(value.label)) ?? state?.data?.windows[0];
-        return {id, name: MODULE_META[id].name, window,
-            percent: window && (!window.resetsAt || window.resetsAt > Date.now()) ? Math.round(100 - window.usedPercent) : null};
+        const summary = reportedAllowanceSummary(id === 'commandcode' && state?.status === 'stale' ? null : state?.data);
+        return {id, name: MODULE_META[id].name, ...summary};
     }
 
     _syncIndicator() {

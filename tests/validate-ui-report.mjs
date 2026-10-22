@@ -68,17 +68,23 @@ const badTodayMetric = !report.todayMetric?.labels?.some(label => label.startsWi
             new Intl.NumberFormat('en-US').format(report.todayMetric.canonicalTokens))
         : !report.todayMetric.labels.includes('Pending') ||
           !report.todayMetric.accessibleName?.includes('not reported'));
-const badProgress = report.progressGeometry?.length !== 2 ||
-    report.progressGeometry.some(item => !Number.isFinite(item.usableWidth) ||
-        item.usableWidth <= 0 || !Number.isFinite(item.fillWidth)) ||
-    Math.abs(report.progressGeometry[0].fillWidth /
-        report.progressGeometry[0].usableWidth - 0.98) > 0.005 ||
-    report.progressGeometry[1].fillWidth !== report.progressGeometry[1].usableWidth;
+const progressRatios = [...(report.progressGeometry ?? []),
+    ...(report.commandCodeProgressGeometry ? [report.commandCodeProgressGeometry] : []),
+    ...(report.commandCodeProgressAfterSwitch ? [report.commandCodeProgressAfterSwitch] : []),
+    ...(report.codexProgressAfterSwitch ? [report.codexProgressAfterSwitch] : [])];
+const badProgress = progressRatios.length < 2 ||
+    progressRatios.some(item => !Number.isFinite(item.usableWidth) ||
+        item.usableWidth <= 0 || !Number.isFinite(item.fillWidth) ||
+        Math.abs(item.fillWidth / item.usableWidth - item.remainingPercent / 100) > 0.01);
+const animated = report.animatedProgress;
+const badAnimatedProgress = !animated || !Number.isFinite(animated.usableWidth) ||
+    animated.usableWidth <= 0 ||
+    Math.abs(animated.fillWidth / animated.usableWidth - animated.remainingPercent / 100) > 0.01;
 const badCostSummary = expect('SHADOW_UI_COST_SAMPLE') &&
     (!report.costSummary?.visible || report.costSummary.width <= 0);
 const badCodexPolish = badCostSummary || !report.codexFooter || report.codexFooter.width <= 300 ||
     badHeatmap ||
-    badTodayMetric || badProgress;
+    badTodayMetric || badProgress || badAnimatedProgress;
 const badPage = report.tabSwitches.length !== 4 || report.tabSwitches.some(item =>
     !item.hasExpectedContent || item.page.width <= 0 || item.page.height <= 0 ||
     item.stack.height <= 0 || item.childCount < 2);
@@ -93,7 +99,9 @@ const badCodexRefreshLifecycle = !report.popupRefreshDeferred ||
     report.timerCountWhileCodexVisible !== report.expectedTimerCount + 1 ||
     report.timerCountAfterFocusedClose !== report.expectedTimerCount;
 
-if (!report.octopusScenes || !report.octopusFixedSize || !report.octopusStopsWhenIdle || !report.mascotIdleDespiteVariety || !report.mascotApplicationStatic || report.aiPages?.length !== 6 || report.aiPages.some(page => !page.ready || page.width <= 0 || page.height <= 0) ||
+if (!report.octopusScenes || !report.octopusFixedSize || !report.octopusStopsWhenIdle || !report.mascotIdleDespiteVariety || !report.mascotApplicationStatic ||
+    !report.commandCodeOpenIsIdle || !report.commandCodeTaskAnimates || !report.commandCodeTaskStops ||
+    report.aiPages?.length !== 6 || report.aiPages.some(page => !page.ready || page.width <= 0 || page.height <= 0) ||
     !report.aiAllowanceRendered || !report.focusKeepsSelectedAllowance || !report.selectedProviderSummary || !report.reopened || !report.usageSettingUpdatedLive ||
     !report.unchangedCodexStateIgnored ||
     !report.hiddenPageTreesPreserved || !report.refreshTreesPreserved ||

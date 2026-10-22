@@ -20,12 +20,15 @@ fi
 glib-compile-schemas --strict --dry-run schemas
 gjs -m tests/validate-mascot.mjs "$shadow_project_dir"
 python3 tests/validate-clawd-layout.py
+python3 tests/commandcode-pty.py
 
 SHADOW_PANEL_TEST_ISOLATED=1 \
 XDG_DATA_HOME="$shadow_test_dir/data" \
 XDG_CACHE_HOME="$shadow_test_dir/cache" \
 gjs -m tests/run-tests.mjs
 SHADOW_PANEL_TEST_ISOLATED=1 XDG_CONFIG_HOME="$shadow_test_dir/config" gjs -m tests/ai-providers.mjs
+SHADOW_PANEL_TEST_ISOLATED=1 XDG_CONFIG_HOME="$shadow_test_dir/config" gjs -m tests/commandcode.mjs
+SHADOW_PANEL_TEST_ISOLATED=1 XDG_CONFIG_HOME="$shadow_test_dir/config" gjs -m tests/commandcode-api.mjs
 
 for shadow_scenario in authenticated unauthenticated missing existing-history; do
   shadow_case_dir="$shadow_test_dir/first-run-$shadow_scenario"

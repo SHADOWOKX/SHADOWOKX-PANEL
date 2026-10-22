@@ -3,6 +3,8 @@ import GLib from 'gi://GLib';
 import {AI_IDS} from '../../lib/constants.js';
 import {JsonStore} from '../../services/jsonStore.js';
 import {normalizeUsage, sourceConfig} from './normalize.js';
+import {CommandCodeApi} from './commandcodeApi.js';
+import {clearCommandCodeKey, storeCommandCodeKey} from './commandcodeCredentials.js';
 
 export function updateSource(settings, id, patch) {
     if (!AI_IDS.includes(id)) throw new Error('Unknown provider');
@@ -26,9 +28,25 @@ export async function connectUsageFile(settings, id, path) {
     const raw = await store.read(null);
     if (!raw) throw new Error('The selected file could not be read as JSON.');
     const usage = normalizeUsage(raw, id);
-    updateSource(settings, id, {path});
+    updateSource(settings, id, {path, ...(id === 'commandcode' ? {mode: 'json'} : {})});
     showProvider(settings, id);
     return usage;
+}
+
+export async function connectCommandCode(settings, key, cancellable = null) {
+    const api = new CommandCodeApi();
+    try {
+        const usage = await api.fetch(key, cancellable);
+        await storeCommandCodeKey(key, cancellable);
+        updateSource(settings, 'commandcode', {mode: 'api', path: '', keyFile: '', authRevision: Date.now()});
+        showProvider(settings, 'commandcode');
+        return usage;
+    } finally { api.destroy(); }
+}
+
+export async function disconnectCommandCode(settings, cancellable = null) {
+    await clearCommandCodeKey(cancellable);
+    updateSource(settings, 'commandcode', {mode: 'api', path: '', keyFile: '', authRevision: Date.now()});
 }
 
 export async function saveDeepseekKey(settings, token, directory = null) {

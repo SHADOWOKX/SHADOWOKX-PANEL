@@ -8,6 +8,9 @@ import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/ex
 
 import {ACCENTS, AI_IDS, APP_VERSION, MODULE_IDS, MODULE_META} from './lib/constants.js';
 import {connectClaude, connectUsageFile, saveDeepseekKey, updateSource} from './modules/ai/connections.js';
+import {commandCodeStatus, commandCodeMessage} from './modules/ai/commandcode.js';
+import {commandCodeSetupRows} from './modules/ai/commandcodeSetup.js';
+import {COMMANDCODE_USAGE_URL, GOAT_REFERENCE} from './lib/commandcodeReference.js';
 import {sourceConfig} from './modules/ai/normalize.js';
 import {isHexColor} from './lib/format.js';
 import {findCodexExecutable} from './modules/codex/discovery.js';
@@ -326,8 +329,40 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
                 group.add(connect);
             }
             if (id !== 'codex') {
+                if (id === 'commandcode') {
+                    for (const row of commandCodeSetupRows(settings, window, title => addToast(window, title)))
+                        group.add(row);
+                    const automatic = new Adw.ActionRow({title: 'CLI login detection',
+                        subtitle: 'Optional: verify your existing CLI login. Native live usage uses the API key saved above; CLI credentials are never extracted.'});
+                    const check = new Gtk.Button({label: 'Check login', valign: Gtk.Align.CENTER});
+                    const cancellation = new Gio.Cancellable();
+                    window.connect('close-request', () => { cancellation.cancel(); return false; });
+                    check.connect('clicked', async () => {
+                        check.sensitive = false;
+                        const status = await commandCodeStatus(cancellation);
+                        if (!cancellation.is_cancelled()) {
+                            automatic.subtitle = commandCodeMessage(status);
+                            check.sensitive = true;
+                        }
+                    });
+                    automatic.add_suffix(check);
+                    group.add(automatic);
+                    const usage = new Adw.ActionRow({title: 'View actual usage in Command Code',
+                        subtitle: 'Opens Studio Usage in your browser. CLI: start cmd, then /usage. Desktop: Settings → Usage.'});
+                    const openUsage = new Gtk.Button({label: 'Open CommandCode Usage', valign: Gtk.Align.CENTER});
+                    openUsage.connect('clicked', () => Gio.AppInfo.launch_default_for_uri_async(COMMANDCODE_USAGE_URL,
+                        null, null, (_source, result) => {
+                            try { Gio.AppInfo.launch_default_for_uri_finish(result); }
+                            catch { addToast(window, 'Could not open usage. Check your default browser.'); }
+                        }));
+                    usage.add_suffix(openUsage);
+                    group.add(usage);
+                    group.add(new Adw.ActionRow({title: GOAT_REFERENCE.title,
+                        subtitle: `${GOAT_REFERENCE.price}. ${GOAT_REFERENCE.limits}. ${GOAT_REFERENCE.note} ${GOAT_REFERENCE.checked}.`}));
+                }
                 const connection = new Adw.ActionRow({title: 'Connect usage source',
-                    subtitle: 'Choose your exported usage JSON. It is checked now and updates the panel automatically.'});
+                    subtitle: id === 'commandcode' ? 'Advanced: choose a trusted JSON source instead of the native API connection. Existing sources are preserved.'
+                        : 'Choose your exported usage JSON. It is checked now and updates the panel automatically.'});
                 const choose = new Gtk.Button({label: 'Choose file…', valign: Gtk.Align.CENTER});
                 choose.connect('clicked', () => {
                     const dialog = new Gtk.FileDialog({title: `Connect ${MODULE_META[id].name} usage`});
@@ -346,7 +381,8 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
                 group.add(connection);
                 const signIn = new Adw.ActionRow({title: 'Sign in to provider',
                     subtitle: id === 'gemini' ? 'Opens your provider dashboard; API quotas and consumer plan allowances are separate.'
-                        : 'Opens your provider account dashboard. Sign-in alone does not supply a usage export.'});
+                        : id === 'commandcode' ? 'Create or manage your API key in your Command Code account, then save it securely above.'
+                            : 'Opens your provider account dashboard. Sign-in alone does not supply a usage export.'});
                 const open = new Gtk.Button({label: 'Open account', valign: Gtk.Align.CENTER});
                 open.connect('clicked', () => Gio.AppInfo.launch_default_for_uri_async(MODULE_META[id].url,
                     null, null, (_source, result) => {
@@ -357,7 +393,8 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
                 group.add(signIn);
                 const source = new Adw.EntryRow({title: 'Usage JSON file (absolute path or ~/)',
                     text: sourceConfig(settings, id).path ?? ''});
-                source.connect('changed', () => updateSource(settings, id, {path: source.text.trim()}));
+                source.connect('changed', () => updateSource(settings, id, {path: source.text.trim(),
+                    ...(id === 'commandcode' ? {mode: source.text.trim() ? 'json' : 'api'} : {})}));
                 const sourceSignal = settings.connect('changed::ai-sources', () => {
                     const next = sourceConfig(settings, id).path ?? '';
                     if (source.text !== next) source.text = next;
@@ -529,7 +566,7 @@ export default class ShadowPanelPreferences extends ExtensionPreferences {
         }));
         about.add(new Adw.ActionRow({
             title: 'Privacy',
-            subtitle: 'No telemetry. Local usage files stay on your device. A configured DeepSeek key is sent only to api.deepseek.com; weather location goes to Open-Meteo.',
+            subtitle: 'No telemetry. Local usage files stay on your device. Command Code keys stay in GNOME Secret Service and are sent only to api.commandcode.ai. DeepSeek keys go only to api.deepseek.com; weather location goes to Open-Meteo.',
         }));
         const diagnostics = new Adw.ActionRow({
             title: 'Diagnostics',

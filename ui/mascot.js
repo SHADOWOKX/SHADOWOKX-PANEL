@@ -9,12 +9,15 @@ export const MASCOT_WAKE_MS = 330;
 export const MASCOT_SLEEP_TRANSITION_MS = 330;
 export const MASCOT_SLEEP_MIN_MS = 8000;
 export const MASCOT_SLEEP_MAX_MS = 15000;
+// A reported in-flight request speeds the same sequence up slightly.
+export const MASCOT_BUSY_CADENCE = 0.6;
 
 export const MascotState = Object.freeze({
     SLEEPING: 'sleeping',
     WAKING: 'waking',
     AWAKE: 'awake',
     ACTIVE: 'active',
+    BUSY: 'busy',
     GOING_TO_SLEEP: 'going-to-sleep',
 });
 
@@ -116,6 +119,7 @@ export class MascotController {
         this._destroyed = false;
         this._state = MascotState.SLEEPING;
         this._codexActive = false;
+        this._busy = false;
         this._appOpen = false;
         this._continuous = settings.get_boolean('mascot-continuous');
         this._continuousPhase = 0;
@@ -216,10 +220,18 @@ export class MascotController {
     }
 
     setState(state, {completed = false} = {}) {
-        const active = state === MascotState.ACTIVE;
-        if (this._codexActive === active)
+        const active = state === MascotState.ACTIVE || state === MascotState.BUSY;
+        const busy = state === MascotState.BUSY;
+        if (active && this._codexActive) {
+            // Already working: only the cadence changes, so the running
+            // sequence is never torn down or restarted.
+            this._busy = busy;
+            return;
+        }
+        if (!active && !this._codexActive)
             return;
         this._codexActive = active;
+        this._busy = busy;
         if (active) {
             this._continuousPhase = 0;
             this._clearPostCloseTimer();
@@ -324,7 +336,8 @@ export class MascotController {
             this._show(frame);
             this._activeId = GLib.timeout_add(
                 GLib.PRIORITY_DEFAULT,
-                Math.round(duration * ({codex: 0.90, penguin: 1.15}[this._character] ?? 1)),
+                Math.round(duration * ({codex: 0.90, penguin: 1.15}[this._character] ?? 1) *
+                    (this._busy ? MASCOT_BUSY_CADENCE : 1)),
                 () => {
                     this._activeId = 0;
                     advance();
